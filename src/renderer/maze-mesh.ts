@@ -29,12 +29,12 @@ export function mazeMesh(maze: Maze): THREE.Group {
   if (maze.roof) {
     const roof = new THREE.Mesh(
       new THREE.BoxGeometry(maze.width + WALL_THICKNESS, WALL_THICKNESS, maze.depth + WALL_THICKNESS),
-      material,
+      fabricMaterial(maze.wallColor, maze.translucentFabric, 'roof'),
     );
     roof.name = 'roof';
     roof.castShadow = true; roof.receiveShadow = true;
     roof.customDepthMaterial = mesh.customDepthMaterial;
-    // Lower surface sits exactly at the top of the walls and uses the same fabric.
+    // The roof scatters the source into a dotted spot while hiding the distant scene.
     roof.position.set(maze.width / 2, maze.wallHeight + WALL_THICKNESS / 2, maze.depth / 2);
     group.add(roof);
   }

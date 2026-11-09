@@ -49,7 +49,7 @@ test('woven fabric applies to walls and roof, retaining collisions and opaque ti
   expect(new CollisionWorld(walls(fabric)).blocked({ x: (panel.x1+panel.x2)/2, z: (panel.z1+panel.z2)/2 })).toBe(true);
   const roof = group.getObjectByName('roof') as Mesh;
   expect((roof.material as { transparent: boolean }).transparent).toBe(true);
-  expect(roof.material).toBe((group.children[0] as Mesh).material);
+  expect(roof.material).not.toBe((group.children[0] as Mesh).material);
   const timber = group.getObjectByName('timber-boards') as Mesh;
   expect((timber.material as { opacity: number }).opacity).toBe(1);
 });
