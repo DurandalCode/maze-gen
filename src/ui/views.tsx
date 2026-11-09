@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import type { HeatDisplay } from './coldspot-controls';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {trapOverlay} from './trap-overlay';
+import {routeTraps} from '../analysis/route-traps';
 import { walls, type Maze, type Portal } from '../core/maze';
 import { mazePortals, samePortal } from '../core/portals';
 import type { Environment } from '../core/environment';
@@ -9,10 +12,16 @@ import type { Recorder } from '../simulation/recorder';
 import type { WalkScene } from '../renderer/scene';
 import { MapView } from './map-view';
 
-export function MapCanvas({ maze, showRoute, recorder, onPlacePortal, onEnvironmentChange }: {
-  maze: Maze; showRoute: boolean; recorder: Recorder | null; onPlacePortal?: (portal: Portal | null) => void;
+export function MapCanvas({ maze, heat, showRoute, recorder, onPlacePortal, onEnvironmentChange }: {
+  maze: Maze; heat?: HeatDisplay|null; showRoute: boolean; recorder: Recorder | null; onPlacePortal?: (portal: Portal | null) => void;
   onEnvironmentChange?: (environment: Environment) => void;
 }) {
+  const [hover,setHover]=useState<{x:number;y:number;text:string}|null>(null);
+  const [trapState,setTrapState]=useState<{maze:Maze|null;show:boolean;selected:string}>({maze:null,show:false,selected:'all'});
+  const showTraps=trapState.maze===maze&&trapState.show,selected=trapState.maze===maze?trapState.selected:'all';
+  const trapAnalysis=useMemo(()=>showTraps?routeTraps(maze):null,[maze,showTraps]);
+  const allTraps=useMemo(()=>trapAnalysis?trapOverlay(maze,trapAnalysis):[],[maze,trapAnalysis]);
+  const visibleTraps=useMemo(()=>selected==='all'?allTraps:allTraps.filter(t=>String(t.fork)===selected),[allTraps,selected]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const view = useRef<MapView | null>(null);
   useEffect(() => {
@@ -30,8 +39,27 @@ export function MapCanvas({ maze, showRoute, recorder, onPlacePortal, onEnvironm
     if (!view.current) return;
     view.current.showRoute = showRoute; view.current.trajectory = recorder?.samples ?? []; view.current.draw();
   }, [maze, showRoute, recorder]);
+  useEffect(()=> {
+    if(view.current) {view.current.heat=heat??null;view.current.draw();}setHover(null);
+  },[maze,heat]);
+  useEffect(()=>{
+    if(view.current){view.current.traps=visibleTraps;view.current.draw();}setHover(null);
+  },[maze,visibleTraps]);
   return <>
-    <canvas ref={canvas} className={`map-canvas ${onPlacePortal ? 'placing-portal' : ''}`} aria-label="План лабиринта. Колесо — масштаб, перетаскивание — перемещение." />
+    <canvas ref={canvas} onPointerLeave={()=>setHover(null)} onPointerMove={event=>{
+      if(event.buttons || (!heat&&!showTraps)) {setHover(null);return;}
+      const rect=event.currentTarget.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
+      const text=view.current?.heatDetailsAt(x,y);
+      setHover(text?{x:Math.max(8,Math.min(rect.width-228,x+12)),y:Math.max(8,Math.min(rect.height-120,y+12)),text}:null);
+    }} className={`map-canvas ${onPlacePortal ? 'placing-portal' : ''}`} aria-label="План лабиринта. Колесо — масштаб, перетаскивание — перемещение." />
+    {heat && <div className="heat-legend" aria-label="Легенда горячести"><span className="heat-scale"/><span>{heat.layer==='probability'?'0–100% · посещение до финиша':'Реже → чаще · средние посещения'}{heat.coldOnly?' · только холодные':''}</span></div>}
+    <div className="trap-map-controls">
+      <label><input type="checkbox" aria-label="Ловушки на карте" checked={showTraps} onChange={e=>setTrapState({maze,show:e.target.checked,selected:'all'})}/> Ловушки на карте</label>
+      {showTraps&&<><span role="status">{!trapAnalysis?.supported?'Разметка доступна для деревьев проходов':allTraps.length?`Ловушек по критериям модели: ${allTraps.length}`:'Подходящих ловушек не найдено'}</span>
+      {allTraps.length>1&&<select aria-label="Выбрать ловушку" value={selected} onChange={e=>setTrapState({maze,show:true,selected:e.target.value})}><option value="all">Все ловушки</option>{allTraps.map(t=><option key={t.fork} value={t.fork}>{t.label}</option>)}</select>}</>}
+    </div>
+    {showTraps&&allTraps.length>0&&<div className={`trap-map-legend ${heat?'with-heat':''}`} aria-label="Легенда ловушек"><span><i className="trap-false"/> Ложный путь · × тупик</span><span><i className="trap-away"/> Правильный: от цели</span><span>Л1… · развилки</span></div>}
+    {hover && <div className="heat-tooltip" role="status" style={{left:hover.x,top:hover.y}}>{hover.text}</div>}
     <div className="map-tools" aria-label="Масштаб карты">
       <button title="Приблизить" aria-label="Приблизить" onClick={() => view.current?.zoomBy(1.25)}>+</button>
       <button title="Отдалить" aria-label="Отдалить" onClick={() => view.current?.zoomBy(0.8)}>−</button>
@@ -42,16 +70,17 @@ export function MapCanvas({ maze, showRoute, recorder, onPlacePortal, onEnvironm
   </>;
 }
 
-export interface WalkResult { recorder: Recorder; finished: boolean }
+export interface WalkResult { recorder: Recorder; finished: boolean; id?:string }
 
-export function WalkCanvas({ maze, onEnd, onError }: {
-  maze: Maze; onEnd: (result: WalkResult) => void; onError: (message: string) => void;
+export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
+  maze: Maze; onEnd: (result: WalkResult) => void; onError: (message: string) => void; onCheckpoint?: (result:WalkResult)=>void;
 }) {
   const portals = mazePortals(maze);
   const startNumber = portals.findIndex(p => samePortal(p, maze.entrance))+1;
   const finishNumber = portals.findIndex(p => samePortal(p, maze.exit))+1;
   const canvas = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<Player | null>(null);
+  const runId = useRef(crypto.randomUUID());
   const [locked, setLocked] = useState(false);
   const [stats, setStats] = useState({ distance: 0, elapsed: 0 });
   const [lockError, setLockError] = useState('');
@@ -90,7 +119,7 @@ export function WalkCanvas({ maze, onEnd, onError }: {
     document.addEventListener('keydown', keyDown); document.addEventListener('keyup', keyUp);
     document.addEventListener('mousemove', mouse); document.addEventListener('pointerlockchange', change);
     window.addEventListener('blur', clear);
-    let frame = 0, previous = performance.now(), lastStats = previous, stopped = false;
+    let frame = 0, previous = performance.now(), lastStats = previous, lastCheckpoint=previous, savedDistance=0, stopped = false;
     const loop = (now: number) => {
       if (stopped) return;
       const dt = (now-previous)/1000; previous = now;
@@ -98,12 +127,17 @@ export function WalkCanvas({ maze, onEnd, onError }: {
       if (document.pointerLockElement === element && !document.hidden && dt < 0.25) player.update(dt, keys);
       scene.render(player);
       if (now-lastStats > 100) { setStats({ distance: player.recorder.distance, elapsed: player.recorder.elapsed }); lastStats = now; }
-      if (player.finished) { document.exitPointerLock(); onEnd({ recorder: player.recorder, finished: true }); return; }
+      if(now-lastCheckpoint>10_000 && player.recorder.distance>savedDistance+.01) {
+        onCheckpoint?.({id:runId.current,recorder:player.recorder,finished:false});lastCheckpoint=now;savedDistance=player.recorder.distance;
+      }
+      if (player.finished) { document.exitPointerLock(); onEnd({ id:runId.current,recorder: player.recorder, finished: true }); return; }
       frame = requestAnimationFrame(loop);
     };
+    const checkpoint=()=>{if(player.recorder.distance>0)onCheckpoint?.({id:runId.current,recorder:player.recorder,finished:false});};
+    window.addEventListener('pagehide',checkpoint);
     frame = requestAnimationFrame(loop);
     cleanup = () => {
-      stopped = true; cancelAnimationFrame(frame);
+      stopped = true; cancelAnimationFrame(frame);window.removeEventListener('pagehide',checkpoint);
       if (document.pointerLockElement === element) document.exitPointerLock();
       document.removeEventListener('keydown', keyDown); document.removeEventListener('keyup', keyUp);
       document.removeEventListener('mousemove', mouse); document.removeEventListener('pointerlockchange', change);
@@ -111,12 +145,12 @@ export function WalkCanvas({ maze, onEnd, onError }: {
     };
     })();
     return () => { cancelled = true; cleanup(); };
-  }, [maze, onEnd, onError]);
+  }, [maze, onEnd, onError, onCheckpoint]);
   const stop = () => {
     const player = playerRef.current;
     if (!player) return;
     player.recorder.record(player.position, player.recorder.elapsed, true);
-    onEnd({ recorder: player.recorder, finished: false });
+    onEnd({ id:runId.current,recorder: player.recorder, finished: false });
   };
   return <div className="walk-view">
     <canvas ref={canvas} className="walk-canvas" aria-label="Лабиринт от первого лица" onClick={() => { if (!locked) void lock(); }} />

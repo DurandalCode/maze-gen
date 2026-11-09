@@ -1,7 +1,8 @@
+import { domainOf } from './domain';
 import { cellCenter, portalPoint, type Maze, type Point } from './maze';
 
 export function shortestPath(maze: Maze, from = maze.entrance.cell, to = maze.exit.cell): number[] {
-  if (!maze.passages[from] || !maze.passages[to]) return [];
+  if (!domainOf(maze).active[from] || !domainOf(maze).active[to]) return [];
   const parent = new Int32Array(maze.passages.length).fill(-1);
   const queue = [from]; parent[from] = from;
   for (let head = 0; head < queue.length; head++) {

@@ -1,9 +1,13 @@
-import { axisBounds, portalPoint, walls, type Maze, type Point, type Portal } from '../core/maze';
+import type { HeatDisplay } from './coldspot-controls';
+import { cellAtPoint } from '../analysis/navigation';
+import { domainOf } from '../core/domain';
+import { portalPoint, walls, type Maze, type Point, type Portal } from '../core/maze';
 import { mazePortals, portalAtPoint, samePortal } from '../core/portals';
 import { moduleFootprints } from '../core/structure';
 import { routePoints } from '../core/pathfinding';
 import { environmentOf, forestAtPoint, forestMapPoints, landmarkMapBounds, type Environment } from '../core/environment';
 import { solarMinuteForAzimuth, solarPosition } from '../core/solar';
+import {trapDetailsAt,type TrapOverlayEntry} from './trap-overlay';
 
 interface MapLayout { scale: number; left: number; top: number; centerX: number; centerY: number; radiusX: number; radiusY: number }
 
@@ -21,6 +25,8 @@ export class MapView {
   private frozenLayout: MapLayout | null = null;
   private observer: ResizeObserver;
   private events = new AbortController();
+  heat: HeatDisplay|null = null;
+  traps:readonly TrapOverlayEntry[]=[];
   showRoute = false;
   trajectory: readonly Point[] = [];
   onPlacePortal: ((portal: Portal | null) => void) | null = null;
@@ -93,6 +99,19 @@ export class MapView {
   zoomBy(factor: number): void { this.zoom = Math.max(0.35, Math.min(12, this.zoom*factor)); this.draw(); }
   dispose(): void { this.observer.disconnect(); this.events.abort(); }
 
+  heatDetailsAt(x:number,y:number):string|null {
+    const {left,top,scale}=this.layout(),cell=cellAtPoint(this.maze,{x:(x-left)/scale,z:(y-top)/scale});
+    if(cell===null) return null;
+    const trapText=trapDetailsAt(this.traps,cell);
+    if(!this.heat)return trapText.length?trapText.join(' · '):null;
+    const {analysis}=this.heat,p=analysis.probability[cell]!;
+    const region=p<analysis.options.threshold?analysis.regions.find(r=>r.cells.includes(cell)):undefined;
+    const fmt=(v:number)=>v.toLocaleString('ru-RU',{maximumFractionDigits:1});
+    const visibility=analysis.landmarks;
+    const cues=visibility?[visibility.sun[cell]!>=0.2?'солнце':'',visibility.forest[cell]!>=0.2?'лес':'',visibility.boundary[cell]!>=0.2?'внешняя граница':''].filter(Boolean):[];
+    const visibilityText=visibility?` · ${cues.length?cues.join(', '):'ориентиры скрыты'}`:'';
+    return [`Посещение: ${fmt(p*100)}% · в среднем ${fmt(analysis.visits[cell]!)} раз${region?` · колдспот ${fmt(region.area)} м²`:''}${visibilityText}`,...trapText].join(' · ');
+  }
   private layout(): MapLayout {
     if (this.frozenLayout) return this.frozenLayout;
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
@@ -140,28 +159,63 @@ export class MapView {
     ctx.font = '10px "Segoe UI", sans-serif';
     ctx.fillText(sunPosition.elevation < 0 ? 'СОЛНЦЕ ЗА ГОРИЗОНТОМ' : `СОЛНЦЕ · ${Math.round(sunPosition.elevation)}°`,
       Math.max(100, Math.min(w-100, handles.sun.x)), handles.sun.y+25);
-    ctx.fillStyle = '#1b211b'; ctx.fillRect(left, top, maze.width*s, maze.depth*s);
+    ctx.fillStyle = '#1b211b';
+    for (const cell of domainOf(maze).cells) { const r=domainOf(maze).rectangles[cell]!; ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s); }
     for (const m of moduleFootprints(maze)) {
       ctx.fillStyle = '#293023'; ctx.fillRect(px(m.x), py(m.z), m.size*s, m.size*s);
       ctx.strokeStyle = '#576044'; ctx.lineWidth = 1; ctx.strokeRect(px(m.x), py(m.z), m.size*s, m.size*s);
     }
+    if(this.heat) {
+      const {analysis,layer,coldOnly}=this.heat;
+      let maximum=1;
+      if(layer==='visits') for(const cell of domainOf(maze).cells) maximum=Math.max(maximum,analysis.visits[cell]!);
+      for(const cell of domainOf(maze).cells) {
+        const p=analysis.probability[cell]!;
+        if(coldOnly && p>=analysis.options.threshold) continue;
+        const value=layer==='probability'?p:analysis.visits[cell]!/maximum,r=domainOf(maze).rectangles[cell]!;
+        const red=Math.round(38+207*value),green=Math.round(97+39*value),blue=Math.round(150-100*value);
+        ctx.fillStyle=`rgb(${red} ${green} ${blue} / 82%)`;
+        ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);
+      }
+    }
     ctx.strokeStyle = '#293027'; ctx.lineWidth = 1;
     const cell = maze.parameters.corridorWidth;
     ctx.beginPath();
-    for (const x of axisBounds(maze, 'x')) { ctx.moveTo(px(x), top); ctx.lineTo(px(x), py(maze.depth)); }
-    for (const z of axisBounds(maze, 'z')) { ctx.moveTo(left, py(z)); ctx.lineTo(px(maze.width), py(z)); }
+    for(const cellIndex of domainOf(maze).cells) {
+      const r=domainOf(maze).rectangles[cellIndex]!;
+      ctx.rect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);
+    }
     ctx.stroke();
     const line = (points: readonly Point[], color: string, width: number) => {
       if (!points.length) return;
       ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.beginPath(); points.forEach((p, i) => i ? ctx.lineTo(px(p.x), py(p.z)) : ctx.moveTo(px(p.x), py(p.z))); ctx.stroke();
     };
+    for(const trap of this.traps){
+      for(const points of trap.falsePaths)line(points,'#ec8af144',Math.max(5,Math.min(16,cell*s*.5)));
+      line(trap.awayPath,'#63e5e944',Math.max(5,Math.min(16,cell*s*.5)));
+    }
     if (this.showRoute) line(routePoints(maze), '#d1ee86', Math.max(2, Math.min(5, cell*s*0.16)));
     line(this.trajectory, '#e2ab78', 3);
     ctx.strokeStyle = '#c4ccb7'; ctx.lineWidth = Math.max(1.3, Math.min(3, cell*s*0.065)); ctx.lineCap = 'square';
     ctx.beginPath();
     for (const wall of this.segments) { ctx.moveTo(px(wall.x1), py(wall.z1)); ctx.lineTo(px(wall.x2), py(wall.z2)); }
     ctx.stroke();
+    ctx.save();
+    const offset=Math.min(4,cell*s*.16),shifted=(points:readonly Point[],sign:number)=>points.map(p=>({x:p.x+sign*offset/s,z:p.z-sign*offset/s}));
+    for(const trap of this.traps){
+      ctx.setLineDash([5,4]);for(const points of trap.falsePaths)line(shifted(points,1),'#f39cf7',2);
+      ctx.setLineDash([2,4]);line(shifted(trap.awayPath,-1),'#65edf1',2);
+      ctx.setLineDash([]);
+      const end=shifted(trap.awayPath,-1),a=end.at(-2),b=end.at(-1);
+      if(a&&b){const angle=Math.atan2(b.z-a.z,b.x-a.x),x=px(b.x),y=py(b.z);ctx.strokeStyle='#65edf1';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x-7*Math.cos(angle-.5),y-7*Math.sin(angle-.5));ctx.lineTo(x,y);ctx.lineTo(x-7*Math.cos(angle+.5),y-7*Math.sin(angle+.5));ctx.stroke();}
+      ctx.strokeStyle='#f39cf7';ctx.lineWidth=2.5;
+      for(const p of trap.deadEnds){const x=px(p.x),y=py(p.z);ctx.beginPath();ctx.moveTo(x-4,y-4);ctx.lineTo(x+4,y+4);ctx.moveTo(x+4,y-4);ctx.lineTo(x-4,y+4);ctx.stroke();}
+      const x=px(trap.point.x),y=py(trap.point.z),radius=10;
+      ctx.fillStyle='#331938';ctx.strokeStyle='#f39cf7';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#fff0ff';ctx.font='600 9px "Segoe UI", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(trap.label,x,y);
+    }
+    ctx.restore();
     for (const [index, portal] of mazePortals(maze).entries()) {
       const start = samePortal(portal, maze.entrance), end = samePortal(portal, maze.exit);
       const label = `${index+1} · ${start ? 'СТАРТ' : end ? 'ФИНИШ' : 'ПРОЁМ'}`;

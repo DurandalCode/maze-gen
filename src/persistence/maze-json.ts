@@ -1,5 +1,7 @@
-import { DEFAULT_CONSTRUCTION, emptyMaze, neighbors, routingSize, validateConstruction, validateParameters, type Construction, type Maze, type Parameters, type Portal } from '../core/maze';
-import { samePortal, withPortals } from '../core/portals';
+import { domainOf } from '../core/domain';
+import { componentCount } from '../core/graph';
+import { DEFAULT_CONSTRUCTION, emptyMaze, neighbors, validateConstruction, validateParameters, type Construction, type Maze, type Parameters, type Portal } from '../core/maze';
+import { boundaryPortal, samePortal, withPortals } from '../core/portals';
 import { validateEnvironment, type Environment } from '../core/environment';
 
 const fail = (): never => { throw new Error('Некорректный файл Maze Lab: проверьте формат и топологию.'); };
@@ -11,15 +13,19 @@ const object = (value: unknown): Record<string, unknown> => {
 export function deserialize(json: string): Maze {
   if (json.length > 5_000_000) throw new Error('Файл слишком большой (максимум 5 МБ).');
   const data = object(JSON.parse(json) as unknown);
-  if (data.version !== 1 && data.version !== 2) throw new Error('Неподдерживаемая версия формата.');
+  if (data.version !== 1 && data.version !== 2 && data.version !== 3) throw new Error('Неподдерживаемая версия формата.');
   const raw = object(data.parameters);
   const p = {
+    ...(raw.design === undefined ? {} : {design:raw.design}),
+    ...(raw.routeTrapCount === undefined ? {} : {routeTrapCount:raw.routeTrapCount}),
+    ...(raw.shape === undefined ? {} : {shape: raw.shape}),
     columns: raw.columns, rows: raw.rows, corridorWidth: raw.corridorWidth,
     extraConnections: raw.extraConnections, seed: raw.seed, algorithm: raw.algorithm,
     ...(raw.moduleSize === undefined ? {} : { moduleSize: raw.moduleSize }),
   } as Parameters;
   validateParameters(p);
   if (data.version === 2 && p.moduleSize === undefined) fail();
+  if ((data.version === 3) !== (p.shape !== undefined)) fail();
   const maze = emptyMaze(p, data.version);
   if (data.width !== maze.width || data.depth !== maze.depth) fail();
   // v1 files written before construction settings lack color and roof fields.
@@ -56,22 +62,19 @@ export function deserialize(json: string): Maze {
   const portal = (value: unknown): Portal => {
     const v = object(value);
     if (typeof v.cell !== 'number' || !Number.isInteger(v.cell) || v.cell < 0 || v.cell >= maze.passages.length) return fail();
-    const { columns, rows } = routingSize(maze);
-    const x = v.cell % columns, y = Math.floor(v.cell / columns);
-    if (!(v.side === 'west' && x === 0 || v.side === 'east' && x === columns - 1 ||
-      v.side === 'north' && y === 0 || v.side === 'south' && y === rows - 1)) return fail();
+    if (!boundaryPortal(maze, {cell:v.cell, side:v.side as Portal['side']})) fail();
     return { cell: v.cell, side: v.side as Portal['side'] };
   };
   maze.entrance = portal(data.entrance);
   maze.exit = portal(data.exit);
   if (maze.entrance.cell === maze.exit.cell && maze.entrance.side === maze.exit.side) fail();
   if (data.portals !== undefined) {
-    const size = routingSize(maze);
-    if (!Array.isArray(data.portals) || data.portals.length < 2 || data.portals.length > 2*(size.columns+size.rows)) fail();
+    if (!Array.isArray(data.portals) || data.portals.length < 2 || data.portals.length > domainOf(maze).boundary.length) fail();
     const portals = (data.portals as unknown[]).map(portal);
     if (!portals.some(p => samePortal(p, maze.entrance)) || !portals.some(p => samePortal(p, maze.exit))) fail();
     Object.assign(maze, withPortals(maze, portals));
   }
+  if (data.version === 3 && componentCount(maze) !== 1) fail();
   return maze;
 }
 

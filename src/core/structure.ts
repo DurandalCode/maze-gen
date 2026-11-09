@@ -1,3 +1,4 @@
+import { domainOf } from './domain';
 import { walls, type Maze, type Point, type Wall } from './maze';
 
 export const BOARD_WIDTH = 0.12;
@@ -17,13 +18,13 @@ export function moduleFootprints(maze: Maze): ModuleFootprint[] {
   if (moduleSize === undefined) return [];
   const modules: ModuleFootprint[] = [];
   for (let z = 0; z < rows; z++) for (let x = 0; x < columns; x++)
-    modules.push({ x: (maze.version === 1 ? gap : 0)+x*(moduleSize+gap), z: (maze.version === 1 ? gap : 0)+z*(moduleSize+gap), size: moduleSize });
+    if (domainOf(maze).modules[z*columns+x]) modules.push({ x: (maze.version === 1 ? gap : 0)+x*(moduleSize+gap), z: (maze.version === 1 ? gap : 0)+z*(moduleSize+gap), size: moduleSize });
   return modules;
 }
 
 /** Each separate module owns four corner uprights and a closed top perimeter. */
 export function timberStructure(maze: Maze): TimberStructure {
-  const { columns, rows, corridorWidth: s } = maze.parameters;
+  const { corridorWidth: s } = maze.parameters;
   const posts: Point[] = [], frames: Wall[] = [];
   if (maze.parameters.moduleSize !== undefined) {
     const uniquePosts = new Map<string, Point>();
@@ -46,11 +47,18 @@ export function timberStructure(maze: Maze): TimberStructure {
       braceDrop: Math.min(0.42, maze.parameters.moduleSize*0.28, Math.max(0, maze.wallHeight-HEADER_DEPTH-1.88)) };
   }
   // Legacy files retain their continuous-grid layout.
-  for (let z = 0; z <= rows; z++) for (let x = 0; x <= columns; x++) {
-    posts.push({ x: x * s, z: z * s });
-    if (x < columns) frames.push({ x1: x*s, z1: z*s, x2: (x+1)*s, z2: z*s });
-    if (z < rows) frames.push({ x1: x*s, z1: z*s, x2: x*s, z2: (z+1)*s });
+  const domain = domainOf(maze), uniquePosts = new Map<string,Point>(), uniqueFrames = new Map<string,Wall>();
+  for (const cell of domain.cells) {
+    const r=domain.rectangles[cell]!;
+    const corners=[{x:r.x1,z:r.z1},{x:r.x2,z:r.z1},{x:r.x2,z:r.z2},{x:r.x1,z:r.z2}];
+    for(let i=0;i<4;i++) {
+      const a=corners[i]!,b=corners[(i+1)%4]!;
+      uniquePosts.set(`${a.x}:${a.z}`,a);
+      const endpoints=[`${a.x}:${a.z}`,`${b.x}:${b.z}`].sort();
+      uniqueFrames.set(endpoints.join('/'),{x1:Math.min(a.x,b.x),z1:Math.min(a.z,b.z),x2:Math.max(a.x,b.x),z2:Math.max(a.z,b.z)});
+    }
   }
+  posts.push(...uniquePosts.values()); frames.push(...uniqueFrames.values());
   return {
     posts, frames,
     // At the minimum wall height omit braces rather than putting them at eye level.

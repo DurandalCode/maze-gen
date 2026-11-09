@@ -1,10 +1,12 @@
+import { domainOf } from '../core/domain';
 import { connect, neighbors, type Maze } from '../core/maze';
 
 /** Iterative DFS avoids recursion overflow on 100 × 100 mazes. */
 export function backtracker(maze: Maze, rng: () => number): void {
   const visited = new Uint8Array(maze.passages.length);
-  const stack = [0];
-  visited[0] = 1;
+  const first = domainOf(maze).cells[0]!;
+  const stack = [first];
+  visited[first] = 1;
   while (stack.length) {
     const cell = stack[stack.length - 1]!;
     const choices = neighbors(maze, cell).filter(n => !visited[n]);

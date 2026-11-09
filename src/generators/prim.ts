@@ -1,3 +1,4 @@
+import { domainOf } from '../core/domain';
 import { connect, neighbors, type Maze } from '../core/maze';
 
 export function prim(maze: Maze, rng: () => number): void {
@@ -7,7 +8,7 @@ export function prim(maze: Maze, rng: () => number): void {
     visited[cell] = 1;
     for (const n of neighbors(maze, cell)) if (!visited[n]) frontier.push([cell, n]);
   };
-  visit(0);
+  visit(domainOf(maze).cells[0]!);
   while (frontier.length) {
     const i = Math.floor(rng() * frontier.length);
     const [from, to] = frontier[i]!;

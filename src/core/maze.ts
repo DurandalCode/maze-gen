@@ -1,7 +1,18 @@
+import { domainOf, validateShape, type GridShape } from './domain';
 import type { Environment } from './environment';
 
 export type Algorithm = 'backtracker' | 'prim';
+export interface DesignLimits {
+  maxForcedStraight:number; maxForcedRun:number; maxVisibleStraight:number;
+  maxColdRatio:number; maxColdRegion:number;
+  allowReshape:boolean; maxModuleGrowth:number;
+}
+export const DEFAULT_DESIGN_LIMITS:Readonly<DesignLimits>={maxForcedStraight:8,maxForcedRun:16,maxVisibleStraight:12,maxColdRatio:.12,maxColdRegion:16,allowReshape:false,maxModuleGrowth:.25};
 export interface Parameters {
+  design?:DesignLimits;
+  /** Requested minimum number of distinct directional-trap forks; absent means zero. */
+  routeTrapCount?: number;
+  shape?: GridShape;
   columns: number;
   rows: number;
   corridorWidth: number;
@@ -19,7 +30,7 @@ export interface Construction {
   roof: boolean;
 }
 export const DEFAULT_CONSTRUCTION: Readonly<Construction> = {
-  wallHeight: 2.5, wallColor: '#000000', translucentFabric: false, roof: false,
+  wallHeight: 2.5, wallColor: '#000000', translucentFabric: true, roof: false,
 };
 export function validateConstruction(value: Construction): void {
   if (!Number.isFinite(value.wallHeight) || value.wallHeight < 1.8 || value.wallHeight > 10)
@@ -30,7 +41,7 @@ export function validateConstruction(value: Construction): void {
   if (typeof value.roof !== 'boolean') throw new Error('Параметр крыши должен быть логическим значением.');
 }
 export interface Maze extends Construction {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   parameters: Parameters;
   width: number;
   depth: number;
@@ -47,6 +58,15 @@ export interface Wall { x1: number; z1: number; x2: number; z2: number; thicknes
 export const WALL_THICKNESS = 0.06;
 
 export function validateParameters(p: Parameters): void {
+  if(p.design!==undefined){
+    const d=p.design;
+    if(!d||typeof d!=='object'||typeof d.allowReshape!=='boolean')throw new Error('Некорректные ограничения качества.');
+    for(const [key,min,max] of [['maxForcedStraight',2,40],['maxForcedRun',2,100],['maxVisibleStraight',2,24],['maxColdRatio',0,1],['maxColdRegion',0,10000],['maxModuleGrowth',0,1]] as const)
+      if(!Number.isFinite(d[key])||d[key]<min||d[key]>max)throw new Error('Некорректные ограничения качества.');
+    if(p.extraConnections>0)throw new Error('Совместный подбор качества пока доступен без дополнительных соединений.');
+  }
+  if(p.routeTrapCount!==undefined&&(!Number.isInteger(p.routeTrapCount)||p.routeTrapCount<0||p.routeTrapCount>6))throw new Error('Число ловушек должно быть целым от 0 до 6.');
+  if((p.routeTrapCount??0)>0&&p.extraConnections>0)throw new Error('Ловушки на маршруте пока доступны без дополнительных соединений.');
   if (!Number.isInteger(p.columns) || !Number.isInteger(p.rows) || p.columns < 1 || p.rows < 1 || p.columns > 100 || p.rows > 100)
     throw new Error('Размер сетки должен быть целым числом от 1 до 100.');
   if (!Number.isFinite(p.corridorWidth) || p.corridorWidth < 0.8 || p.corridorWidth > 10)
@@ -57,15 +77,17 @@ export function validateParameters(p: Parameters): void {
     throw new Error('Число дополнительных соединений: от 0 до 20000.');
   if (typeof p.seed !== 'string' || p.seed.length > 256) throw new Error('Seed должен содержать до 256 символов.');
   if (p.algorithm !== 'backtracker' && p.algorithm !== 'prim') throw new Error('Неизвестный алгоритм.');
+  validateShape(p);
 }
 
-export function emptyMaze(parameters: Parameters, version: 1 | 2 = parameters.moduleSize === undefined ? 1 : 2): Maze {
+export function emptyMaze(parameters: Parameters, version: 1 | 2 | 3 = parameters.shape ? 3 : parameters.moduleSize === undefined ? 1 : 2): Maze {
   validateParameters(parameters);
-  const p = { ...parameters };
+  if ((version === 3) !== (parameters.shape !== undefined)) throw new Error('Версия формата не соответствует форме лабиринта.');
+  const p = structuredClone(parameters);
   const legacy = version === 1 && p.moduleSize !== undefined;
   const columns = p.moduleSize === undefined ? p.columns : p.columns * 2 + (legacy ? 1 : -1);
   const rows = p.moduleSize === undefined ? p.rows : p.rows * 2 + (legacy ? 1 : -1);
-  return {
+  const maze: Maze = {
     version, parameters: p,
     width: p.moduleSize === undefined ? p.columns * p.corridorWidth : p.columns * p.moduleSize + (p.columns+(legacy ? 1 : -1)) * p.corridorWidth,
     depth: p.moduleSize === undefined ? p.rows * p.corridorWidth : p.rows * p.moduleSize + (p.rows+(legacy ? 1 : -1)) * p.corridorWidth,
@@ -74,6 +96,12 @@ export function emptyMaze(parameters: Parameters, version: 1 | 2 = parameters.mo
     entrance: { cell: legacy ? columns : 0, side: 'west' },
     exit: { cell: legacy ? (rows-2)*columns+columns-1 : columns * rows - 1, side: 'east' },
   };
+  if (p.shape) {
+    const cells = domainOf(maze).cells;
+    maze.entrance = { cell: cells[0]!, side: 'west' };
+    maze.exit = { cell: cells[cells.length-1]!, side: 'east' };
+  }
+  return maze;
 }
 
 export function routingSize(maze: Maze): { columns: number; rows: number } {
@@ -102,13 +130,14 @@ export function cellSize(maze: Maze, cell: number): { width: number; depth: numb
 
 export function neighbors(maze: Maze, cell: number): number[] {
   const { columns, rows } = routingSize(maze);
+  if (!domainOf(maze).active[cell]) return [];
   const x = cell % columns, y = Math.floor(cell / columns);
   const result: number[] = [];
   if (x > 0) result.push(cell - 1);
   if (x < columns - 1) result.push(cell + 1);
   if (y > 0) result.push(cell - columns);
   if (y < rows - 1) result.push(cell + columns);
-  return result;
+  return result.filter(n => domainOf(maze).active[n]);
 }
 
 export function connect(maze: Maze, a: number, b: number): void {
@@ -140,21 +169,18 @@ export function portalPoint(maze: Maze, portal: Portal): Point {
   return center;
 }
 
-/** Unique wall segments, shared by map, mesh and collisions. Portals are real openings. */
+/** Unique segments shared by map, scene and collisions. */
 export function walls(maze: Maze): Wall[] {
-  const { columns: w, rows: h } = routingSize(maze);
-  const xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z');
-  const result: Wall[] = [];
-  const isPortal = (cell: number, side: Portal['side']) =>
-    (maze.portals ?? [maze.entrance, maze.exit]).some(p => p.cell === cell && p.side === side);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * w + x;
-    if (y === 0 && !isPortal(i, 'north')) result.push({ x1: xs[x]!, z1: 0, x2: xs[x+1]!, z2: 0 });
-    if (x === 0 && !isPortal(i, 'west')) result.push({ x1: 0, z1: zs[y]!, x2: 0, z2: zs[y+1]! });
-    if (x === w-1 ? !isPortal(i, 'east') : !maze.passages[i]!.includes(i+1))
-      result.push({ x1: xs[x+1]!, z1: zs[y]!, x2: xs[x+1]!, z2: zs[y+1]! });
-    if (y === h-1 ? !isPortal(i, 'south') : !maze.passages[i]!.includes(i+w))
-      result.push({ x1: xs[x]!, z1: zs[y+1]!, x2: xs[x+1]!, z2: zs[y+1]! });
+  const domain = domainOf(maze), result: Wall[] = [];
+  const columns = routingSize(maze).columns;
+  const isPortal = (p: Portal) => (maze.portals ?? [maze.entrance, maze.exit]).some(q => q.cell === p.cell && q.side === p.side);
+  for (const edge of domain.boundary) if (!isPortal(edge.portal)) result.push(edge.wall);
+  for (const a of domain.cells) for (const b of neighbors(maze, a)) {
+    if (b <= a || maze.passages[a]!.includes(b)) continue;
+    const rect = domain.rectangles[a]!;
+    result.push(Math.floor(a/columns) === Math.floor(b/columns)
+      ? { x1: rect.x2, z1: rect.z1, x2: rect.x2, z2: rect.z2 }
+      : { x1: rect.x1, z1: rect.z2, x2: rect.x2, z2: rect.z2 });
   }
   return result;
 }

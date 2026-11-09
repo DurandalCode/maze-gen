@@ -1,3 +1,4 @@
+import { domainOf } from '../core/domain';
 import { cellSize, portalPoint, type Maze, type Point } from '../core/maze';
 import { CollisionWorld } from './collisions';
 import { Recorder } from './recorder';
@@ -28,18 +29,19 @@ export class Player {
     const previousTime = this.recorder.elapsed;
     let step = 0;
     const totalSteps = Math.max(1, Math.ceil(Math.hypot(delta.x, delta.z) / 0.0625));
+    let previous = {...this.position};
     this.position = this.world.move(this.position, delta, 0.25, point => {
       step++;
       // Keep visitors on the site: leaving via the entrance cannot bypass the maze.
-      point.x = Math.max(0, Math.min(this.maze.width, point.x));
-      point.z = Math.max(0, Math.min(this.maze.depth, point.z));
+      const clipped = domainOf(this.maze).constrain(previous, point);
+      point.x=clipped.x; point.z=clipped.z; previous={...point};
       if (!this.finished) {
         this.recorder.record(point, previousTime + dt * step / totalSteps);
         this.position = point;
         if (this.atExit(point)) { this.finished = true; this.recorder.record(point, this.recorder.elapsed, true); }
       }
     });
-    this.position = { x: Math.max(0, Math.min(this.maze.width, this.position.x)), z: Math.max(0, Math.min(this.maze.depth, this.position.z)) };
+
     if (this.finished) {
       const end = this.recorder.samples[this.recorder.samples.length-1]!;
       this.position = { x: end.x, z: end.z };

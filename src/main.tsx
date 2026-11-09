@@ -1,7 +1,14 @@
-import { useCallback, useMemo, useState } from 'react';
+import { LibraryPanel } from './ui/library-panel';
+import { captureWalk,flushPendingWalks,saveLibraryMaze,prepareLibraryWalk } from './persistence/library';
+import { assessWalk } from './analysis/walk-assessment';
+import { ColdspotControls, type HeatDisplay } from './ui/coldspot-controls';
+import type { OptimizationResult } from './analysis/optimize';
+import { ShapeControls, ShapeEditor, shapeStatus, type ShapeTool } from './ui/shape-editor';
+import { domainOf } from './core/domain';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Algorithm, Parameters, Maze, Portal } from './core/maze';
-import { mazePortals, samePortal, transferPortals, withPortals } from './core/portals';
+import { mazePortals, samePortal, withPortals } from './core/portals';
 import { metrics } from './core/metrics';
 import { generate } from './generators/generate';
 import { loadMaze, saveMaze } from './persistence/files';
@@ -11,6 +18,7 @@ import { PortalControls, type PortalEdit } from './ui/portal-controls';
 import { EnvironmentControls } from './ui/environment-controls';
 import type { Environment } from './core/environment';
 import './style.css';
+import {DesignControls} from './ui/design-controls';
 
 const initial: Parameters = { columns: 5, rows: 5, corridorWidth: 2, moduleSize: 2, extraConnections: 0, seed: 'FIELD-024', algorithm: 'backtracker' };
 const number = (value: number, digits = 0) => value.toLocaleString('ru-RU', { maximumFractionDigits: digits });
@@ -20,9 +28,16 @@ function Logo() {
 }
 
 function App() {
+  const generationCancel=useRef<(()=>void)|null>(null);
+  const [libraryOpen,setLibraryOpen]=useState(false);
+  const [libraryRevision,setLibraryRevision]=useState(0);
+  const [shapeEditing, setShapeEditing] = useState(false);
+  const [shapeSelected, setShapeSelected] = useState<number|null>(null);
+  const [shapeTool, setShapeTool] = useState<ShapeTool>('select');
   const [maze, setMaze] = useState(() => generate(initial));
   const [draft, setDraft] = useState<Parameters>(initial);
   const [mode, setMode] = useState<'map' | 'walk'>('map');
+  const [heatDisplay,setHeatDisplay] = useState<HeatDisplay|null>(null);
   const [showRoute, setShowRoute] = useState(false);
   const [result, setResult] = useState<WalkResult | null>(null);
   const [message, setMessage] = useState('');
@@ -31,13 +46,26 @@ function App() {
   const [generationMs, setGenerationMs] = useState<number | null>(null);
   const [portalEdit, setPortalEdit] = useState<PortalEdit>(null);
   const analysis = useMemo(() => metrics(maze), [maze]);
+  const moduleCount=useMemo(()=>domainOf(maze).modules.reduce((sum,active)=>sum+active,0),[maze]);
+  const walkAssessment=useMemo(()=>result?assessWalk(maze,result.recorder.samples,result.recorder.distance,result.finished):null,[maze,result]);
+  useEffect(()=> {
+    void flushPendingWalks();const retry=()=>void flushPendingWalks();
+    window.addEventListener('online',retry);const timer=window.setInterval(retry,30_000);
+    return ()=>{window.removeEventListener('online',retry);window.clearInterval(timer);};
+  },[]);
+  const draftStatus = useMemo(() => shapeStatus(draft), [draft]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(maze.parameters);
-  const patch = <K extends keyof Parameters>(key: K, value: Parameters[K]) => setDraft(p => ({ ...p, [key]: value }));
+  const patch = <K extends keyof Parameters>(key: K, value: Parameters[K]) => {
+    if ((key==='columns' || key==='rows') && draft.shape && draft.shape.rectangles.some(r=>key==='columns'?r.x+r.width>(value as number):r.z+r.height>(value as number))) {
+      setError('Нельзя уменьшить сетку: прямоугольники выходят за новую границу. Сначала измените форму.');return;
+    }
+    setDraft(p => ({ ...p, [key]: value }));
+  };
   const resetNotice = () => { setError(''); setMessage(''); };
   const changePortals = (next: Maze) => { setMaze(next); setResult(null); resetNotice(); };
   const changeEnvironment = (environment: Environment) => { setMaze(current => ({ ...current, environment })); resetNotice(); };
   const placePortal = (portal: Portal | null) => {
-    if (!portal) { setError('Выберите место на внешнем периметре карты.'); return; }
+    if (!portal) { setError('Выберите место на границе области, включая внутренние отверстия.'); return; }
     const portals = [...mazePortals(maze)];
     if (portals.some((p, i) => i !== portalEdit && samePortal(p, portal))) {
       setError('Здесь уже есть вход-выход. Выберите другой участок.'); return;
@@ -52,21 +80,41 @@ function App() {
       exit: previous && samePortal(previous, maze.exit) ? portal : maze.exit };
     changePortals(withPortals(next, portals)); setPortalEdit(null);
   };
-  const regenerate = (blind = false) => {
+  const regenerate = async (blind = false) => {
     resetNotice();
+    setBusy(true);
     try {
       const start = performance.now();
-      const next = { ...transferPortals(maze, generate(draft)), wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof,
+      const generated=((draft.routeTrapCount??0)>0 || draft.design) ? await new Promise<Maze>((resolve,reject)=>{
+        const worker=new Worker(new URL('./generators/worker.ts',import.meta.url),{type:'module'});
+        generationCancel.current=()=>{worker.terminate();generationCancel.current=null;reject(new Error('Генерация отменена. Текущий лабиринт сохранён.'));};
+        worker.onmessage=e=>{if(e.data.progress){setMessage(e.data.progress);return;}worker.terminate();generationCancel.current=null;e.data.error?reject(new Error(e.data.error)):resolve(e.data.maze);};
+        worker.onerror=e=>{worker.terminate();generationCancel.current=null;reject(new Error(e.message||'Не удалось сгенерировать лабиринт.'));};
+        worker.postMessage({parameters:draft,previous:maze});
+      }):generate(draft,maze);
+      const next = { ...generated, wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof,
         ...(maze.environment ? { environment: maze.environment } : {}) }; setGenerationMs(performance.now()-start);
-      setMaze(next); setResult(null); setShowRoute(false); setPortalEdit(null);
-      if (blind) setMode('walk');
-      else setMessage('Лабиринт сгенерирован. Seed сохранён.');
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+      const oldPortals=mazePortals(maze),newPortals=mazePortals(next);
+      const moved=oldPortals.some((p,i)=>!newPortals[i] || !samePortal(p,newPortals[i]!));
+      const reshaped=draft.columns!==next.parameters.columns||draft.rows!==next.parameters.rows||JSON.stringify(draft.shape)!==JSON.stringify(next.parameters.shape);
+      setMaze(next); setDraft(current=>JSON.stringify(current)===JSON.stringify(draft)?structuredClone(next.parameters):current); setResult(null); setShowRoute(false); setPortalEdit(null);setShapeEditing(false);
+      if (blind) void beginWalk(next);
+      else setMessage(reshaped?`Подобрана другая форма: ${next.parameters.columns}×${next.parameters.rows}, ${domainOf(next).modules.reduce((a,b)=>a+b,0)} модулей.`:moved?'Лабиринт сгенерирован. Проёмы перенесены на ближайшие свободные участки границы.':'Лабиринт сгенерирован. Seed сохранён.');
+    } catch (e) { setMessage('');setError(e instanceof Error ? e.message : String(e)); }
+    finally {generationCancel.current=null;setBusy(false);}
   };
+  const persistRun=useCallback((value:WalkResult,status:'in-progress'|'stopped'|'finished')=>{
+    if(value.recorder.distance<=.01)return;
+    void captureWalk(maze,value.recorder,value.id??crypto.randomUUID(),value.finished,status).then(saved=>{
+      if(saved.saved){setLibraryRevision(n=>n+1);if(status!=='in-progress')setMessage('Маршрут сохранён в общей библиотеке.');}
+      else setMessage(saved.queued?'Сервер недоступен. Запись сохранена в браузере и будет отправлена повторно.':'Не удалось сохранить запись. Текущий маршрут остаётся на карте.');
+    });
+  },[maze]);
+  const onCheckpoint=useCallback((value:WalkResult)=>persistRun(value,'in-progress'),[persistRun]);
   const onEnd = useCallback((value: WalkResult) => {
-    setResult(value); setMode('map'); setShowRoute(true);
+    setResult(value); setMode('map'); setShowRoute(true);persistRun(value,value.finished?'finished':'stopped');
     setMessage(value.finished ? 'Выход найден! Твой маршрут записан.' : 'Прохождение остановлено. Записанная часть пути показана на карте.');
-  }, []);
+  }, [persistRun]);
   const onWalkError = useCallback((value: string) => { setError(value); setMode('map'); }, []);
   const save = async () => {
     resetNotice(); setBusy(true);
@@ -79,14 +127,38 @@ function App() {
     try {
       const next = await loadMaze();
       if (next) {
-        setMaze(next); setDraft({ ...next.parameters }); setResult(null); setShowRoute(false); setGenerationMs(null); setPortalEdit(null);
+        setShapeEditing(false);setShapeSelected(null);setMaze(next); setDraft(structuredClone(next.parameters)); setResult(null); setShowRoute(false); setGenerationMs(null); setPortalEdit(null);
         setMessage('Лабиринт загружен. Топология восстановлена из файла.');
       }
     } catch (e) { setError(`Не удалось загрузить: ${e instanceof Error ? e.message : String(e)}`); }
     finally { setBusy(false); }
   };
-  const parameterNumber = (label: string, key: 'columns' | 'rows' | 'corridorWidth' | 'moduleSize' | 'extraConnections', min: number, max: number, step = 1, unit?: string) =>
-    <label className="field"><span>{label}</span><div className="input-unit"><input aria-label={label} type="number" min={min} max={max} step={step} required value={Number.isNaN(draft[key]) ? '' : draft[key] ?? ''} onChange={e => patch(key, e.target.valueAsNumber)} />{unit && <em>{unit}</em>}</div></label>;
+  const acceptOptimized = (result: OptimizationResult) => {
+    setMaze(result.maze);setDraft(structuredClone(result.maze.parameters));setResult(null);setShowRoute(false);setPortalEdit(null);
+    setMessage('Лабиринт улучшен. Форма и проёмы сохранены. Сохраните результат в JSON.');
+  };
+  const openLibraryMaze=(next:Maze)=>{
+    setMaze(next);setDraft(structuredClone(next.parameters));setResult(null);setMode('map');setShowRoute(false);setShapeEditing(false);setPortalEdit(null);resetNotice();
+  };
+  const openLibraryWalk=(next:Maze,value:WalkResult)=>{
+    openLibraryMaze(next);setResult(value);setShowRoute(true);setMessage('Прохождение открыто из общей библиотеки.');
+  };
+  const saveShared=async()=>{
+    setBusy(true);resetNotice();
+    try{await saveLibraryMaze(maze);setLibraryRevision(n=>n+1);setMessage('Лабиринт сохранён в общей библиотеке.');}
+    catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
+  };
+  async function beginWalk(next:Maze) {
+    setBusy(true);
+    try {
+      const prepared=await prepareLibraryWalk(next);setMaze(prepared.maze);setMode('walk');
+      if(prepared.roofEnforced)setMessage('Первое записанное прохождение: крыша включена.');
+    }catch {
+      setMaze({...next,roof:true});setMode('walk');setMessage('Сервер недоступен. Начинаем с крышей; запись будет отправлена после восстановления связи.');
+    }finally{setBusy(false);}
+  }
+  const parameterNumber = (label: string, key: 'columns' | 'rows' | 'corridorWidth' | 'moduleSize' | 'extraConnections' | 'routeTrapCount', min: number, max: number, step = 1, unit?: string) =>
+    <label className="field"><span>{label}</span><div className="input-unit"><input aria-label={label} type="number" min={min} max={max} step={step} required value={Number.isNaN(draft[key]) ? '' : draft[key] ?? (key === 'routeTrapCount' ? 0 : '')} onChange={e => patch(key, e.target.valueAsNumber)} />{unit && <em>{unit}</em>}</div></label>;
 
   return <div className={`app-shell ${mode === 'walk' ? 'is-walking' : ''}`}>
     <header className="topbar">
@@ -105,42 +177,49 @@ function App() {
             const { moduleSize, ...rest } = p;
             return event.target.value === 'modules' ? { ...rest, moduleSize: moduleSize ?? 2 } : rest;
           })}><option value="modules">Отдельные квадратные модули</option><option value="grid">Классическая сетка</option></select></label>
+          <ShapeControls value={draft} onChange={setDraft} editing={shapeEditing} onEditing={value=>{setShapeEditing(value);setPortalEdit(null);}} selected={shapeSelected} onSelect={setShapeSelected} tool={shapeTool} onTool={setShapeTool}/>
           <label className="field"><span>Алгоритм</span><select aria-label="Алгоритм" value={draft.algorithm} onChange={e => patch('algorithm', e.target.value as Algorithm)}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
           <p className="field-note algorithm-note">{draft.algorithm === 'backtracker' ? 'Длинные извилистые пути и глубокие тупики.' : 'Много коротких ответвлений и частых развилок.'}</p>
           <div className="field-pair">{parameterNumber('Столбцы', 'columns', 1, 100)}{parameterNumber('Строки', 'rows', 1, 100)}</div>
           {draft.moduleSize !== undefined && parameterNumber('Размер модуля', 'moduleSize', 0.8, 10, 0.1, 'м')}
           {parameterNumber(draft.moduleSize === undefined ? 'Ширина коридора' : 'Проход между модулями', 'corridorWidth', 0.8, 10, 0.1, 'м')}
           {parameterNumber('Дополнительные соединения', 'extraConnections', 0, 20000)}
+          {parameterNumber('Ловушки на маршруте, не менее', 'routeTrapCount', 0, 6)}
           <p className="field-note">{draft.moduleSize === undefined ? 'Добавляют циклы между существующими путями.' : 'Стены на модулях и между ними образуют единый лабиринт. Дополнительные связи добавляют циклы.'}</p>
+          <p className="field-note">Разные развилки с ложным приближением к выходу. 0 — без требования к количеству. Если места недостаточно, генерация сообщит об этом.</p>
+          <DesignControls value={draft.design} onChange={value=>patch('design',value)}/>
           <label className="field seed-field"><span>Seed <small>ВОСПРОИЗВОДИМОСТЬ</small></span><div className="seed-input"><input value={draft.seed} maxLength={256} onChange={e => patch('seed', e.target.value)} spellCheck={false} /><button type="button" title="Новый seed" aria-label="Новый seed" onClick={() => patch('seed', `FIELD-${Date.now().toString(36).toUpperCase()}`)}>⟳</button></div></label>
-          <button className="primary generate" type="submit" aria-label="Сгенерировать">Сгенерировать <span aria-hidden="true">↗</span></button>
-          <button className="blind-button" type="button" onClick={() => regenerate(true)}>Сгенерировать и пройти вслепую <span>→</span></button>
+          <button className="primary generate" disabled={busy||!!draftStatus.error} type="submit" aria-label="Сгенерировать">Сгенерировать <span aria-hidden="true">↗</span></button>
+          {busy&&generationCancel.current&&<button className="blind-button" type="button" onClick={()=>generationCancel.current?.()}>Отменить генерацию</button>}
+          <button className="blind-button" disabled={busy||!!draftStatus.error} type="button" onClick={() => regenerate(true)}>Сгенерировать и пройти вслепую <span>→</span></button>
           {dirty && <p className="draft-notice">Есть изменения. Применятся при генерации.</p>}
         </form>
         <ConstructionControls value={maze} onChange={patch => setMaze(current => ({ ...current, ...patch }))} />
-        <PortalControls maze={maze} edit={portalEdit} onEdit={setPortalEdit} onChange={changePortals} />
-        <EnvironmentControls maze={maze} onChange={changeEnvironment} />
+        {!shapeEditing && <PortalControls maze={maze} edit={portalEdit} onEdit={setPortalEdit} onChange={changePortals} />}
+        <div hidden={shapeEditing}><ColdspotControls maze={maze} onDisplay={setHeatDisplay} onOptimized={acceptOptimized} /></div>
+        {!shapeEditing && <EnvironmentControls maze={maze} onChange={changeEnvironment} />}
         <div className="sidebar-bottom"><span className="mini-mark">ML /</span><span>Каждая развилка — эксперимент.</span></div>
       </aside>
       <main className="workspace">
-        <div className="workspace-header"><div><div className="eyebrow">РАБОЧАЯ ОБЛАСТЬ</div><h2>План лабиринта <span>{maze.parameters.columns} × {maze.parameters.rows}</span></h2></div><div className="file-actions"><button disabled={busy} onClick={() => void load()}><span aria-hidden="true">↥</span> Открыть</button><button disabled={busy} onClick={() => void save()}><span aria-hidden="true">↧</span> Сохранить</button></div></div>
-        <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable} onClick={() => { resetNotice(); setMode('walk'); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
-        <div className="map-panel">
-          <div className="map-topline"><span><i className="live-dot" /> {analysis.reachable ? 'ВЫХОД ДОСТИЖИМ' : 'ВЫХОД НЕДОСТИЖИМ'}</span><span>ВИД СВЕРХУ / МЕТРЫ</span></div>
-          <MapCanvas maze={maze} showRoute={showRoute} recorder={result?.recorder ?? null} onPlacePortal={portalEdit === null ? undefined : placePortal} onEnvironmentChange={changeEnvironment} />
-          <div className="map-legend"><span><i className="legend-wall" /> Стены</span><span><i className="legend-route" /> Кратчайший путь</span>{result && <span><i className="legend-actual" /> Твой путь</span>}</div>
+        <div className="workspace-header"><div><div className="eyebrow">РАБОЧАЯ ОБЛАСТЬ</div><h2>План лабиринта <span>{maze.parameters.columns} × {maze.parameters.rows}</span></h2><div className="workspace-module-count" aria-label={maze.parameters.moduleSize===undefined?"Количество клеток":"Количество модулей"}>{maze.parameters.moduleSize===undefined?"Клетки":"Модули"}: <strong>{number(maze.parameters.moduleSize===undefined?analysis.cells:moduleCount)}</strong></div></div><div className="file-actions"><button onClick={()=>setLibraryOpen(true)}>Библиотека</button><button disabled={busy} onClick={()=>void saveShared()}>В библиотеку</button><button disabled={busy} onClick={() => void load()}><span aria-hidden="true">↥</span> Открыть</button><button disabled={busy} onClick={() => void save()}><span aria-hidden="true">↧</span> Сохранить</button></div></div>
+        <LibraryPanel open={libraryOpen} revision={libraryRevision} onClose={()=>setLibraryOpen(false)} onMaze={openLibraryMaze} onWalk={openLibraryWalk}/>
+        <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable||busy} onClick={() => { resetNotice(); void beginWalk(maze); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
+        <div className={`map-panel ${shapeEditing ? 'editing-shape' : ''}`}>
+          {!shapeEditing && <div className="map-topline"><span><i className="live-dot" /> {analysis.reachable ? 'ВЫХОД ДОСТИЖИМ' : 'ВЫХОД НЕДОСТИЖИМ'}</span><span>ВИД СВЕРХУ / МЕТРЫ</span></div>}
+          {shapeEditing && draft.shape ? <ShapeEditor value={draft} onChange={setDraft} selected={shapeSelected} onSelect={setShapeSelected} tool={shapeTool}/> : <MapCanvas maze={maze} heat={heatDisplay} showRoute={showRoute} recorder={result?.recorder ?? null} onPlacePortal={portalEdit === null ? undefined : placePortal} onEnvironmentChange={changeEnvironment} />}
+          {!shapeEditing && <div className="map-legend"><span><i className="legend-wall" /> Стены</span><span><i className="legend-route" /> Кратчайший путь</span>{result && <span><i className="legend-actual" /> Твой путь</span>}</div>}
         </div>
-        <section className="metrics-section" aria-label="Метрики лабиринта"><div className="metrics-title"><span className="eyebrow">АНАЛИЗ ТОПОЛОГИИ</span><span>{number(analysis.area, 1)} м² · {number(maze.width, 1)} × {number(maze.depth, 1)} м</span></div><div className="metric-grid">
-          <Metric label={maze.parameters.moduleSize === undefined ? 'КЛЕТКИ' : 'УЗЛЫ ГРАФА'} value={number(analysis.cells)} detail={`${maze.parameters.moduleSize === undefined ? '' : `${maze.parameters.columns*maze.parameters.rows} модулей · `}${number(analysis.corridors)} коридоров`} />
+        <section className="metrics-section" aria-label="Метрики лабиринта"><div className="metrics-title"><span className="eyebrow">АНАЛИЗ ТОПОЛОГИИ</span><span>{number(analysis.area, 1)} м² · габариты сетки {number(maze.width, 1)} × {number(maze.depth, 1)} м</span></div><div className="metric-grid">
+          <Metric label={maze.parameters.moduleSize === undefined ? 'КЛЕТКИ' : 'УЗЛЫ ГРАФА'} value={number(analysis.cells)} detail={`${maze.parameters.moduleSize === undefined ? '' : `${domainOf(maze).modules.reduce((a,b)=>a+b,0)} модулей · `}${number(analysis.corridors)} коридоров`} />
           <Metric label="ТУПИКИ" value={number(analysis.deadEnds)} detail="точки возврата" />
           <Metric label="РАЗВИЛКИ" value={number(analysis.junctions)} detail="3 и более направлений" />
           <Metric label="ЦИКЛЫ" value={number(analysis.cycles)} detail={`${analysis.components} комп. · E − V + C`} />
           <Metric label="КРАТЧАЙШИЙ ПУТЬ" value={number(analysis.optimalLength, 1)} unit="м" detail={`${number(analysis.routeAreaRatio, 3)} м/м² · по центрам клеток`} accent />
         </div></section>
-        {result && <section className="results" aria-label="Результаты прохождения"><div className="result-heading"><span className="eyebrow">{result.finished ? 'ВЫХОД НАЙДЕН' : 'ПРОХОЖДЕНИЕ ОСТАНОВЛЕНО'}</span><button aria-label="Закрыть результаты" onClick={() => setResult(null)}>×</button></div><div className="result-values"><div><strong>{formatTime(result.recorder.elapsed)}</strong><span>время в движении и исследовании</span></div><div><strong>{number(result.recorder.distance, 1)} <small>м</small></strong><span>твой путь</span></div><div><strong>{number(analysis.optimalLength, 1)} <small>м</small></strong><span>кратчайший путь по центрам клеток</span></div><div><strong>{result.finished ? `${number(result.recorder.distance/analysis.optimalLength, 2)}×` : '—'}</strong><span>отношение к кратчайшему</span></div></div><p>Маршрут-эталон идёт по центрам клеток; свободное движение со срезанием углов может дать отношение меньше 1.</p></section>}
+        {result && <section className="results" aria-label="Результаты прохождения"><div className="result-heading"><span className="eyebrow">{result.finished ? 'ВЫХОД НАЙДЕН' : 'ПРОХОЖДЕНИЕ ОСТАНОВЛЕНО'}</span><button aria-label="Закрыть результаты" onClick={() => setResult(null)}>×</button></div><div className="result-values"><div><strong>{formatTime(result.recorder.elapsed)}</strong><span>время в движении и исследовании</span></div><div><strong>{number(result.recorder.distance, 1)} <small>м</small></strong><span>твой путь</span></div><div><strong>{number(analysis.optimalLength, 1)} <small>м</small></strong><span>кратчайший путь по центрам клеток</span></div><div><strong>{result.finished ? `${number(result.recorder.distance/analysis.optimalLength, 2)}×` : '—'}</strong><span>отношение к кратчайшему</span></div></div>{walkAssessment?.exploration&&<><div className="result-values exploration-values" aria-label="Разведка боковых веток"><div><strong>{number(walkAssessment.exploration.exploredOptionalRatio*100)}%</strong><span>боковой площади разведано</span></div><div><strong>{walkAssessment.exploration.firstDetourChoices}/{walkAssessment.exploration.assessedFirstChoices}</strong><span>первый выбор боковой ветки</span></div><div><strong>{walkAssessment.exploration.deepBranches}</strong><span>веток глубиной ≥6 м</span></div><div><strong>{number(walkAssessment.exploration.uniqueExplorationRatio*100)}%</strong><span>разведка сверх кратчайшего пути</span></div></div><p className="walk-observations">Повторы: {number(walkAssessment.exploration.repeatedLength)} м по центрам. Обязательный маршрут занимает {number(walkAssessment.exploration.mandatoryAreaRatio*100)}% площади. Эти метрики отделяют разведку от обязательного пути и повторов.</p></>}<p>{walkAssessment && <span className="walk-observations">По записи: посещено {number(walkAssessment.coveredAreaRatio*100)}% площади; на {walkAssessment.decisionCount} развилках продолжил прямо {walkAssessment.continuedStraight} раз; из {walkAssessment.comparableCorridorChoices} выборов с разной видимой длиной выбрал длиннейший {walkAssessment.longestCorridorChoices} раз. Оценка по движению, направление взгляда не записано.</span>}Маршрут-эталон идёт по центрам клеток; свободное движение со срезанием углов может дать отношение меньше 1.</p></section>}
         <footer className="workspace-footer"><span>{maze.parameters.algorithm === 'backtracker' ? 'Recursive Backtracker' : 'Randomized Prim'} <b>·</b> Seed: {maze.parameters.seed || '(пустой)'}</span><span>{generationMs === null ? 'ЛОКАЛЬНО · БЕЗ ТЕЛЕМЕТРИИ' : `ГЕНЕРАЦИЯ ${number(generationMs, 1)} мс`}</span></footer>
       </main>
-    </> : <main className="walk-main"><WalkCanvas maze={maze} onEnd={onEnd} onError={onWalkError} /></main>}
+    </> : <main className="walk-main"><WalkCanvas maze={maze} onEnd={onEnd} onError={onWalkError} onCheckpoint={onCheckpoint} /></main>}
     {(message || error) && <div className={`notification ${error ? 'error' : ''}`} role={error ? 'alert' : 'status'}><span>{error || message}</span><button onClick={resetNotice} aria-label="Закрыть уведомление">×</button></div>}
   </div>;
 }

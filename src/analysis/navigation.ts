@@ -1,0 +1,134 @@
+import { domainOf } from '../core/domain';
+import { axisBounds, cellCenter, neighbors, portalPoint, routingSize, type Maze, type Point } from '../core/maze';
+export type NavigationProfile = 'explorer' | 'compass' | 'outline';
+export const PROFILE_NAMES: Record<NavigationProfile, string> = {
+  explorer: 'Без предпочтения направления', compass: 'Знает направление на выход', outline: 'Знает направление и контур',
+};
+export interface NavigationContext {
+  cells: number[];
+  adjacent: number[][];
+  centers: Point[];
+  goal: Point;
+  outlineTargets?: Point[];
+  outlineDistances?: Float64Array;
+}
+export function prepareNavigation(maze: Maze): NavigationContext {
+  const cells = domainOf(maze).cells;
+  const adjacent: number[][] = [], centers: Point[] = [];
+  for (const cell of cells) {
+    adjacent[cell] = neighbors(maze, cell);
+    centers[cell] = cellCenter(maze, cell);
+  }
+  return { cells, adjacent, centers, goal: portalPoint(maze, maze.exit) };
+}
+/** Footprint-only distances and visible waypoints: no internal maze passages are consulted. */
+export function prepareOutline(maze: Maze, context: NavigationContext): void {
+  if (context.outlineTargets)
+    return;
+  const size = maze.passages.length, distances = new Float64Array(size).fill(Infinity);
+  const parent = new Int32Array(size).fill(-1), targets: Point[] = [];
+  const heap: {
+    cell: number;
+    distance: number;
+  }[] = [];
+  const push = (cell: number, distance: number) => {
+    let i = heap.length;
+    heap.push({ cell, distance });
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (heap[p]!.distance <= distance)
+        break;
+      heap[i] = heap[p]!;
+      i = p;
+    }
+    heap[i] = { cell, distance };
+  };
+  const pop = () => {
+    const first = heap[0]!, last = heap.pop()!;
+    if (heap.length) {
+      let i = 0;
+      while (2 * i + 1 < heap.length) {
+        let child = 2 * i + 1;
+        if (child + 1 < heap.length && heap[child + 1]!.distance < heap[child]!.distance)
+          child++;
+        if (heap[child]!.distance >= last.distance)
+          break;
+        heap[i] = heap[child]!;
+        i = child;
+      }
+      heap[i] = last;
+    }
+    return first;
+  };
+  const xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z'), domain = domainOf(maze);
+  const visible = (a: Point, b: Point) => {
+    const cuts = [0, 1], dx = b.x - a.x, dz = b.z - a.z;
+    if (dx)
+      for (const x of xs) {
+        const t = (x - a.x) / dx;
+        if (t > 0 && t < 1)
+          cuts.push(t);
+      }
+    if (dz)
+      for (const z of zs) {
+        const t = (z - a.z) / dz;
+        if (t > 0 && t < 1)
+          cuts.push(t);
+      }
+    cuts.sort((a, b) => a - b);
+    for (let i = 1; i < cuts.length; i++) {
+      const t = (cuts[i - 1]! + cuts[i]!) / 2;
+      if (!domain.contains({ x: a.x + dx * t, z: a.z + dz * t }))
+        return false;
+    }
+    return true;
+  };
+  distances[maze.exit.cell] = 0;
+  targets[maze.exit.cell] = context.goal;
+  push(maze.exit.cell, 0);
+  while (heap.length) {
+    const current = pop();
+    if (current.distance !== distances[current.cell])
+      continue;
+    const a = current.cell, point = context.centers[a]!;
+    if (parent[a] !== -1) {
+      const next = parent[a]!, target = targets[next]!;
+      targets[a] = visible(point, context.goal) ? context.goal : visible(point, target) ? target : context.centers[next]!;
+    }
+    for (const b of context.adjacent[a]!) {
+      const q = context.centers[b]!, distance = current.distance + Math.hypot(q.x - point.x, q.z - point.z);
+      if (distance < distances[b]!) {
+        distances[b] = distance;
+        parent[b] = a;
+        push(b, distance);
+      }
+    }
+  }
+  // Disconnected footprint components cannot reach this exit even without internal walls.
+  for (const a of context.cells)
+    targets[a] ??= context.goal;
+  context.outlineTargets = targets;
+  context.outlineDistances = distances;
+}
+export function directionScore(context: NavigationContext, from: number, to: number, profile: NavigationProfile): number {
+  if (profile === 'explorer')
+    return 0;
+  const a = context.centers[from]!, b = context.centers[to]!;
+  const goal = profile === 'outline' ? context.outlineTargets![from]! : context.goal;
+  const dx = b.x - a.x, dz = b.z - a.z, gx = goal.x - a.x, gz = goal.z - a.z;
+  const norm = Math.hypot(dx, dz) * Math.hypot(gx, gz);
+  return norm ? (dx * gx + dz * gz) / norm : 0;
+}
+export function edgeLength(context: NavigationContext, a: number, b: number): number {
+  const p = context.centers[a]!, q = context.centers[b]!;
+  return Math.hypot(q.x - p.x, q.z - p.z);
+}
+export function cellAtPoint(maze: Maze, point: Point): number | null {
+  const xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z');
+  const x = xs.findIndex((v, i) => i > 0 && point.x < v) - 1;
+  const z = zs.findIndex((v, i) => i > 0 && point.z < v) - 1;
+  if (x < 0 || z < 0 || point.x < 0 || point.z < 0)
+    return null;
+  const cell = z * routingSize(maze).columns + x;
+  return domainOf(maze).active[cell] ? cell : null;
+}

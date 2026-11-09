@@ -37,7 +37,7 @@ export function PortalControls({ maze, edit, onEdit, onChange }: {
     </li>)}</ol>
     <button type="button" className="portal-add" aria-pressed={edit === 'add'} onClick={() => onEdit(edit === 'add' ? null : 'add')}>+ Добавить вход-выход</button>
     {edit !== null && <div className="portal-edit-notice" role="status">
-      {edit === 'add' ? 'Нажмите на внешнюю границу карты, чтобы добавить проём.' : `Нажмите на внешнюю границу: новое место проёма ${edit+1}.`}
+      {edit === 'add' ? 'Нажмите на границу области, чтобы добавить проём.' : `Нажмите на границу области: новое место проёма ${edit+1}.`}
       <button type="button" onClick={() => onEdit(null)}>Отмена</button>
     </div>}
   </section>;

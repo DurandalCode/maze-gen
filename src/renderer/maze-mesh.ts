@@ -1,3 +1,4 @@
+import { domainOf } from '../core/domain';
 import * as THREE from 'three';
 import { WALL_THICKNESS, walls, type Maze } from '../core/maze';
 import { timberMesh } from './timber-mesh';
@@ -26,17 +27,24 @@ export function mazeMesh(maze: Maze): THREE.Group {
   mesh.instanceMatrix.needsUpdate = true;
   mesh.computeBoundingSphere(); group.add(mesh);
   group.add(timberMesh(maze));
-  if (maze.roof) {
-    const roof = new THREE.Mesh(
-      new THREE.BoxGeometry(maze.width + WALL_THICKNESS, WALL_THICKNESS, maze.depth + WALL_THICKNESS),
-      fabricMaterial(maze.wallColor, maze.translucentFabric, 'roof'),
-    );
-    roof.name = 'roof';
-    roof.castShadow = true; roof.receiveShadow = true;
-    roof.customDepthMaterial = mesh.customDepthMaterial;
-    // The roof scatters the source into a dotted spot while hiding the distant scene.
-    roof.position.set(maze.width / 2, maze.wallHeight + WALL_THICKNESS / 2, maze.depth / 2);
-    group.add(roof);
+  if (maze.roof && !maze.parameters.shape) {
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(maze.width+WALL_THICKNESS,WALL_THICKNESS,maze.depth+WALL_THICKNESS),
+      fabricMaterial(maze.wallColor,maze.translucentFabric,'roof'));
+    roof.name='roof'; roof.castShadow=true; roof.receiveShadow=true; roof.customDepthMaterial=mesh.customDepthMaterial;
+    roof.position.set(maze.width/2,maze.wallHeight+WALL_THICKNESS/2,maze.depth/2);group.add(roof);
+  } else if (maze.roof) {
+    const domain = domainOf(maze);
+    const rects = domain.cells.map(c=>domain.rectangles[c]!);
+    const roof = new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),
+      fabricMaterial(maze.wallColor,maze.translucentFabric,'roof'),rects.length);
+    roof.name='roof'; roof.castShadow=true; roof.receiveShadow=true;
+    roof.customDepthMaterial=mesh.customDepthMaterial;
+    rects.forEach((r,i)=> {
+      dummy.position.set((r.x1+r.x2)/2,maze.wallHeight+WALL_THICKNESS/2,(r.z1+r.z2)/2);
+      dummy.scale.set(r.x2-r.x1,WALL_THICKNESS,r.z2-r.z1);
+      dummy.updateMatrix(); roof.setMatrixAt(i,dummy.matrix);
+    });
+    roof.instanceMatrix.needsUpdate=true; roof.computeBoundingSphere(); group.add(roof);
   }
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(maze.width+100, maze.depth+100),
     groundMaterial(maze.width+100, maze.depth+100));

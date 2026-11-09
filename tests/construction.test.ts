@@ -8,8 +8,9 @@ import { mazeMesh } from '../src/renderer/maze-mesh';
 
 const maze = () => generate({ columns: 3, rows: 2, corridorWidth: 1.5, extraConnections: 0, seed: 'construction', algorithm: 'prim' });
 
-test('defaults are black walls, 2.5m high, without a roof', () => {
+test('defaults are translucent black fabric, 2.5m high, without a roof', () => {
   expect(maze()).toMatchObject(DEFAULT_CONSTRUCTION);
+  expect(maze().translucentFabric).toBe(true);
 });
 
 test('custom construction survives JSON without changing topology', () => {
@@ -23,7 +24,7 @@ test('custom construction survives JSON without changing topology', () => {
 test('legacy v1 JSON loads using the default color and open sky', () => {
   const legacy = JSON.parse(serialize(maze()));
   delete legacy.wallColor; delete legacy.translucentFabric; delete legacy.roof;
-  expect(deserialize(JSON.stringify(legacy))).toMatchObject(DEFAULT_CONSTRUCTION);
+  expect(deserialize(JSON.stringify(legacy))).toMatchObject({...DEFAULT_CONSTRUCTION,translucentFabric:false});
 });
 
 test('rejects invalid height, color and roof values in saved files', () => {
@@ -64,7 +65,7 @@ test('old opacity files migrate to the fabric checkbox', () => {
 });
 
 test('roof covers the whole site at wall height and can be removed', () => {
-  const custom = { ...maze(), wallHeight: 3.4, wallColor: '#3478ab', roof: true };
+  const custom = { ...maze(), wallHeight: 3.4, wallColor: '#3478ab', translucentFabric:false, roof: true };
   const group = mazeMesh(custom);
   const roof = group.getObjectByName('roof');
   expect(roof).toBeInstanceOf(Mesh);

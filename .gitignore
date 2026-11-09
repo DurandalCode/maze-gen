@@ -5,3 +5,5 @@ src-tauri/target/
 src-tauri/gen/
 test-results/
 *.log
+
+.local-data/

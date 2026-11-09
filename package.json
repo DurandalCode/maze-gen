@@ -9,7 +9,8 @@
     "check": "tsc --noEmit",
     "preview": "bun --bun vite preview --host 127.0.0.1",
     "test": "bun test",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "serve": "bun server/index.ts"
   },
   "dependencies": {
     "react": "^19.2.0",
