@@ -21,7 +21,16 @@ export class Player {
     let right = Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
     const norm = Math.hypot(forward, right);
     if (norm) { forward /= norm; right /= norm; }
-    const distance = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 2.8 : 1.4) * dt;
+    this.updateAnalog(dt, forward, right, keys.has('ShiftLeft') || keys.has('ShiftRight'));
+  }
+
+  /** Continuous thumbstick movement; magnitude controls speed, diagonals stay bounded. */
+  updateAnalog(dt: number, forward: number, right: number, sprint = false): void {
+    if (this.finished || !Number.isFinite(dt) || dt <= 0) return;
+    if (!Number.isFinite(forward) || !Number.isFinite(right)) { forward = 0; right = 0; }
+    const norm = Math.hypot(forward, right);
+    if (norm > 1) { forward /= norm; right /= norm; }
+    const distance = (sprint ? 2.8 : 1.4) * dt;
     const delta = {
       x: (-Math.sin(this.yaw)*forward + Math.cos(this.yaw)*right)*distance,
       z: (-Math.cos(this.yaw)*forward - Math.sin(this.yaw)*right)*distance,

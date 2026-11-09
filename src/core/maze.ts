@@ -12,6 +12,7 @@ export interface Parameters {
   design?:DesignLimits;
   /** Requested minimum number of distinct directional-trap forks; absent means zero. */
   routeTrapCount?: number;
+  loopTrapCount?: number;
   shape?: GridShape;
   columns: number;
   rows: number;
@@ -63,10 +64,10 @@ export function validateParameters(p: Parameters): void {
     if(!d||typeof d!=='object'||typeof d.allowReshape!=='boolean')throw new Error('Некорректные ограничения качества.');
     for(const [key,min,max] of [['maxForcedStraight',2,40],['maxForcedRun',2,100],['maxVisibleStraight',2,24],['maxColdRatio',0,1],['maxColdRegion',0,10000],['maxModuleGrowth',0,1]] as const)
       if(!Number.isFinite(d[key])||d[key]<min||d[key]>max)throw new Error('Некорректные ограничения качества.');
-    if(p.extraConnections>0)throw new Error('Совместный подбор качества пока доступен без дополнительных соединений.');
   }
+  if(p.loopTrapCount!==undefined&&(!Number.isInteger(p.loopTrapCount)||p.loopTrapCount<0||p.loopTrapCount>6))throw new Error('Число кольцевых ловушек должно быть целым от 0 до 6.');
+  if((p.loopTrapCount??0)>p.extraConnections)throw new Error('Для каждой кольцевой ловушки нужно хотя бы одно дополнительное соединение.');
   if(p.routeTrapCount!==undefined&&(!Number.isInteger(p.routeTrapCount)||p.routeTrapCount<0||p.routeTrapCount>6))throw new Error('Число ловушек должно быть целым от 0 до 6.');
-  if((p.routeTrapCount??0)>0&&p.extraConnections>0)throw new Error('Ловушки на маршруте пока доступны без дополнительных соединений.');
   if (!Number.isInteger(p.columns) || !Number.isInteger(p.rows) || p.columns < 1 || p.rows < 1 || p.columns > 100 || p.rows > 100)
     throw new Error('Размер сетки должен быть целым числом от 1 до 100.');
   if (!Number.isFinite(p.corridorWidth) || p.corridorWidth < 0.8 || p.corridorWidth > 10)

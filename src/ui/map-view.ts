@@ -1,4 +1,5 @@
 import type { HeatDisplay } from './coldspot-controls';
+import {visibleDeadEnds} from '../analysis/visible-deadends';
 import { cellAtPoint } from '../analysis/navigation';
 import { domainOf } from '../core/domain';
 import { portalPoint, walls, type Maze, type Point, type Portal } from '../core/maze';
@@ -8,6 +9,7 @@ import { routePoints } from '../core/pathfinding';
 import { environmentOf, forestAtPoint, forestMapPoints, landmarkMapBounds, type Environment } from '../core/environment';
 import { solarMinuteForAzimuth, solarPosition } from '../core/solar';
 import {trapDetailsAt,type TrapOverlayEntry} from './trap-overlay';
+import {criticalWallAt,type CriticalWall} from '../analysis/critical-walls';
 
 interface MapLayout { scale: number; left: number; top: number; centerX: number; centerY: number; radiusX: number; radiusY: number }
 
@@ -27,6 +29,7 @@ export class MapView {
   private events = new AbortController();
   heat: HeatDisplay|null = null;
   traps:readonly TrapOverlayEntry[]=[];
+  criticalWalls:readonly CriticalWall[]=[];
   showRoute = false;
   trajectory: readonly Point[] = [];
   onPlacePortal: ((portal: Portal | null) => void) | null = null;
@@ -102,9 +105,11 @@ export class MapView {
   heatDetailsAt(x:number,y:number):string|null {
     const {left,top,scale}=this.layout(),cell=cellAtPoint(this.maze,{x:(x-left)/scale,z:(y-top)/scale});
     if(cell===null) return null;
-    const trapText=trapDetailsAt(this.traps,cell);
+    const trapText=trapDetailsAt(this.traps,cell),critical=criticalWallAt(this.criticalWalls,{x:(x-left)/scale,z:(y-top)/scale},6/scale);
+    if(critical)trapText.unshift(`Критическая стена: ${critical.protections.map(p=>p.reason).join('; ')}`);
     if(!this.heat)return trapText.length?trapText.join(' · '):null;
     const {analysis}=this.heat,p=analysis.probability[cell]!;
+    if(analysis.method==='sampled'&&analysis.options.profile!=='explorer'&&visibleDeadEnds(this.maze).cells.has(cell))trapText.push('Полностью видимый тупик: исследуется взглядом, без захода');
     const region=p<analysis.options.threshold?analysis.regions.find(r=>r.cells.includes(cell)):undefined;
     const fmt=(v:number)=>v.toLocaleString('ru-RU',{maximumFractionDigits:1});
     const visibility=analysis.landmarks;
@@ -202,6 +207,8 @@ export class MapView {
     for (const wall of this.segments) { ctx.moveTo(px(wall.x1), py(wall.z1)); ctx.lineTo(px(wall.x2), py(wall.z2)); }
     ctx.stroke();
     ctx.save();
+    ctx.strokeStyle='#ffda75';ctx.lineWidth=Math.max(2.5,Math.min(4,cell*s*.12));
+    for(const item of this.criticalWalls){const wall=item.wall;ctx.beginPath();ctx.moveTo(px(wall.x1),py(wall.z1));ctx.lineTo(px(wall.x2),py(wall.z2));ctx.stroke();}
     const offset=Math.min(4,cell*s*.16),shifted=(points:readonly Point[],sign:number)=>points.map(p=>({x:p.x+sign*offset/s,z:p.z-sign*offset/s}));
     for(const trap of this.traps){
       ctx.setLineDash([5,4]);for(const points of trap.falsePaths)line(shifted(points,1),'#f39cf7',2);

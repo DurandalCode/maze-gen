@@ -1,9 +1,11 @@
+import {isAndroidApp,downloadJson} from './platform';
 import { isTauri } from '@tauri-apps/api/core';
 import { deserialize, serialize } from './maze-json';
 import type { Maze } from '../core/maze';
 
 export async function saveMaze(maze: Maze): Promise<boolean> {
   const text = serialize(maze);
+  if(isAndroidApp()){downloadJson('maze-lab.json',text);return true;}
   if (isTauri()) {
     const { save } = await import('@tauri-apps/plugin-dialog');
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');

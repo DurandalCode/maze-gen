@@ -1,3 +1,4 @@
+import {isOfflineLibrary} from './persistence/platform';
 import { LibraryPanel } from './ui/library-panel';
 import { captureWalk,flushPendingWalks,saveLibraryMaze,prepareLibraryWalk } from './persistence/library';
 import { assessWalk } from './analysis/walk-assessment';
@@ -29,7 +30,7 @@ function Logo() {
 
 function App() {
   const generationCancel=useRef<(()=>void)|null>(null);
-  const [libraryOpen,setLibraryOpen]=useState(false);
+  const [libraryOpen,setLibraryOpen]=useState(isOfflineLibrary);
   const [libraryRevision,setLibraryRevision]=useState(0);
   const [shapeEditing, setShapeEditing] = useState(false);
   const [shapeSelected, setShapeSelected] = useState<number|null>(null);
@@ -85,7 +86,7 @@ function App() {
     setBusy(true);
     try {
       const start = performance.now();
-      const generated=((draft.routeTrapCount??0)>0 || draft.design) ? await new Promise<Maze>((resolve,reject)=>{
+      const generated=((draft.routeTrapCount??0)>0 || (draft.loopTrapCount??0)>0 || draft.design) ? await new Promise<Maze>((resolve,reject)=>{
         const worker=new Worker(new URL('./generators/worker.ts',import.meta.url),{type:'module'});
         generationCancel.current=()=>{worker.terminate();generationCancel.current=null;reject(new Error('Генерация отменена. Текущий лабиринт сохранён.'));};
         worker.onmessage=e=>{if(e.data.progress){setMessage(e.data.progress);return;}worker.terminate();generationCancel.current=null;e.data.error?reject(new Error(e.data.error)):resolve(e.data.maze);};
@@ -106,7 +107,7 @@ function App() {
   const persistRun=useCallback((value:WalkResult,status:'in-progress'|'stopped'|'finished')=>{
     if(value.recorder.distance<=.01)return;
     void captureWalk(maze,value.recorder,value.id??crypto.randomUUID(),value.finished,status).then(saved=>{
-      if(saved.saved){setLibraryRevision(n=>n+1);if(status!=='in-progress')setMessage('Маршрут сохранён в общей библиотеке.');}
+      if(saved.saved){setLibraryRevision(n=>n+1);if(status!=='in-progress')setMessage(isOfflineLibrary()?'Маршрут сохранён на устройстве. Его можно экспортировать из библиотеки.':'Маршрут сохранён в общей библиотеке.');}
       else setMessage(saved.queued?'Сервер недоступен. Запись сохранена в браузере и будет отправлена повторно.':'Не удалось сохранить запись. Текущий маршрут остаётся на карте.');
     });
   },[maze]);
@@ -157,8 +158,8 @@ function App() {
       setMaze({...next,roof:true});setMode('walk');setMessage('Сервер недоступен. Начинаем с крышей; запись будет отправлена после восстановления связи.');
     }finally{setBusy(false);}
   }
-  const parameterNumber = (label: string, key: 'columns' | 'rows' | 'corridorWidth' | 'moduleSize' | 'extraConnections' | 'routeTrapCount', min: number, max: number, step = 1, unit?: string) =>
-    <label className="field"><span>{label}</span><div className="input-unit"><input aria-label={label} type="number" min={min} max={max} step={step} required value={Number.isNaN(draft[key]) ? '' : draft[key] ?? (key === 'routeTrapCount' ? 0 : '')} onChange={e => patch(key, e.target.valueAsNumber)} />{unit && <em>{unit}</em>}</div></label>;
+  const parameterNumber = (label: string, key: 'columns' | 'rows' | 'corridorWidth' | 'moduleSize' | 'extraConnections' | 'routeTrapCount' | 'loopTrapCount', min: number, max: number, step = 1, unit?: string) =>
+    <label className="field"><span>{label}</span><div className="input-unit"><input aria-label={label} type="number" min={min} max={max} step={step} required value={Number.isNaN(draft[key]) ? '' : draft[key] ?? ((key === 'routeTrapCount' || key === 'loopTrapCount') ? 0 : '')} onChange={e => patch(key, e.target.valueAsNumber)} />{unit && <em>{unit}</em>}</div></label>;
 
   return <div className={`app-shell ${mode === 'walk' ? 'is-walking' : ''}`}>
     <header className="topbar">
@@ -185,6 +186,8 @@ function App() {
           {parameterNumber(draft.moduleSize === undefined ? 'Ширина коридора' : 'Проход между модулями', 'corridorWidth', 0.8, 10, 0.1, 'м')}
           {parameterNumber('Дополнительные соединения', 'extraConnections', 0, 20000)}
           {parameterNumber('Ловушки на маршруте, не менее', 'routeTrapCount', 0, 6)}
+          {parameterNumber('Кольцевые ловушки, не менее', 'loopTrapCount', 0, 6)}
+          <p className="hint">Кольцевая ловушка: два выхода с одной развилки соединены обходом и возвращают на неё. Требует дополнительных соединений.</p>
           <p className="field-note">{draft.moduleSize === undefined ? 'Добавляют циклы между существующими путями.' : 'Стены на модулях и между ними образуют единый лабиринт. Дополнительные связи добавляют циклы.'}</p>
           <p className="field-note">Разные развилки с ложным приближением к выходу. 0 — без требования к количеству. Если места недостаточно, генерация сообщит об этом.</p>
           <DesignControls value={draft.design} onChange={value=>patch('design',value)}/>
@@ -202,7 +205,7 @@ function App() {
       </aside>
       <main className="workspace">
         <div className="workspace-header"><div><div className="eyebrow">РАБОЧАЯ ОБЛАСТЬ</div><h2>План лабиринта <span>{maze.parameters.columns} × {maze.parameters.rows}</span></h2><div className="workspace-module-count" aria-label={maze.parameters.moduleSize===undefined?"Количество клеток":"Количество модулей"}>{maze.parameters.moduleSize===undefined?"Клетки":"Модули"}: <strong>{number(maze.parameters.moduleSize===undefined?analysis.cells:moduleCount)}</strong></div></div><div className="file-actions"><button onClick={()=>setLibraryOpen(true)}>Библиотека</button><button disabled={busy} onClick={()=>void saveShared()}>В библиотеку</button><button disabled={busy} onClick={() => void load()}><span aria-hidden="true">↥</span> Открыть</button><button disabled={busy} onClick={() => void save()}><span aria-hidden="true">↧</span> Сохранить</button></div></div>
-        <LibraryPanel open={libraryOpen} revision={libraryRevision} onClose={()=>setLibraryOpen(false)} onMaze={openLibraryMaze} onWalk={openLibraryWalk}/>
+        <LibraryPanel open={libraryOpen} revision={libraryRevision} onClose={()=>setLibraryOpen(false)} onMaze={openLibraryMaze} onWalk={openLibraryWalk} onPlay={next=>{openLibraryMaze(next);void beginWalk(next);}}/>
         <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable||busy} onClick={() => { resetNotice(); void beginWalk(maze); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
         <div className={`map-panel ${shapeEditing ? 'editing-shape' : ''}`}>
           {!shapeEditing && <div className="map-topline"><span><i className="live-dot" /> {analysis.reachable ? 'ВЫХОД ДОСТИЖИМ' : 'ВЫХОД НЕДОСТИЖИМ'}</span><span>ВИД СВЕРХУ / МЕТРЫ</span></div>}

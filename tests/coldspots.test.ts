@@ -1,3 +1,4 @@
+import {visibleDeadEnds} from '../src/analysis/visible-deadends';
 import { expect, test } from 'bun:test';
 import { analyzeColdspots, DEFAULT_ANALYSIS } from '../src/analysis/coldspots';
 import { prepareNavigation, prepareOutline, type NavigationProfile } from '../src/analysis/navigation';
@@ -183,14 +184,17 @@ test('oriented search travel and revisit counts agree, including hidden-cue cycl
         expect(a.landmarks!.orientedAreaRatio).toBe(0);
     }
 });
-test('reported gray region becomes cold with landmarks, but remains plausible when they are hidden', async () => {
+test('landmarks affect uncertain branches but visible blind tails stay cold even without orientation', async () => {
   const source = deserialize(await Bun.file(new URL('./fixtures/gray-branch-maze.json', import.meta.url)).text());
   const maze = { ...source, translucentFabric: true };
   const daylight = analyzeColdspots(maze,{...DEFAULT_ANALYSIS,internalOrientation:0}), night = analyzeColdspots({ ...maze, environment: { sun: { day: 15, minutes: 0 }, forest: { side: 'north', distance: 12, offset: 0 } } },{...DEFAULT_ANALYSIS,internalOrientation:0});
   // These cells are in the large northern branch from the reported screenshot.
   for (const cell of [3, 6, 9, 12]) {
     expect(daylight.probability[cell]!).toBeLessThan(.05);
-    expect(night.probability[cell]!).toBeGreaterThan(.3);
+    // Loss of heading does not hide a terminal wall. Do not restore the old
+    // expectation of walking into visually exhausted branches merely because it is night.
+    if(visibleDeadEnds(maze).cells.has(cell))expect(night.probability[cell]!).toBe(0);
+    else expect(night.probability[cell]!).toBeGreaterThan(daylight.probability[cell]!);
   }
   expect(daylight.landmarks!.sunAreaRatio).toBe(1);
   expect(night.landmarks!.orientedAreaRatio).toBe(0);

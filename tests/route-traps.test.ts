@@ -33,7 +33,7 @@ test('a straight route and visible blind ends cannot qualify as a directional tr
  const p=analyzePotential({...line,parameters:{...line.parameters,routeTrapCount:1}},{...DEFAULT_ANALYSIS,samples:16},undefined,false);
  expect(p.eligible).toBe(false);expect(p.issues.some(s=>s.includes('Ловушек'))).toBe(true);
  const cyclic=generate({...base().parameters,extraConnections:2});
- expect(routeTraps(cyclic)).toEqual({supported:false,candidates:[],qualifiedCount:0,best:null});
+ expect(routeTraps(cyclic).supported).toBe(true);
 });
 test('a route trap can be far from the exit; a nearby finish is not a requirement',()=>{
  const m=emptyMaze({columns:11,rows:13,corridorWidth:2,algorithm:'prim',seed:'far-trap',extraConnections:0});
@@ -58,14 +58,15 @@ test('ordinary generate accepts a trap count, preserves it in JSON and is reprod
  expect(deserialize(serialize(maze)).parameters.routeTrapCount).toBe(1);
  expect(generate({...old.parameters,routeTrapCount:0}).passages).toEqual(generate(old.parameters).passages);
  expect(()=>generate({...parameters,routeTrapCount:1.5},old)).toThrow();
- expect(()=>generate({...parameters,extraConnections:1},old)).toThrow();
+ const cyclic=generate({...parameters,extraConnections:1},old);
+ expect(metrics(cyclic).cycles).toBe(1);expect(routeTraps(cyclic).qualifiedCount).toBeGreaterThanOrEqual(1);
  const two=generate({...parameters,routeTrapCount:2},old);
  expect(new Set(routeTraps(two).candidates.filter(t=>t.qualifies).map(t=>t.fork)).size).toBeGreaterThanOrEqual(2);
  expect(deserialize(serialize(two)).parameters.routeTrapCount).toBe(2);
  const prim=generate({...parameters,algorithm:'prim'},{...old,roof:true});
  expect(routeTraps(prim).qualifiedCount).toBeGreaterThanOrEqual(1);
  expect(prim.roof).toBe(true);expect(maze.roof).toBe(old.roof);
-});
+},30000);
 test('generator varies by seed and refuses other shapes without modifying them',()=>{
  const a=base(),before=structuredClone(a),one=pRouteTrapMaze(a,'one')!,two=pRouteTrapMaze(a,'two')!;
  expect(one.passages).not.toEqual(two.passages);expect(a).toEqual(before);

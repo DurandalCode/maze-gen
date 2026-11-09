@@ -57,9 +57,10 @@ test('the application optimizer uses the potential forecast and cannot accept ex
   expect(result.maze.entrance).toEqual(base.entrance);
   expect(result.maze.exit).toEqual(base.exit);
 });
-test('unsupported cyclic metrics and pockets that do not fit are explicit', () => {
+test('cyclic assessment separates tree-only forecasts and pockets that do not fit are explicit', () => {
   const cyclic = generate({ ...fixture().parameters, extraConnections: 2 });
-  expect(analyzePotential(cyclic, options).supported).toBe(false);
+  expect(analyzePotential(cyclic, options).supported).toBe(true);
+  expect(analyzePotential(cyclic, options).treeForecast).toBe(false);
   expect(() => optimizeColdspots(cyclic, options, 'seeds', 2, undefined, 'exploration')).toThrow();
   const tiny = generate({ ...fixture().parameters, columns: 1, rows: 1 });
   expect(() => guardedMaze(tiny, 'tiny')).toThrow();

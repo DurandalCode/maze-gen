@@ -9,6 +9,7 @@ import { random } from '../core/random';
 import type { Maze } from '../core/maze';
 import { generateBase } from '../generators/generate';
 import {analyzePotential} from './potential-difficulty';
+import {criticalWalls} from './critical-walls';
 import { analyzeColdspots, validateAnalysisOptions, type AnalysisOptions } from './coldspots';
 import { prepareNavigation, type NavigationContext, type NavigationProfile } from './navigation';
 export type OptimizationObjective = 'coldspots' | 'exploration';
@@ -51,6 +52,7 @@ export function optimizeColdspots(base: Maze, options: AnalysisOptions, method: 
   if (componentCount(base) !== 1)
     throw new Error('Для оптимизации все клетки должны быть соединены.');
   const context = prepareNavigation(base), initial = metrics(base);
+  const protectedWalls=base.parameters.design||((base.parameters.routeTrapCount??0)>0||(base.parameters.loopTrapCount??0)>0)?criticalWalls(base):[];
   const sampled = initial.cycles > 0 || options.beta > 0 || (options.corridorPreference ?? 1) > 0 || (options.boundaryPreference ?? 1.5) > 0;
   const budget = Math.min(attempts, Math.max(2, Math.floor(2000000 / (context.cells.length * (sampled ? 64 : 1)))));
   const rankingOptions = { ...options, samples: Math.min(options.samples, 64) };
@@ -90,7 +92,7 @@ export function optimizeColdspots(base: Maze, options: AnalysisOptions, method: 
     }
     if (candidate) {
       const shape = metrics(candidate);
-      if ((!(base.parameters.design||(base.parameters.routeTrapCount??0)>0)||analyzePotential(candidate,rankingOptions,undefined,false).eligible) && shape.cycles === initial.cycles && shape.junctions >= Math.ceil(initial.junctions * 0.8) && shape.deadEnds >= Math.ceil(initial.deadEnds * 0.8) &&
+      if (protectedWalls.every(w=>!candidate!.passages[w.a]!.includes(w.b)) && (!(base.parameters.design||((base.parameters.routeTrapCount??0)>0||(base.parameters.loopTrapCount??0)>0))||analyzePotential(candidate,rankingOptions,undefined,false).eligible) && shape.cycles === initial.cycles && shape.junctions >= Math.ceil(initial.junctions * 0.8) && shape.deadEnds >= Math.ceil(initial.deadEnds * 0.8) &&
         shape.optimalLength >= initial.optimalLength * 0.8 && shape.optimalLength <= initial.optimalLength * 1.5) {
         const value = evaluate(candidate, rankingOptions, context);
         if (value.score < bestScore - 1e-9 && value.search >= baseline.search * 0.9) {

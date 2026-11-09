@@ -8,10 +8,15 @@ import {pRouteTrapMaze} from '../generators/p-route-trap';
 import { analyzePotential } from './potential-difficulty';
 import type { AnalysisOptions } from './coldspots';
 import type { OptimizationMethod, OptimizationResult } from './optimize';
+import {optimizeCyclic} from './optimize-cyclic';
 export function optimizePotential(base: Maze, options: AnalysisOptions, method: OptimizationMethod, attempts: number, progress?: (done: number, total: number) => void): OptimizationResult {
   const initial = metrics(base);
-  if (initial.cycles !== 0 || initial.components !== 1)
+  if (initial.components !== 1)
     throw new Error('Прогноз сложности и скрытые проёмы пока поддерживают связные деревья проходов.');
+  if(initial.cycles){
+    if(method==='seeds')throw new Error('Для колец выбирайте перестановку стен; новый seed доступен в обычной генерации.');
+    return optimizeCyclic(base,options,attempts,progress);
+  }
   const finalOptions=base.parameters.design?{...options,samples:2048}:options;
   const before = analyzePotential(base, finalOptions, undefined, false), prepared = guardedMaze(base, base.parameters.seed + '|privacy', true);
   const budget = Math.min(attempts, Math.max(2, Math.floor(2000000 / (initial.cells * 64 * 3))));

@@ -1,3 +1,4 @@
+import {visibleDeadEnd} from './visible-deadends';
 import { decisionModel, decisionScore, DECISION_WEIGHTS } from './decision-model';
 import { explorationMeter, type ExplorationForecast } from './exploration-meter';
 import { DEFAULT_BEHAVIOR, boundaryBelief, type NavigationBehavior, type BehaviorSummary } from './navigation-behavior';
@@ -49,7 +50,7 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
   }
   const scale = totalEdges ? totalEdgeLength / totalEdges : 1;
   const cognitive = behavior.internalOrientation > 0 || behavior.boundaryStrategy !== 'follow' || behavior.routeMemory < 1;
-  const rng = random(decisionMode === 'local' ? 'coldspots-local-decisions-v7' : cognitive ? 'coldspots-internal-heading-beliefs-v6' : boundaryPreference > 0 || diagonalVision && corridorPreference > 0 ? 'coldspots-diagonals-perimeter-v5' : corridorPreference > 0 ? 'coldspots-visible-corridors-v4' : 'coldspots-landmarks-v3');
+  const rng = random(decisionMode === 'local' ? 'coldspots-visible-blind-branches-v8' : cognitive ? 'coldspots-internal-heading-beliefs-v6' : boundaryPreference > 0 || diagonalVision && corridorPreference > 0 ? 'coldspots-diagonals-perimeter-v5' : corridorPreference > 0 ? 'coldspots-visible-corridors-v4' : 'coldspots-landmarks-v3');
   const choices = decisionMode === 'local' ? decisionModel(maze, context, diagonalVision, boundaryPreference > 0) : null;
   const spatial = !choices && corridorPreference > 0 && diagonalVision ? spatialPerception(maze, context) : null;
   const perimeter = !choices && boundaryPreference > 0 ? perimeterPerception(maze, context) : null;
@@ -159,6 +160,9 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
       shuffle(local, rng);
       for (const next of local)
         if (discovered[next] !== run) {
+          // Observing a complete blind branch is not physical exploration. Do not queue
+          // it for a later visit just because the goal is still hidden elsewhere.
+          if(visibleDeadEnd(maze,cell,next,context))continue;
           discovered[next] = run;
           parent[next] = cell;
           depth[next] = depth[cell]! + 1;
@@ -217,6 +221,9 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
     let current = root, walkLength = endpointLength, confidence = 1;
     while (current !== maze.exit.cell) {
       observe(current);
+      // A visually exhausted end is remembered at the last position actually reached,
+      // not at the terminal cell inspected from a distance.
+      if(current!==root&&!maze.passages[current]!.some(n=>visitedStamp[n]!==run&&!visibleDeadEnd(maze,current,n,context))&&!recognizedLeaves.includes(current))recognizedLeaves.push(current);
       while (heap.length && visitedStamp[heap[0]!.cell] === run)
         pop();
       while (pending.length && visitedStamp[pending[pending.length - 1]!] === run)

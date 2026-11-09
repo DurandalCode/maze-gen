@@ -46,7 +46,7 @@ test('limits roundtrip, validate and do not change the identity of a physical to
  expect(deserialize(serialize(maze))).toEqual(maze);expect(topologyId(maze)).toBe(topologyId(base));
  expect(()=>validateParameters({...base.parameters,design:{...loose,maxColdRatio:NaN}})).toThrow();
  expect(()=>validateParameters({...base.parameters,design:{...loose,maxModuleGrowth:-1}})).toThrow();
- expect(()=>validateParameters({...base.parameters,design:loose,extraConnections:1})).toThrow();
+ expect(()=>validateParameters({...base.parameters,design:loose,extraConnections:1})).not.toThrow();
 });
 test('repair retains a passing design, is deterministic and never mutates its source',()=>{
  const base=fixture(),maze={...base,parameters:{...base.parameters,design:loose}},snapshot=structuredClone(maze);

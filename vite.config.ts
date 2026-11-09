@@ -2,6 +2,7 @@ import { fileLibraryPlugin } from './server/dev-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: './',
   clearScreen: false,
   plugins: [fileLibraryPlugin()],
   server: { port: 1420, strictPort: true },

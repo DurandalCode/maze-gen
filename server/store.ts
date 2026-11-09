@@ -8,7 +8,7 @@ import { domainOf } from '../src/core/domain';
 import type { Maze } from '../src/core/maze';
 
 export interface SavedMaze {id:string;title:string;createdAt:string;updatedAt:string;maze:Maze;status?:'candidate'|'rejected';rejectionReason?:string}
-export function topologyId(maze:Maze):string {const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,...geometry}=maze.parameters;return createHash('sha256').update(canonical({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]})).digest('hex').slice(0,24);}
+export function topologyId(maze:Maze):string {const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,loopTrapCount:______,...geometry}=maze.parameters;return createHash('sha256').update(canonical({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]})).digest('hex').slice(0,24);}
 export interface SavedWalk {id:string;mazeId:string;createdAt:string;updatedAt:string;walk:WalkData;assessment:WalkAssessment}
 const validId=(id:string)=>/^[a-zA-Z0-9_-]{1,80}$/.test(id);
 function canonical(value:unknown):string {

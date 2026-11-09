@@ -17,6 +17,7 @@ export function deserialize(json: string): Maze {
   const raw = object(data.parameters);
   const p = {
     ...(raw.design === undefined ? {} : {design:raw.design}),
+    ...(raw.loopTrapCount === undefined ? {} : {loopTrapCount:raw.loopTrapCount}),
     ...(raw.routeTrapCount === undefined ? {} : {routeTrapCount:raw.routeTrapCount}),
     ...(raw.shape === undefined ? {} : {shape: raw.shape}),
     columns: raw.columns, rows: raw.rows, corridorWidth: raw.corridorWidth,

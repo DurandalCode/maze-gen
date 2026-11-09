@@ -84,7 +84,7 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
       const result = data.result as OptimizationResult;
       if (result.objective === 'exploration') {
         if (result.changed) {
-          setNotice(`Проверено ${result.attempted} вариантов. Проёмы скрыты; прогноз разведки боковой площади ${fmt((result.afterPotential?.minOptionalCoverage ?? 0) * 100)}–${fmt((result.afterPotential?.maxOptionalCoverage ?? 0) * 100)}%.`);
+          setNotice(result.afterPotential?.treeForecast===false?`Проверено ${result.attempted} вариантов. Кольца и защиты сохранены; холодная площадь ${fmt(result.afterPotential.worstColdRatio*100)}%.`:`Проверено ${result.attempted} вариантов. Проёмы скрыты; прогноз разведки боковой площади ${fmt((result.afterPotential?.minOptionalCoverage ?? 0) * 100)}–${fmt((result.afterPotential?.maxOptionalCoverage ?? 0) * 100)}%.`);
           onOptimized(result);
         }
         else
@@ -99,11 +99,11 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
         setNotice(`Проверено ${result.attempted} вариантов. Улучшения с сохранением ограничений не найдено.`);
     };
     worker.onerror = () => { worker.terminate(); optimizer.current = null; setOptimizing(false); setError('Не удалось выполнить оптимизацию.'); };
-    worker.postMessage({ kind: 'optimize', maze, options, method, attempts, objective });
+    worker.postMessage({ kind: 'optimize', maze, options, method:analysis?.potential?.cycles?'walls':method, attempts, objective });
   };
   return <section className="coldspot-controls" aria-label="Анализ колдспотов">
   <div className="section-label"><span>КОЛДСПОТЫ И СЛОЖНОСТЬ</span><span>◈</span></div>
-  <p className="field-note">Вероятность попасть в участок до выхода. Модель v7 оценивает местные развилки по видимой перспективе, направлению и заметным тупикам. Узнаваемый финиш имеет приоритет; скрытые стены заранее неизвестны.</p>
+  <p className="field-note">Вероятность попасть в участок до выхода. Модель v8 оценивает местные развилки по видимой перспективе, направлению и заметным тупикам. Узнаваемый финиш имеет приоритет; скрытые стены заранее неизвестны.</p>
   <label className="field"><span>Профиль игрока</span><select aria-label="Профиль игрока" value={options.profile} onChange={e => setOptions({ ...options, profile: e.target.value as NavigationProfile })}>{Object.entries(PROFILE_NAMES).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
   {options.profile !== 'explorer' && <label className="field"><span>Опора на направление · {options.beta}</span><input aria-label="Опора на направление" type="range" min="0" max="5" step="0.25" value={options.beta} onChange={e => setOptions({ ...options, beta: Number(e.target.value) })}/></label>}
   {options.profile !== 'explorer' && <label className="field"><span>Внутреннее удержание направления · {Math.round((options.internalOrientation ?? 1) * 100)}%</span><input aria-label="Внутреннее удержание направления" type="range" min="0" max="1" step="0.05" value={options.internalOrientation ?? 1} onChange={e => setOptions({ ...options, internalOrientation: Number(e.target.value) })}/><small>Сохраняет курс без внешних ориентиров. Не даёт знания скрытых проходов.</small></label>}
@@ -136,9 +136,9 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
   <p className="field-note">{analysis.method === 'exact-tree' ? 'Точный расчёт для модели на дереве.' : `Оценка по ${analysis.samples} воспроизводимым прохождениям; значения около порога могут колебаться.`} Видимость солнца, леса и внешней ткани проверяется лучами. Без ориентиров уверенность сохраняется на уровне внутреннего удержания курса. Это приближённая модель, не статистика людей.</p>
   <div className="section-label"><span>АВТОПОДБОР ПЛАНИРОВКИ</span></div>
   <label className="field"><span>Цель подбора</span><select aria-label="Цель подбора" value={objective} disabled={optimizing} onChange={e => setObjective(e.target.value as OptimizationObjective)}><option value="exploration">Сложные решения и скрытые проёмы</option><option value="coldspots">Меньше колдспотов</option></select></label>
-  <label className="field"><span>Способ улучшения</span><select aria-label="Способ улучшения" value={method} disabled={optimizing} onChange={e => setMethod(e.target.value as OptimizationMethod)}><option value="seeds">Подобрать seed</option><option value="walls">Переставить стены</option></select></label>
+  <label className="field"><span>Способ улучшения</span><select aria-label="Способ улучшения" value={method} disabled={optimizing} onChange={e => setMethod(e.target.value as OptimizationMethod)}><option value="seeds" disabled={!!analysis?.potential?.cycles}>Подобрать seed</option><option value="walls">Переставить стены</option></select></label>
   <label className="field"><span>Вариантов до</span><select aria-label="Бюджет оптимизации" value={attempts} disabled={optimizing} onChange={e => setAttempts(Number(e.target.value))}>{[16, 32, 64].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
-  <p className="field-note">{objective === 'exploration' ? 'Подбор по прогнозу боковой разведки без повторов. Вход и выход экранируются; обязательный маршрут занимает 35–55% площади. Форма и места проёмов сохраняются. Пока для деревьев проходов.' : 'Оценка колдспотов по трём профилям. Сохраняем форму, проёмы и циклы; не менее 80% развилок и тупиков.'} На больших лабиринтах бюджет ограничен объёмом расчёта. Изменённые стены сохраняются в JSON.</p>
+  <p className="field-note">{analysis.potential?.cycles ? 'Подбор перестановкой стен сохраняет число колец, защищённые элементы и пределы качества. Новый seed выбирается обычной генерацией.' : objective === 'exploration' ? 'Подбор по прогнозу боковой разведки без повторов. Вход и выход экранируются; обязательный маршрут занимает 35–55% площади. Форма и места проёмов сохраняются.' : 'Оценка колдспотов по трём профилям. Сохраняем форму, проёмы и циклы; не менее 80% развилок и тупиков.'} На больших лабиринтах бюджет ограничен объёмом расчёта. Изменённые стены сохраняются в JSON.</p>
   <button type="button" className="coldspot-action" disabled={optimizing || calculating} onClick={optimize}>Улучшить лабиринт</button>
   {optimizing && <div className="coldspot-progress" role="status">{progress}<button type="button" onClick={cancel}>Отмена</button></div>}
   </>}

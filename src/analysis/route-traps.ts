@@ -4,6 +4,7 @@ import {shortestPath} from '../core/pathfinding';
 import {prepareNavigation,prepareOutline} from './navigation';
 import {decisionModel,decisionScore,choiceProbabilities} from './decision-model';
 import {spatialPerception} from './spatial-perception';
+import {minimaxRetreat} from './minimax-retreat';
 
 export interface RouteTrap {
   fork:number; deadEnd:number;
@@ -19,9 +20,10 @@ export interface RouteTraps {supported:boolean; candidates:RouteTrap[]; qualifie
  */
 export function routeTraps(maze:Maze):RouteTraps {
   const m=metrics(maze);
-  if(m.components!==1||m.cycles!==0)return {supported:false,candidates:[],qualifiedCount:0,best:null};
+  if(m.components!==1)return {supported:false,candidates:[],qualifiedCount:0,best:null};
   const ctx=prepareNavigation(maze);prepareOutline(maze,ctx);
   const distance=ctx.outlineDistances!,route=shortestPath(maze),onRoute=new Set(route),model=decisionModel(maze,ctx),sight=spatialPerception(maze,ctx);
+  const minimumPeak=m.cycles?minimaxRetreat(maze,distance):null;
   const edge=(a:number,b:number)=>Math.hypot(ctx.centers[a]!.x-ctx.centers[b]!.x,ctx.centers[a]!.z-ctx.centers[b]!.z);
   const candidates:RouteTrap[]=[];
   for(let i=0;i<route.length-1;i++){
@@ -37,9 +39,19 @@ export function routeTraps(maze:Maze):RouteTraps {
       if(distance[c]!<distance[prev]!-1e-7)break;
       awayLength+=edge(prev,c);peak=Math.max(peak,distance[c]!);correctAwayPath.push(c);
     }
-    const requiredRetreat=peak-distance[fork]!;
+    // A later unrelated detour must not inflate the initial retreat, while a cyclic shortcut
+    // can reduce how much of this apparent retreat is actually necessary.
+    const requiredRetreat=Math.min(peak,minimumPeak?minimumPeak[fork]!:peak)-distance[fork]!;
     for(let k=0;k<choices.length;k++){
       const n=choices[k]!;if(n===correct||onRoute.has(n))continue;
+      if(m.cycles){
+        // Only real pendant tree branches count as blind traps. A loop leading back to the main
+        // network is an alternative route, not a dead end, even if one DFS happens to stop there.
+        const seen=new Set([n]),queue=[n];let edges=0;
+        for(let q=0;q<queue.length;q++)for(const next of maze.passages[queue[q]!]!)if(next!==fork){edges++;if(!seen.has(next)){seen.add(next);queue.push(next);}}
+        const attachments=queue.reduce((sum,c)=>sum+Number(maze.passages[c]!.includes(fork)),0);
+        if(attachments!==1||queue.some(c=>onRoute.has(c))||edges/2!==queue.length-1)continue;
+      }
       const stack=[{cell:n,parent:fork,path:[fork,n],length:edge(fork,n),toward:Math.max(0,distance[fork]!-distance[n]!)}];
       while(stack.length){
         const state=stack.pop()!,children=maze.passages[state.cell]!.filter(c=>c!==state.parent);

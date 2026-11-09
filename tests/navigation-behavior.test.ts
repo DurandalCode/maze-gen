@@ -37,8 +37,10 @@ test('internal orientation preserves directional choices when all external landm
   const lost = analyzeColdspots(maze, { ...options, internalOrientation: 0 }), retained = analyzeColdspots(maze, { ...options, internalOrientation: 1 });
   expect(retained.landmarks!.orientedAreaRatio).toBe(0);
   expect(lost.landmarks!.orientedAreaRatio).toBe(0);
-  expect(lost.probability[6]!).toBeGreaterThan(.3);
-  expect(retained.probability[6]!).toBeLessThan(.05);
+  // Cell 6 is a visible blind tail; cell 4 is an unresolved continuation.
+  expect(lost.probability[6]!).toBe(0);
+  expect(lost.probability[4]!).toBeGreaterThan(.3);
+  expect(retained.probability[4]!).toBeLessThan(.05);
   expect(retained.probability[maze.exit.cell]).toBe(1);
 });
 test('reliable recognition suppresses bounded rechecks, not compulsory returns or the discovery of new passages', () => {
