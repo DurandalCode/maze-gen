@@ -9,6 +9,13 @@ export function stickVector(vector: StickVector, deadzone = 0.12): StickVector {
   return { x: vector.x / length * magnitude, y: vector.y / length * magnitude };
 }
 
+/** Full deflection runs at 2.8m/s; half deflection walks at 1.4m/s.
+ * The deadzone-adjusted magnitude stays continuous and diagonal speed stays bounded.
+ */
+export function applyTouchMovement(player:{updateAnalog(dt:number,forward:number,right:number,sprint?:boolean):void},vector:StickVector,dt:number):void{
+ player.updateAnalog(dt,vector.y,vector.x,true);
+}
+
 export function applyTouchLook(player: { yaw: number; pitch: number }, vector: StickVector, dt: number): void {
   if (!Number.isFinite(dt) || dt <= 0 || dt >= 0.25) return;
   player.yaw -= vector.x * 2.2 * dt;

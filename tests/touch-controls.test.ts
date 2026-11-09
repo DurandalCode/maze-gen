@@ -3,7 +3,7 @@ import { cellCenter, emptyMaze, walls } from '../src/core/maze';
 import { generate } from '../src/generators/generate';
 import { CollisionWorld } from '../src/simulation/collisions';
 import { Player } from '../src/simulation/player';
-import { applyTouchLook, stickVector } from '../src/ui/touch-input';
+import { applyTouchLook, applyTouchMovement, stickVector } from '../src/ui/touch-input';
 
 function openPlayer() {
   const maze = emptyMaze({ columns: 10, rows: 10, corridorWidth: 10, extraConnections: 0, seed: 'touch-test', algorithm: 'backtracker' });
@@ -69,4 +69,18 @@ test('analog movement respects walls and cannot escape through entrance', () => 
   p.updateAnalog(.4, 1, 0); p.updateAnalog(5, 0, 1);
   expect(new CollisionWorld(walls(maze)).blocked(p.position)).toBe(false);
   expect(p.finished).toBe(false);
+});
+
+test('left thumbstick continuously scales from slow movement through walking to full running',()=>{
+ for(const fps of [30,60,144]){
+  for(const [magnitude,expected] of [[0,0],[.25,.7],[.5,1.4],[.75,2.1],[1,2.8]]){
+   const p=openPlayer(),start={...p.position};
+   for(let i=0;i<fps;i++)applyTouchMovement(p,{x:0,y:magnitude!},1/fps);
+   expect(Math.hypot(p.position.x-start.x,p.position.z-start.z)).toBeCloseTo(expected!,7);
+   expect(p.recorder.distance).toBeCloseTo(expected!,7);
+  }
+  const diagonal=openPlayer(),start={...diagonal.position};
+  for(let i=0;i<fps;i++)applyTouchMovement(diagonal,stickVector({x:1,y:1}),1/fps);
+  expect(Math.hypot(diagonal.position.x-start.x,diagonal.position.z-start.z)).toBeCloseTo(2.8,7);
+ }
 });

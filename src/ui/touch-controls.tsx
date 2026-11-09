@@ -34,7 +34,7 @@ export function TouchControls({ onMove, onLook, onError }: {
     };
   }, [onMove, onLook, onError]);
   return <div className="touch-controls" aria-label="Сенсорное управление двумя джойстиками">
-    <div className="touch-stick touch-stick-move" ref={move} aria-label="Левый джойстик: движение"><span>ДВИЖЕНИЕ</span></div>
+    <div className="touch-stick touch-stick-move" ref={move} aria-label="Левый джойстик: движение"><span>ХОДЬБА / БЕГ</span></div>
     <div className="touch-stick touch-stick-look" ref={look} aria-label="Правый джойстик: обзор"><span>ОБЗОР</span></div>
   </div>;
 }

@@ -13,7 +13,7 @@ import type { Recorder } from '../simulation/recorder';
 import type { WalkScene } from '../renderer/scene';
 import { MapView } from './map-view';
 import { TouchControls } from './touch-controls';
-import { applyTouchLook, neutralStick, touchControlsAvailable, type StickVector } from './touch-input';
+import { applyTouchLook, applyTouchMovement, neutralStick, touchControlsAvailable, type StickVector } from './touch-input';
 
 export function MapCanvas({ maze, heat, showRoute, recorder, onPlacePortal, onEnvironmentChange }: {
   maze: Maze; heat?: HeatDisplay|null; showRoute: boolean; recorder: Recorder | null; onPlacePortal?: (portal: Portal | null) => void;
@@ -154,7 +154,7 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
       if (activeRef.current && !document.hidden && dt < 0.25) {
         if (touchRef.current) {
           applyTouchLook(player, lookRef.current, dt);
-          player.updateAnalog(dt, moveRef.current.y, moveRef.current.x);
+          applyTouchMovement(player, moveRef.current, dt);
         } else player.update(dt, keys);
       }
       scene.render(player);
@@ -201,13 +201,13 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
       <span className="eyebrow">ПОЛЕВОЕ ИССЛЕДОВАНИЕ / 01</span>
       <h2>{stats.elapsed > 0 ? 'Продолжим путь?' : 'Найди свой выход.'}</h2>
       <p>Вход {startNumber} → выход {finishNumber}. Найди выбранный выход.<br />После прохождения сравним твой путь с кратчайшим.</p>
-      {touch ? <div className="key-guide touch-guide"><span>ЛЕВЫЙ · движение</span><span>ПРАВЫЙ · обзор</span></div> : <div className="key-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> движение</span><span><kbd>⇧</kbd> быстрее</span><span>МЫШЬ · обзор</span></div>}
+      {touch ? <div className="key-guide touch-guide"><span>ЛЕВЫЙ · ходьба / бег</span><span>ПРАВЫЙ · обзор</span></div> : <div className="key-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> движение</span><span><kbd>⇧</kbd> быстрее</span><span>МЫШЬ · обзор</span></div>}
       <label className="walk-touch-choice"><input type="checkbox" checked={touch} onChange={event => { clearTouch(); setTouch(event.target.checked); }} /> Управление двумя джойстиками</label>
       <button className="primary" onClick={() => void lock()}>{stats.elapsed > 0 ? 'Продолжить' : 'Начать прохождение'} <span>↗</span></button>
-      <small>{touch ? 'Два пальца — движение и обзор одновременно. Кнопка «Пауза» останавливает таймер.' : 'Esc — пауза и освобождение курсора. Таймер на паузе не идёт.'}</small>
+      <small>{touch ? 'Чем сильнее отклонён левый джойстик, тем быстрее движение: у края — бег. Кнопка «Пауза» останавливает таймер.' : 'Esc — пауза и освобождение курсора. Таймер на паузе не идёт.'}</small>
       {lockError && <p role="alert">{lockError}</p>}
     </div></div>}
-    <div className="walk-footer">ВЫСОТА ГЛАЗ 1,7 м <span /> СТЕНЫ {maze.wallHeight.toLocaleString('ru-RU')} м <span /> {maze.roof ? 'С КРЫШЕЙ' : 'ОТКРЫТОЕ НЕБО'} <span /> СКОРОСТЬ 1,4 м/с</div>
+    <div className="walk-footer">ВЫСОТА ГЛАЗ 1,7 м <span /> СТЕНЫ {maze.wallHeight.toLocaleString('ru-RU')} м <span /> {maze.roof ? 'С КРЫШЕЙ' : 'ОТКРЫТОЕ НЕБО'} <span /> СКОРОСТЬ {touch ? 'ДО 2,8' : '1,4'} м/с</div>
   </div>;
 }
 
