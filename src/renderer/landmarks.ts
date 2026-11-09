@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FOREST_EDGE_Z, SUN_DIRECTION } from '../core/environment';
+import { environmentOf, forestFrame, sunDirection } from '../core/environment';
 import type { Maze } from '../core/maze';
 import { random } from '../core/random';
 import { foliageAssets } from './foliage';
@@ -19,12 +19,14 @@ function sunHalo(): THREE.DataTexture {
   return texture;
 }
 
-/** A continuous treeline on the north side; tree variation never uses the maze seed. */
+/** Continuous movable treeline; tree variation never uses the maze seed. */
 export function forestMesh(maze: Maze): THREE.Group {
-  const group = new THREE.Group(); group.name = 'forest-north';
+  const group = new THREE.Group(); group.name = 'forest-landmark';
+  const environment = environmentOf(maze), frame = forestFrame(maze, environment);
+  group.position.set(frame.origin.x, 0, frame.origin.z); group.rotation.y = frame.rotation;
   const rng = random('maze-lab-north-forest-v1');
-  const spacing = Math.max(4.5, (maze.width+80)/160);
-  const perRow = Math.ceil((maze.width+80)/spacing), treeCount = perRow*3;
+  const spacing = Math.max(4.5, (frame.length+80)/160);
+  const perRow = Math.ceil((frame.length+80)/spacing), treeCount = perRow*3;
   const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.55, 0.8, 1, 7),
     new THREE.MeshStandardMaterial({ color: '#5b5041', roughness: 1 }), treeCount);
   trunks.name = 'forest-trunks'; trunks.castShadow = true; trunks.receiveShadow = true;
@@ -42,7 +44,7 @@ export function forestMesh(maze: Maze): THREE.Group {
   };
   for (let row = 0; row < 3; row++) for (let i = 0; i < perRow; i++) {
     const x = -40+(i+0.5)*spacing+(rng()-0.5)*spacing*0.6;
-    const z = FOREST_EDGE_Z-row*8-rng()*4;
+    const z = -environment.forest.distance-row*8-rng()*4;
     const height = 12+rng()*9, radius = 1.8+rng()*1.2;
     dummy.position.set(x, height*0.35, z); dummy.scale.set(0.26, height*0.7, 0.26);
     dummy.rotation.set(0, rng()*Math.PI, 0); dummy.updateMatrix(); trunks.setMatrixAt(tree++, dummy.matrix);
@@ -65,14 +67,18 @@ export function forestMesh(maze: Maze): THREE.Group {
 export class WorldLandmarks {
   readonly group = new THREE.Group();
   private sun = new THREE.Group();
-  private direction = new THREE.Vector3(SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z).normalize();
+  private direction: THREE.Vector3;
   private disc: THREE.Mesh;
   private halo: THREE.Mesh;
 
   constructor(maze: Maze) {
+    const direction = sunDirection(environmentOf(maze));
+    this.direction = new THREE.Vector3(direction.x, direction.y, direction.z);
+    this.sun.visible = direction.y >= 0;
     this.group.name = 'world-landmarks'; this.sun.name = 'sun-landmark';
     this.disc = new THREE.Mesh(new THREE.CircleGeometry(1, 48),
-      new THREE.MeshBasicMaterial({ color: '#fff4d1', fog: false, toneMapped: false, depthWrite: false }));
+      new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff4d1').multiplyScalar(80),
+        fog: false, toneMapped: false, depthWrite: false }));
     this.disc.name = 'sun-disc';
     this.halo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
       map: sunHalo(), transparent: true, blending: THREE.AdditiveBlending,

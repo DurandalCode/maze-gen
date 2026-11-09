@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 
-/** Approximate nonwoven fabric: 1% open area, only resolved at close viewing distances. */
+/** 1% light transmission at every distance; individual pores resolve only up close. */
 export function fabricMaterial(color: string, translucent: boolean): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({
     color, roughness: 0.98, metalness: 0, transparent: translucent, depthWrite: !translucent,
   });
   if (!translucent) return material;
-  material.customProgramCacheKey = () => 'near-field-fabric-v1';
+  material.customProgramCacheKey = () => 'light-transmitting-fabric-v2';
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, {
       uFabricNear: { value: 0.3 }, uFabricFar: { value: 0.9 },
@@ -48,7 +48,7 @@ export function fabricMaterial(color: string, translucent: boolean): THREE.MeshS
         vec2(fabricPoreRadius) + fabricFootprint * 0.5, fabricCell);
       float fabricResolved = 1.0 - smoothstep(0.35, 1.0, max(fabricFootprint.x, fabricFootprint.y));
       float fabricTransmission = mix(uFabricOpenArea, fabricPore.x * fabricPore.y, fabricResolved);
-      diffuseColor.a = 1.0 - fabricClose * fabricTransmission;
+      diffuseColor.a *= 1.0 - mix(uFabricOpenArea, fabricTransmission, fabricClose);
     `);
   };
   return material;

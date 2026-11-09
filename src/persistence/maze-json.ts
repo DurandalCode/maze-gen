@@ -1,4 +1,6 @@
 import { DEFAULT_CONSTRUCTION, emptyMaze, neighbors, routingSize, validateConstruction, validateParameters, type Construction, type Maze, type Parameters, type Portal } from '../core/maze';
+import { samePortal, withPortals } from '../core/portals';
+import { validateEnvironment, type Environment } from '../core/environment';
 
 const fail = (): never => { throw new Error('Некорректный файл Maze Lab: проверьте формат и топологию.'); };
 const object = (value: unknown): Record<string, unknown> => {
@@ -32,6 +34,12 @@ export function deserialize(json: string): Maze {
   } as Construction;
   validateConstruction(construction);
   Object.assign(maze, construction);
+  if (data.environment !== undefined) {
+    const value = object(data.environment), sun = object(value.sun), forest = object(value.forest);
+    const environment = { sun: { day: sun.day, minutes: sun.minutes },
+      forest: { side: forest.side, distance: forest.distance, offset: forest.offset } } as Environment;
+    validateEnvironment(environment); maze.environment = environment;
+  }
   if (!Array.isArray(data.passages) || data.passages.length !== maze.passages.length) return fail();
   maze.passages = data.passages.map((value: unknown, i: number) => {
     if (!Array.isArray(value) || value.length > 4) return fail();
@@ -57,6 +65,13 @@ export function deserialize(json: string): Maze {
   maze.entrance = portal(data.entrance);
   maze.exit = portal(data.exit);
   if (maze.entrance.cell === maze.exit.cell && maze.entrance.side === maze.exit.side) fail();
+  if (data.portals !== undefined) {
+    const size = routingSize(maze);
+    if (!Array.isArray(data.portals) || data.portals.length < 2 || data.portals.length > 2*(size.columns+size.rows)) fail();
+    const portals = (data.portals as unknown[]).map(portal);
+    if (!portals.some(p => samePortal(p, maze.entrance)) || !portals.some(p => samePortal(p, maze.exit))) fail();
+    Object.assign(maze, withPortals(maze, portals));
+  }
   return maze;
 }
 

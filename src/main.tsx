@@ -1,11 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { Algorithm, Parameters } from './core/maze';
+import type { Algorithm, Parameters, Maze, Portal } from './core/maze';
+import { mazePortals, samePortal, transferPortals, withPortals } from './core/portals';
 import { metrics } from './core/metrics';
 import { generate } from './generators/generate';
 import { loadMaze, saveMaze } from './persistence/files';
 import { MapCanvas, WalkCanvas, formatTime, type WalkResult } from './ui/views';
 import { ConstructionControls } from './ui/construction-controls';
+import { PortalControls, type PortalEdit } from './ui/portal-controls';
+import { EnvironmentControls } from './ui/environment-controls';
+import type { Environment } from './core/environment';
 import './style.css';
 
 const initial: Parameters = { columns: 5, rows: 5, corridorWidth: 2, moduleSize: 2, extraConnections: 0, seed: 'FIELD-024', algorithm: 'backtracker' };
@@ -25,16 +29,36 @@ function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [generationMs, setGenerationMs] = useState<number | null>(null);
+  const [portalEdit, setPortalEdit] = useState<PortalEdit>(null);
   const analysis = useMemo(() => metrics(maze), [maze]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(maze.parameters);
   const patch = <K extends keyof Parameters>(key: K, value: Parameters[K]) => setDraft(p => ({ ...p, [key]: value }));
   const resetNotice = () => { setError(''); setMessage(''); };
+  const changePortals = (next: Maze) => { setMaze(next); setResult(null); resetNotice(); };
+  const changeEnvironment = (environment: Environment) => { setMaze(current => ({ ...current, environment })); resetNotice(); };
+  const placePortal = (portal: Portal | null) => {
+    if (!portal) { setError('Выберите место на внешнем периметре карты.'); return; }
+    const portals = [...mazePortals(maze)];
+    if (portals.some((p, i) => i !== portalEdit && samePortal(p, portal))) {
+      setError('Здесь уже есть вход-выход. Выберите другой участок.'); return;
+    }
+    if (portalEdit === 'add') portals.push(portal);
+    else if (typeof portalEdit === 'number') portals[portalEdit] = portal;
+    else return;
+    // Moving a selected endpoint keeps it selected in its new location.
+    const previous = typeof portalEdit === 'number' ? mazePortals(maze)[portalEdit] : null;
+    const next = { ...maze,
+      entrance: previous && samePortal(previous, maze.entrance) ? portal : maze.entrance,
+      exit: previous && samePortal(previous, maze.exit) ? portal : maze.exit };
+    changePortals(withPortals(next, portals)); setPortalEdit(null);
+  };
   const regenerate = (blind = false) => {
     resetNotice();
     try {
       const start = performance.now();
-      const next = { ...generate(draft), wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof }; setGenerationMs(performance.now()-start);
-      setMaze(next); setResult(null); setShowRoute(false);
+      const next = { ...transferPortals(maze, generate(draft)), wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof,
+        ...(maze.environment ? { environment: maze.environment } : {}) }; setGenerationMs(performance.now()-start);
+      setMaze(next); setResult(null); setShowRoute(false); setPortalEdit(null);
       if (blind) setMode('walk');
       else setMessage('Лабиринт сгенерирован. Seed сохранён.');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
@@ -55,7 +79,7 @@ function App() {
     try {
       const next = await loadMaze();
       if (next) {
-        setMaze(next); setDraft({ ...next.parameters }); setResult(null); setShowRoute(false); setGenerationMs(null);
+        setMaze(next); setDraft({ ...next.parameters }); setResult(null); setShowRoute(false); setGenerationMs(null); setPortalEdit(null);
         setMessage('Лабиринт загружен. Топология восстановлена из файла.');
       }
     } catch (e) { setError(`Не удалось загрузить: ${e instanceof Error ? e.message : String(e)}`); }
@@ -94,6 +118,8 @@ function App() {
           {dirty && <p className="draft-notice">Есть изменения. Применятся при генерации.</p>}
         </form>
         <ConstructionControls value={maze} onChange={patch => setMaze(current => ({ ...current, ...patch }))} />
+        <PortalControls maze={maze} edit={portalEdit} onEdit={setPortalEdit} onChange={changePortals} />
+        <EnvironmentControls maze={maze} onChange={changeEnvironment} />
         <div className="sidebar-bottom"><span className="mini-mark">ML /</span><span>Каждая развилка — эксперимент.</span></div>
       </aside>
       <main className="workspace">
@@ -101,7 +127,7 @@ function App() {
         <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable} onClick={() => { resetNotice(); setMode('walk'); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
         <div className="map-panel">
           <div className="map-topline"><span><i className="live-dot" /> {analysis.reachable ? 'ВЫХОД ДОСТИЖИМ' : 'ВЫХОД НЕДОСТИЖИМ'}</span><span>ВИД СВЕРХУ / МЕТРЫ</span></div>
-          <MapCanvas maze={maze} showRoute={showRoute} recorder={result?.recorder ?? null} />
+          <MapCanvas maze={maze} showRoute={showRoute} recorder={result?.recorder ?? null} onPlacePortal={portalEdit === null ? undefined : placePortal} onEnvironmentChange={changeEnvironment} />
           <div className="map-legend"><span><i className="legend-wall" /> Стены</span><span><i className="legend-route" /> Кратчайший путь</span>{result && <span><i className="legend-actual" /> Твой путь</span>}</div>
         </div>
         <section className="metrics-section" aria-label="Метрики лабиринта"><div className="metrics-title"><span className="eyebrow">АНАЛИЗ ТОПОЛОГИИ</span><span>{number(analysis.area, 1)} м² · {number(maze.width, 1)} × {number(maze.depth, 1)} м</span></div><div className="metric-grid">

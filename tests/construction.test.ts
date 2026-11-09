@@ -40,7 +40,7 @@ test('rejects invalid height, color and roof values in saved files', () => {
   expect(() => validateConstruction({ ...DEFAULT_CONSTRUCTION, wallHeight: NaN })).toThrow();
 });
 
-test('woven fabric keeps visible walls and collisions; roof and timber stay opaque', () => {
+test('woven fabric applies to walls and roof, retaining collisions and opaque timber', () => {
   const original = maze(), fabric = { ...original, translucentFabric: true, roof: true };
   const group = mazeMesh(fabric);
   expect(group.children[0]!.visible).toBe(true);
@@ -48,7 +48,8 @@ test('woven fabric keeps visible walls and collisions; roof and timber stay opaq
   const panel = walls(fabric)[0]!;
   expect(new CollisionWorld(walls(fabric)).blocked({ x: (panel.x1+panel.x2)/2, z: (panel.z1+panel.z2)/2 })).toBe(true);
   const roof = group.getObjectByName('roof') as Mesh;
-  expect((roof.material as { opacity: number }).opacity).toBe(1);
+  expect((roof.material as { transparent: boolean }).transparent).toBe(true);
+  expect(roof.material).toBe((group.children[0] as Mesh).material);
   const timber = group.getObjectByName('timber-boards') as Mesh;
   expect((timber.material as { opacity: number }).opacity).toBe(1);
 });
@@ -68,6 +69,7 @@ test('roof covers the whole site at wall height and can be removed', () => {
   const roof = group.getObjectByName('roof');
   expect(roof).toBeInstanceOf(Mesh);
   if (!(roof instanceof Mesh)) throw new Error('Missing roof');
+  expect((roof.material as { transparent: boolean }).transparent).toBe(false);
   roof.geometry.computeBoundingBox();
   const box = roof.geometry.boundingBox!.clone().translate(roof.position);
   expect(box.min.y).toBeCloseTo(3.4);

@@ -1,3 +1,5 @@
+import type { Environment } from './environment';
+
 export type Algorithm = 'backtracker' | 'prim';
 export interface Parameters {
   columns: number;
@@ -36,6 +38,9 @@ export interface Maze extends Construction {
   passages: number[][];
   entrance: Portal;
   exit: Portal;
+  /** All placed openings; entrance/exit select the current traversal pair. */
+  portals?: Portal[];
+  environment?: Environment;
 }
 export interface Point { x: number; z: number }
 export interface Wall { x1: number; z1: number; x2: number; z2: number; thickness?: number }
@@ -141,7 +146,7 @@ export function walls(maze: Maze): Wall[] {
   const xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z');
   const result: Wall[] = [];
   const isPortal = (cell: number, side: Portal['side']) =>
-    [maze.entrance, maze.exit].some(p => p.cell === cell && p.side === side);
+    (maze.portals ?? [maze.entrance, maze.exit]).some(p => p.cell === cell && p.side === side);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x;
     if (y === 0 && !isPortal(i, 'north')) result.push({ x1: xs[x]!, z1: 0, x2: xs[x+1]!, z2: 0 });
