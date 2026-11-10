@@ -7,6 +7,7 @@ import {domainOf} from '../core/domain';
 import type {Maze} from '../core/maze';
 import {contentId,browserTopologyId} from './identity';
 import bundled from '../data/field-pack.json';
+import commute from '../data/commute-pack.json';
 const dbName=()=>{
  const test=typeof location!=='undefined'?new URLSearchParams(location.search).get('test'):null;
  return test&&/^[0-9]{1,6}$/.test(test)?'maze-lab-offline-test-'+test:'maze-lab-offline-v1';
@@ -37,7 +38,11 @@ export async function saveOfflineMaze(raw:unknown,title?:string):Promise<SavedMa
 }
 async function ensureBundle():Promise<void>{
  if(!seeded)seeded=(async()=>{
-  for(const row of bundled.mazes as {id:string;title:string;maze:Maze}[]){
+  for(const id of (commute as {retiredIds?:string[]}).retiredIds??[]){
+   const known=await get<SavedMaze>('mazes',id);
+   if(known&&known.status!=='rejected')await update<SavedMaze>('mazes',id,old=>({...old!,status:'rejected',rejectionReason:'Отбракован: однотипная схема с очевидным кольцом и проходом без выбора.'}));
+  }
+  for(const row of [...bundled.mazes,...commute.mazes] as {id:string;title:string;maze:Maze}[]){
    // Existing records keep their title, completion history and user construction changes.
    const known=await get<SavedMaze>('mazes',row.id);if(!known)await saveOfflineMaze(row.maze,row.title);
   }

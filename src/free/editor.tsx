@@ -317,6 +317,13 @@ export function FreeEditor({ initial, onGrid }: { initial: FreeDraft; onGrid: ()
         setNotice('Карта сохранена в библиотеке.');
       }).catch(e => setNotice(String(e)));
     }}>В библиотеку</button><button disabled={!ready || busy} onClick={() => ready && void begin(ready)}>Пройти от первого лица</button></div>
+      <LibraryPanel open={library} revision={revision} onClose={() => setLibrary(false)} onMaze={accept} onWalk={(m, v) => {
+        accept(m);
+        setResult(v);
+      }} onPlay={m => {
+        accept(m);
+        void begin(m);
+      }} />
       {restore && <div className="free-notice">Найден сохранённый черновик. <button onClick={() => {
         try {
           update(decodeDraft(restore));
@@ -384,12 +391,6 @@ export function FreeEditor({ initial, onGrid }: { initial: FreeDraft; onGrid: ()
       <section className="free-validation" aria-label="Проверка конструкции"><h3>Проверка конструкции</h3>{issues.length ? <ul>{issues.slice(0, 30).map((i, n) => <li key={n}><button onClick={() => setSelected(i.ids[0] ?? '')}>{i.message}</button></li>)}</ul> : <p>Связность, пролёты, проёмы и физическая проходимость проверены.</p>}</section>
       {stats && <p>Модулей: {l.modules.length} · 2×2: {l.modules.filter(m => m.type === '2x2').length} · 2×6: {l.modules.filter(m => m.type === '2x6').length} · циклов: {stats.cycles} · площадь: {stats.area.toFixed(1)} м² · маршрут: {stats.optimalLength.toFixed(1)} м</p>}{materials && <p>Стоек: {materials.posts} · ткани: {materials.fabricSquareMetres.toFixed(1)} м² · обвязки: {(materials.upperMetres + materials.lowerMetres).toFixed(1)} м. Раскрой и отходы не учитываются.</p>}
       <div className="free-tools"><label>Модель поиска<select value={profile} onChange={e => setProfile(e.target.value as typeof profile)}><option value="explorer">Без направления</option><option value="compass">Знает направление</option><option value="outline">Знает направление и контур</option></select></label><button disabled={!ready || busy} onClick={() => run('analyze')}>Проанализировать</button></div>{analysis && <p>Холодная площадь: {(analysis.coldAreaRatio * 100).toFixed(1)}% · крупнейшая область: {analysis.largestColdArea.toFixed(1)} м² · средний путь поиска: {analysis.expectedLength.toFixed(1)} м · завершено симуляций: {(analysis.finishedRatio * 100).toFixed(1)}% из {analysis.samples}. Тепло показано на пространствах и соединениях.</p>}
-      <p role="status" className="free-notice">{notice}</p><LibraryPanel open={library} revision={revision} onClose={() => setLibrary(false)} onMaze={accept} onWalk={(m, v) => {
-        accept(m);
-        setResult(v);
-      }} onPlay={m => {
-        accept(m);
-        void begin(m);
-      }} />
+      <p role="status" className="free-notice">{notice}</p>
     </main></div>;
 }

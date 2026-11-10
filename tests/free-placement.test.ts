@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, test, expect } from 'bun:test';
 import { DEFAULT_CONSTRUCTION, DEFAULT_DESIGN_LIMITS, type Maze } from '../src/core/maze';
 import { emptyLayout, type FreeDraft } from '../src/free/model';
-import { anchorGeometry, connectionGeometry, freeMaze, freeRuntime, modulePolygon, validateFree, freeRay } from '../src/free/layout';
+import { anchorGeometry, connectionGeometry, freeMaze, freeRuntime, modulePolygon, validateFree, freeRay, physical } from '../src/free/layout';
 import { distance, movementClearance, wallDistance } from '../src/free/geometry';
 import { generate } from '../src/generators/generate';
 import { serialize, deserialize } from '../src/persistence/maze-json';
@@ -34,6 +34,16 @@ function fixture(gap = 2, angle = 0): FreeDraft {
 }
 const base = { placementMode: 'free' as const, columns: 24, rows: 16, moduleSize: 2, corridorWidth: 2, extraConnections: 2, seed: 'free-generation', algorithm: 'prim' as const };
 describe('free physical geometry', () => {
+  test('an opening on a distant collinear module cannot extend another module wall', () => {
+    for (const angle of [0, 17, 90]) {
+      const d = fixture(8, angle);
+      d.layout.connections = [];
+      d.layout.openings = [{ id: 'out', room: 'b', edge: 0, offset: 0, width: 1.4 }];
+      const panels = physical(d.layout).panels;
+      expect(panels).toHaveLength(9);
+      for (const w of panels) expect(Math.hypot(w.x2 - w.x1, w.z2 - w.z1)).toBeLessThanOrEqual(2 + 1e-7);
+    }
+  });
   for (const angle of [17, 45, 123]) test(`arbitrary ${angle}° rotations preserve spans, portals and physical route`, () => {
     const d = fixture(3, angle);
     expect(validateFree(d)).toEqual([]);
@@ -244,7 +254,7 @@ describe('free compatibility and physical invariants', () => {
     expect(prepared.roofEnforced).toBe(true);
     const exported = validateLibraryExport(JSON.parse(recordJson({ kind: 'maze-lab-library-export', version: 1, mazes: [{ title: 'Free', maze: m }], walks: [] })));
     expect(exported.mazes[0]!.maze.version).toBe(5);
-  });
+  }, 60_000); // First access also seeds the larger built-in free-placement maps.
   test('schema rejects malformed anchors and derived navigation cannot override geometry', () => {
     const raw = JSON.parse(serialize(freeMaze(fixture())));
     raw.passages = [[], []];

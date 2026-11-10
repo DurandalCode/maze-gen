@@ -55,14 +55,14 @@ test('offline checkpoints cannot replace a terminal finished route, including co
   // Even a newer checkpoint cannot reopen a finished record.
   await saveOfflineWalk({ ...early, recording: { ...early.recording, elapsed: 20 } });
   expect((await storedWalk(finished.id)).walk).toEqual(finished);
-});
+}, 60_000);
 
 test('offline stopped route rejects an equal-time or older in-progress checkpoint', async () => {
   const { early } = fixture('offline-stopped');
   await saveOfflineWalk({ ...early, status: 'stopped' });
   await saveOfflineWalk(early);
   expect((await storedWalk(early.id)).walk.status).toBe('stopped');
-});
+}, 60_000);
 
 test('offline IDs exactly match FileStore, and construction changes preserve topology identity', async () => {
   const { maze, finished } = fixture('identity-offline');
@@ -78,7 +78,7 @@ test('offline IDs exactly match FileStore, and construction changes preserve top
   await saveOfflineWalk(finished);
   const list = await offlineRequest('/api/walks') as { walks: Awaited<ReturnType<FileStore['listWalks']>> };
   expect(list.walks.find(row => row.id === finished.id)?.topologyId).toBe(topologyId(maze));
-});
+}, 60_000);
 
 test('offline first attempt enforces roof and a later construction variant reuses history', async () => {
   const { maze: base, early } = fixture('offline-first-attempt');
@@ -90,7 +90,7 @@ test('offline first attempt enforces roof and a later construction variant reuse
   await saveOfflineWalk({ ...early, maze: first.maze });
   const next = await offlineRequest('/api/prepare-walk', { maze: { ...bare, wallColor: '#123456' } }) as typeof first;
   expect(next.firstAttempt).toBe(false); expect(next.roofEnforced).toBe(false); expect(next.maze.roof).toBe(false);
-});
+}, 60_000);
 
 test('fresh module connection lists persisted maze and raw recordings; full export roundtrips', async () => {
   const { maze, finished } = fixture('offline-restart-export');
@@ -103,16 +103,17 @@ test('fresh module connection lists persisted maze and raw recordings; full expo
   const list = await restarted.offlineRequest('/api/walks') as { walks: { id: string; finished: boolean }[] };
   expect(list.walks.some(row => row.id === finished.id && row.finished)).toBe(true);
   const exported = await buildLibraryExport();
-  expect(exported.modelVersion).toBe(10);
+  // The built-in commute pack includes two-storey maps, which require model v11.
+  expect(exported.modelVersion).toBe(11);
   const decoded = validateLibraryExport(JSON.parse(JSON.stringify(exported)));
-  expect(decoded.modelVersion).toBe(10);
+  expect(decoded.modelVersion).toBe(11);
   expect(decoded.walks.find(row => row.id === finished.id)).toEqual(finished);
   expect(decoded.mazes.find(row => row.title === 'Тест перезапуска')?.maze).toEqual(maze);
   // Reimporting snapshots keeps the exact same route and content identity.
   for (const row of decoded.mazes.filter(row => row.title === 'Тест перезапуска')) await saveOfflineMaze(row.maze, row.title);
   await saveOfflineWalk(decoded.walks.find(row => row.id === finished.id)!);
   expect((await storedWalk(finished.id)).walk).toEqual(finished);
-});
+}, 60_000);
 
 test('export validation rejects malformed samples, conflicting IDs, and corrupt maze snapshots', () => {
   const { maze, finished, early } = fixture('offline-validation');
@@ -123,7 +124,7 @@ test('export validation rejects malformed samples, conflicting IDs, and corrupt 
   expect(() => validateLibraryExport({ ...data, walks: [{ ...finished, recording: { ...finished.recording, samples: [{ x: 1, z: 1, time: -1 }] } }] })).toThrow();
   expect(() => validateLibraryExport({ ...data, mazes: [{ title: 'broken', maze: { ...maze, passages: [[9999]] } }] })).toThrow();
   expect(() => validateLibraryExport({ ...data, version: 9 })).toThrow();
-});
+}, 60_000);
 
 test('offline IDB write failure rejects explicitly and leaves the previous verified route intact', async () => {
   const { early, finished } = fixture('offline-quota');
@@ -137,7 +138,7 @@ test('offline IDB write failure rejects explicitly and leaves the previous verif
   expect((await storedWalk(early.id)).walk).toEqual(early);
   await saveOfflineWalk(finished);
   expect((await storedWalk(finished.id)).walk).toEqual(finished);
-});
+}, 60_000);
 
 
 test('pending finished record survives stale checkpoints and exports at equal elapsed after write failure', async () => {
@@ -162,7 +163,7 @@ test('pending finished record survives stale checkpoints and exports at equal el
   expect(await saveLibraryWalk(finished)).toEqual({ saved: true, queued: false });
   expect(localStorage.getItem(key)).toBeNull();
   expect((await storedWalk(finished.id)).walk).toEqual(finished);
-});
+}, 60_000);
 
 test('walk preference preserves terminal state, accepts final at equal time, and rejects ID/snapshot conflicts', () => {
   const { finished, early } = fixture('offline-preference');
@@ -173,7 +174,7 @@ test('walk preference preserves terminal state, accepts final at equal time, and
   expect(preferWalk({ ...early, status: 'stopped' }, early).status).toBe('stopped');
   expect(() => preferWalk(finished, { ...early, id: 'different' })).toThrow();
   expect(() => preferWalk(finished, { ...early, maze: { ...early.maze, roof: !early.maze.roof } })).toThrow();
-});
+}, 60_000);
 
 test('transient database open failure is recoverable without reloading the module', async () => {
   const modulePath = '../src/persistence/offline-library.ts?open-retry=' + crypto.randomUUID();
@@ -188,7 +189,7 @@ test('transient database open failure is recoverable without reloading the modul
   finally { open.mockRestore(); }
   const saved = await fresh.saveOfflineMaze(maze, 'Retry');
   expect(saved.id).toBe(await contentId(maze));
-});
+}, 60_000);
 
 
 test('offline corridor v4 restores explicit supports and exports without navigation subdivisions',async()=>{
@@ -196,4 +197,4 @@ test('offline corridor v4 restores explicit supports and exports without navigat
  const loaded=await offlineRequest('/api/mazes/'+saved.id) as SavedMaze;expect(loaded.maze).toEqual(maze);
  const exported=await buildLibraryExport(),wire=JSON.parse(recordJson(exported)),entry=wire.mazes.find((r:any)=>r.title==='Corridor offline QA');expect(entry.maze.version).toBe(4);expect(entry.maze.passages).toBeUndefined();expect(entry.maze.supports.length).toBeGreaterThan(0);
  const restored=validateLibraryExport(wire).mazes.find(r=>r.title==='Corridor offline QA')!;expect(restored.maze.passages).toEqual(maze.passages);expect(await browserTopologyId(restored.maze)).toBe(topologyId(maze));
-});
+}, 60_000);

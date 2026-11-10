@@ -35,7 +35,8 @@ function cutWall(w: Wall, cuts: Wall[]): Wall[] {
     const [p, q] = ends(cut);
     if (Math.abs(cross(a, b, p)) > EPS * length || Math.abs(cross(a, b, q)) > EPS * length) continue;
     const t = (v: Point) => ((v.x - a.x) * (b.x - a.x) + (v.z - a.z) * (b.z - a.z)) / (length * length);
-    intervals.push([Math.max(0, Math.min(t(p), t(q))), Math.min(1, Math.max(t(p), t(q)))]);
+    const lo = Math.max(0, Math.min(t(p), t(q))), hi = Math.min(1, Math.max(t(p), t(q)));
+    if (hi > lo) intervals.push([lo, hi]);
   }
   intervals.sort((x, y) => x[0] - y[0]);
   let at = 0;
