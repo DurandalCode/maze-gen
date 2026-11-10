@@ -165,3 +165,26 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 
 .walk-touch-choice{display:flex;align-items:center;justify-content:center;gap:10px;font-size:12px;color:#c6d5b7;margin:0 0 20px;cursor:pointer}.walk-touch-choice input{width:18px;height:18px;min-width:18px;margin:0;padding:0;accent-color:var(--lime)}
+
+/* Separate daily play/analysis actions from generation and construction controls. */
+[hidden]{display:none!important}
+.workspace-tabs{display:flex;gap:6px;margin-bottom:18px;flex-shrink:0}
+.workspace-tabs button{min-height:44px;padding:10px 20px;border-radius:6px;background:#20261e;border:1px solid #3a4233;color:#aeb9a1;font-size:13px}
+.workspace-tabs button[aria-pressed=true]{background:#303b25;border-color:#8ba759;color:var(--lime)}
+.analyze-shortcut{min-height:44px;padding:10px 15px;border:1px solid #657c43;border-radius:5px;background:#303b25;color:var(--lime);font-size:12px}
+.analysis-options{margin:16px 0;border-top:1px solid var(--border)}
+.analysis-options summary{min-height:44px;padding:14px 0;cursor:pointer;font-size:12px;color:#b7c5a5}
+.analysis-options[open] summary{margin-bottom:10px}
+.analysis-panel-anchor{scroll-margin-top:18px}
+.view-toolbar{flex-wrap:wrap}
+@media(max-width:820px){
+ .app-shell:not(.is-walking){padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+ .workspace-tabs{position:fixed;bottom:0;left:0;right:0;z-index:10;background:#131713;padding:10px 12px calc(10px + env(safe-area-inset-bottom));margin:0;border-top:1px solid var(--border)}
+ .workspace-tabs button{flex:1}
+ .analyze-shortcut{flex:1;min-width:150px}
+ .settings-open:not(.is-walking)>.workspace>:not(.workspace-tabs):not(.editing-shape):not(.editing-portals){display:none}
+ .settings-open:not(.is-walking)>.workspace .map-panel{margin-bottom:12px}
+ .sidebar form>.hint,.sidebar form>.field-note{grid-column:1/-1;font-size:11px;line-height:1.6;margin:0 0 12px}
+ .settings-open:not(.is-walking)>.sidebar{margin-top:0;border-top:0;padding-top:8px}
+ .analysis-panel-anchor{scroll-margin-top:12px}
+}

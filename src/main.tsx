@@ -32,6 +32,12 @@ function App() {
   const generationCancel=useRef<(()=>void)|null>(null);
   const [libraryOpen,setLibraryOpen]=useState(isOfflineLibrary);
   const [libraryRevision,setLibraryRevision]=useState(0);
+  const [section,setSection]=useState<'maze'|'settings'>('maze');
+  const [analysisRequest,setAnalysisRequest]=useState(0);
+  const analysisPanel=useRef<HTMLDivElement>(null);
+  const sidebarRef=useRef<HTMLElement>(null);
+  const switchSection=(next:'maze'|'settings')=>{setSection(next);setShapeEditing(false);setPortalEdit(null);requestAnimationFrame(()=>{window.scrollTo({top:0});sidebarRef.current?.scrollTo({top:0});});};
+  const requestAnalysis=()=>{switchSection('maze');setAnalysisRequest(n=>n+1);requestAnimationFrame(()=>analysisPanel.current?.scrollIntoView({block:'start',behavior:'smooth'}));};
   const [shapeEditing, setShapeEditing] = useState(false);
   const [shapeSelected, setShapeSelected] = useState<number|null>(null);
   const [shapeTool, setShapeTool] = useState<ShapeTool>('select');
@@ -113,10 +119,10 @@ function App() {
   },[maze]);
   const onCheckpoint=useCallback((value:WalkResult)=>persistRun(value,'in-progress'),[persistRun]);
   const onEnd = useCallback((value: WalkResult) => {
-    setResult(value); setMode('map'); setShowRoute(true);persistRun(value,value.finished?'finished':'stopped');
+    setResult(value); setMode('map'); setSection('maze'); setShowRoute(true);persistRun(value,value.finished?'finished':'stopped');
     setMessage(value.finished ? 'Выход найден! Твой маршрут записан.' : 'Прохождение остановлено. Записанная часть пути показана на карте.');
   }, [persistRun]);
-  const onWalkError = useCallback((value: string) => { setError(value); setMode('map'); }, []);
+  const onWalkError = useCallback((value: string) => { setError(value); setMode('map'); setSection('maze'); }, []);
   const save = async () => {
     resetNotice(); setBusy(true);
     try { if (await saveMaze(maze)) setMessage('Лабиринт сохранён в JSON.'); }
@@ -139,7 +145,7 @@ function App() {
     setMessage('Лабиринт улучшен. Форма и проёмы сохранены. Сохраните результат в JSON.');
   };
   const openLibraryMaze=(next:Maze)=>{
-    setMaze(next);setDraft(structuredClone(next.parameters));setResult(null);setMode('map');setShowRoute(false);setShapeEditing(false);setPortalEdit(null);resetNotice();
+    setMaze(next);setDraft(structuredClone(next.parameters));setResult(null);setMode('map');setSection('maze');setShowRoute(false);setShapeEditing(false);setPortalEdit(null);resetNotice();
   };
   const openLibraryWalk=(next:Maze,value:WalkResult)=>{
     openLibraryMaze(next);setResult(value);setShowRoute(true);setMessage('Прохождение открыто из общей библиотеки.');
@@ -161,17 +167,16 @@ function App() {
   const parameterNumber = (label: string, key: 'columns' | 'rows' | 'corridorWidth' | 'moduleSize' | 'extraConnections' | 'routeTrapCount' | 'loopTrapCount', min: number, max: number, step = 1, unit?: string) =>
     <label className="field"><span>{label}</span><div className="input-unit"><input aria-label={label} type="number" min={min} max={max} step={step} required value={Number.isNaN(draft[key]) ? '' : draft[key] ?? ((key === 'routeTrapCount' || key === 'loopTrapCount') ? 0 : '')} onChange={e => patch(key, e.target.valueAsNumber)} />{unit && <em>{unit}</em>}</div></label>;
 
-  return <div className={`app-shell ${mode === 'walk' ? 'is-walking' : ''}`}>
+  return <div className={`app-shell ${mode === 'walk' ? 'is-walking' : ''} ${section==='settings'?'settings-open':''}`}>
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Logo /></div><strong>MAZE <span>LAB</span></strong><span className="version">0.1</span></div>
       <div className="topbar-description">Лаборатория физических лабиринтов</div>
       <div className="local-badge"><i /> Локальный проект</div>
     </header>
     {mode === 'map' ? <>
-      <aside className="sidebar">
-        <div className="sidebar-title"><span className="eyebrow">КОНСТРУКТОР</span><span>01 / 02</span></div>
-        <h1>Начинается<br />с одного пути<span>.</span></h1>
-        <p className="sidebar-description">Создавай, исследуй и проверяй<br />лабиринты в реальном масштабе.</p>
+      <aside ref={sidebarRef} className="sidebar">
+        <div className="sidebar-title"><span className="eyebrow">{section==='settings'?'НАСТРОЙКИ ЛАБИРИНТА':'АНАЛИЗ ЛАБИРИНТА'}</span></div>
+        <div id="maze-settings-panel" hidden={section!=='settings'}>
         <form onSubmit={e => { e.preventDefault(); regenerate(); }}>
           <div className="section-label"><span>ПАРАМЕТРЫ ГЕНЕРАЦИИ</span><span>↘</span></div>
           <label className="field"><span>Конструкция</span><select aria-label="Конструкция" value={draft.moduleSize === undefined ? 'grid' : 'modules'} onChange={event => setDraft(p => {
@@ -199,15 +204,20 @@ function App() {
         </form>
         <ConstructionControls value={maze} onChange={patch => setMaze(current => ({ ...current, ...patch }))} />
         {!shapeEditing && <PortalControls maze={maze} edit={portalEdit} onEdit={setPortalEdit} onChange={changePortals} />}
-        <div hidden={shapeEditing}><ColdspotControls maze={maze} onDisplay={setHeatDisplay} onOptimized={acceptOptimized} /></div>
         {!shapeEditing && <EnvironmentControls maze={maze} onChange={changeEnvironment} />}
+        </div>
+        <div ref={analysisPanel} className="analysis-panel-anchor" hidden={section!=='maze'||shapeEditing}><ColdspotControls maze={maze} request={analysisRequest} onDisplay={setHeatDisplay} onOptimized={acceptOptimized} /></div>
         <div className="sidebar-bottom"><span className="mini-mark">ML /</span><span>Каждая развилка — эксперимент.</span></div>
       </aside>
       <main className="workspace">
+        <nav className="workspace-tabs" aria-label="Разделы приложения">
+          <button type="button" aria-pressed={section==='maze'} onClick={()=>switchSection('maze')}>Лабиринт</button>
+          <button type="button" aria-pressed={section==='settings'} onClick={()=>switchSection('settings')}>Настройки</button>
+        </nav>
         <div className="workspace-header"><div><div className="eyebrow">РАБОЧАЯ ОБЛАСТЬ</div><h2>План лабиринта <span>{maze.parameters.columns} × {maze.parameters.rows}</span></h2><div className="workspace-module-count" aria-label={maze.parameters.moduleSize===undefined?"Количество клеток":"Количество модулей"}>{maze.parameters.moduleSize===undefined?"Клетки":"Модули"}: <strong>{number(maze.parameters.moduleSize===undefined?analysis.cells:moduleCount)}</strong></div></div><div className="file-actions"><button onClick={()=>setLibraryOpen(true)}>Библиотека</button><button disabled={busy} onClick={()=>void saveShared()}>В библиотеку</button><button disabled={busy} onClick={() => void load()}><span aria-hidden="true">↥</span> Открыть</button><button disabled={busy} onClick={() => void save()}><span aria-hidden="true">↧</span> Сохранить</button></div></div>
         <LibraryPanel open={libraryOpen} revision={libraryRevision} onClose={()=>setLibraryOpen(false)} onMaze={openLibraryMaze} onWalk={openLibraryWalk} onPlay={next=>{openLibraryMaze(next);void beginWalk(next);}}/>
-        <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable||busy} onClick={() => { resetNotice(); void beginWalk(maze); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
-        <div className={`map-panel ${shapeEditing ? 'editing-shape' : ''}`}>
+        <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable||busy} onClick={() => { resetNotice(); void beginWalk(maze); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><button type="button" className="analyze-shortcut" onClick={requestAnalysis}>Проанализировать</button><label className="route-toggle"><input type="checkbox" checked={!!maze.roof} onChange={e=>setMaze(current=>({...current,roof:e.target.checked}))}/><span className="switch"/>Крыша</label><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
+        <div className={`map-panel ${shapeEditing ? 'editing-shape' : ''} ${portalEdit!==null?'editing-portals':''}`}>
           {!shapeEditing && <div className="map-topline"><span><i className="live-dot" /> {analysis.reachable ? 'ВЫХОД ДОСТИЖИМ' : 'ВЫХОД НЕДОСТИЖИМ'}</span><span>ВИД СВЕРХУ / МЕТРЫ</span></div>}
           {shapeEditing && draft.shape ? <ShapeEditor value={draft} onChange={setDraft} selected={shapeSelected} onSelect={setShapeSelected} tool={shapeTool}/> : <MapCanvas maze={maze} heat={heatDisplay} showRoute={showRoute} recorder={result?.recorder ?? null} onPlacePortal={portalEdit === null ? undefined : placePortal} onEnvironmentChange={changeEnvironment} />}
           {!shapeEditing && <div className="map-legend"><span><i className="legend-wall" /> Стены</span><span><i className="legend-route" /> Кратчайший путь</span>{result && <span><i className="legend-actual" /> Твой путь</span>}</div>}

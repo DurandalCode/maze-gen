@@ -11,8 +11,9 @@ export interface HeatDisplay {
   coldOnly: boolean;
 }
 const fmt = (value: number, digits = 1) => value.toLocaleString('ru-RU', { maximumFractionDigits: digits });
-export function ColdspotControls({ maze, onDisplay, onOptimized }: {
+export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: {
   maze: Maze;
+  request?: number;
   onDisplay: (display: HeatDisplay | null) => void;
   onOptimized: (result: OptimizationResult) => void;
 }) {
@@ -25,6 +26,7 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
   const [objective, setObjective] = useState<OptimizationObjective>('exploration');
   const [progress, setProgress] = useState(''), [notice, setNotice] = useState('');
   const optimizer = useRef<Worker | null>(null);
+  useEffect(()=>{if(request>0)setEnabled(true);},[request]);
   // Visibility depends on topology, construction and environment; cancel every obsolete job.
   useEffect(() => {
     optimizer.current?.terminate();
@@ -103,6 +105,8 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
   };
   return <section className="coldspot-controls" aria-label="Анализ колдспотов">
   <div className="section-label"><span>КОЛДСПОТЫ И СЛОЖНОСТЬ</span><span>◈</span></div>
+  {!enabled && <button type="button" className="coldspot-action" onClick={() => setEnabled(true)}>Проанализировать лабиринт</button>}
+  <details className="analysis-options"><summary>Параметры модели</summary>
   <p className="field-note">Вероятность попасть в участок до выхода. Модель v9 помнит увиденные соединения и оценивает местные развилки по видимой перспективе, направлению и заметным тупикам. Узнаваемый финиш имеет приоритет; скрытые стены заранее неизвестны.</p>
   <label className="field"><span>Профиль игрока</span><select aria-label="Профиль игрока" value={options.profile} onChange={e => setOptions({ ...options, profile: e.target.value as NavigationProfile })}>{Object.entries(PROFILE_NAMES).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
   {options.profile !== 'explorer' && <label className="field"><span>Опора на направление · {options.beta}</span><input aria-label="Опора на направление" type="range" min="0" max="5" step="0.25" value={options.beta} onChange={e => setOptions({ ...options, beta: Number(e.target.value) })}/></label>}
@@ -113,11 +117,11 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
   {options.profile === 'outline' && <label className="field"><span>Тяга к пути вдоль границы · {options.boundaryPreference ?? 1.5}</span><input aria-label="Тяга к пути вдоль границы" type="range" min="0" max="3" step="0.25" value={options.boundaryPreference ?? 1.5} onChange={e => setOptions({ ...options, boundaryPreference: Number(e.target.value) })}/><small>Граница обещает длинный обход. Предпочтение действует на выбор продолжения, но не запрещает уйти внутрь.</small></label>}
   {options.profile === 'outline' && <label className="field"><span>Отношение к границе</span><select aria-label="Отношение к границе" value={options.boundaryStrategy ?? 'adaptive'} onChange={e => setOptions({ ...options, boundaryStrategy: e.target.value as NonNullable<AnalysisOptions['boundaryStrategy']> })}><option value="adaptive">Пересматривает стратегию</option><option value="follow">Доверяет пути вдоль края</option><option value="avoid">Подозревает обманку у края</option></select><small>В адаптивном режиме начальные гипотезы смешаны поровну. После застоя и возврата гипотеза может смениться до двух раз.</small></label>}
   <label className="field"><span>Холодный участок · посещают менее {Math.round(options.threshold * 100)}%</span><input aria-label="Порог колдспота" type="range" min="5" max="50" step="5" value={options.threshold * 100} onChange={e => setOptions({ ...options, threshold: Number(e.target.value) / 100 })}/></label>
-  {!enabled && <button type="button" className="coldspot-action" onClick={() => setEnabled(true)}>Оценить лабиринт</button>}
+  </details>
   {calculating && <div className="coldspot-progress" role="status">Считаем горячесть…<button type="button" onClick={() => setEnabled(false)}>Отменить анализ</button></div>}
   {error && <p className="shape-error" role="alert">{error}</p>}
   {analysis && <>
-  <PotentialPanel value={analysis.potential} onLimit={(key, value) => setOptions({ ...options, [key]: value })}/>
+  <details className="analysis-options"><summary>Подробная оценка сложности</summary><PotentialPanel value={analysis.potential} onLimit={(key, value) => setOptions({ ...options, [key]: value })}/></details>
   <label className="coldspot-check"><input aria-label="Горячесть на карте" type="checkbox" checked={show} onChange={e => setShow(e.target.checked)}/> Горячесть на карте</label>
   <label className="field"><span>Тепловой слой</span><select aria-label="Тепловой слой" value={layer} onChange={e => setLayer(e.target.value as HeatLayer)}><option value="probability">Вероятность посещения</option><option value="visits">Среднее число посещений</option></select></label>
   <label className="coldspot-check"><input aria-label="Только холодные участки" type="checkbox" checked={coldOnly} onChange={e => setColdOnly(e.target.checked)}/> Только холодные участки</label>
@@ -134,6 +138,7 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
   <div><dt>Средний путь модели</dt><dd>{fmt(analysis.expectedLength)} м · {fmt(analysis.searchRatio, 2)}× кратчайшего</dd></div>
   </dl>
   <p className="field-note">{analysis.method === 'exact-tree' ? 'Точный расчёт для модели на дереве.' : `Оценка по ${analysis.samples} воспроизводимым прохождениям; значения около порога могут колебаться.`} Видимость солнца, леса и внешней ткани проверяется лучами. Без ориентиров уверенность сохраняется на уровне внутреннего удержания курса. Это приближённая модель, не статистика людей.</p>
+  <details className="analysis-options"><summary>Улучшение лабиринта</summary>
   <div className="section-label"><span>АВТОПОДБОР ПЛАНИРОВКИ</span></div>
   <label className="field"><span>Цель подбора</span><select aria-label="Цель подбора" value={objective} disabled={optimizing} onChange={e => setObjective(e.target.value as OptimizationObjective)}><option value="exploration">Сложные решения и скрытые проёмы</option><option value="coldspots">Меньше колдспотов</option></select></label>
   <label className="field"><span>Способ улучшения</span><select aria-label="Способ улучшения" value={method} disabled={optimizing} onChange={e => setMethod(e.target.value as OptimizationMethod)}><option value="seeds" disabled={!!analysis?.potential?.cycles}>Подобрать seed</option><option value="walls">Переставить стены</option></select></label>
@@ -141,6 +146,7 @@ export function ColdspotControls({ maze, onDisplay, onOptimized }: {
   <p className="field-note">{analysis.potential?.cycles ? 'Подбор перестановкой стен сохраняет число колец, защищённые элементы и пределы качества. Новый seed выбирается обычной генерацией.' : objective === 'exploration' ? 'Подбор по прогнозу боковой разведки без повторов. Вход и выход экранируются; обязательный маршрут занимает 35–55% площади. Форма и места проёмов сохраняются.' : 'Оценка колдспотов по трём профилям. Сохраняем форму, проёмы и циклы; не менее 80% развилок и тупиков.'} На больших лабиринтах бюджет ограничен объёмом расчёта. Изменённые стены сохраняются в JSON.</p>
   <button type="button" className="coldspot-action" disabled={optimizing || calculating} onClick={optimize}>Улучшить лабиринт</button>
   {optimizing && <div className="coldspot-progress" role="status">{progress}<button type="button" onClick={cancel}>Отмена</button></div>}
+  </details>
   </>}
   {notice && <p className="field-note" role="status">{notice}</p>}
   </section>;
