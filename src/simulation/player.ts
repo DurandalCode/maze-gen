@@ -13,12 +13,13 @@ export class Player {
   readonly recorder: Recorder;
   finished = false;
   private spatialWorld?:TwoStoreyWorld;
-  constructor(private maze: Maze, private world: CollisionWorld) {
+  constructor(private maze: Maze, private world: CollisionWorld, readonly mode:'walk'|'inspection'='walk') {
     this.position = portalPoint(maze, maze.entrance);
     this.yaw = { west: -Math.PI/2, east: Math.PI/2, north: Math.PI, south: 0 }[maze.entrance.side];
     if(maze.version===5){const n=freePortal(maze,maze.free!.entrance).normal;this.yaw=Math.atan2(n.x,n.z);}
+    if(mode==='inspection'){this.position={x:maze.width/2,z:maze.depth+6,y:0,floor:0};this.yaw=0;}
     this.recorder = new Recorder(this.position);
-    if(maze.storeys)this.spatialWorld=new TwoStoreyWorld(maze);
+    if(maze.storeys&&mode==='walk')this.spatialWorld=new TwoStoreyWorld(maze);
   }
 
   update(dt: number, keys: ReadonlySet<string>): void {
@@ -52,6 +53,11 @@ export class Player {
     let previous = {...this.position};
     this.position = this.world.move(this.position, delta, 0.25, point => {
       step++;
+      if(this.mode==='inspection'){
+        point.x=Math.max(-20,Math.min(this.maze.width+20,point.x));
+        point.z=Math.max(-20,Math.min(this.maze.depth+20,point.z));
+        return;
+      }
       // Keep visitors on the site: leaving via the entrance cannot bypass the maze.
       const clipped = domainOf(this.maze).constrain(previous, point);
       point.x=clipped.x; point.z=clipped.z; previous={...point};

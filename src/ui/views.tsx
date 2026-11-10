@@ -82,8 +82,8 @@ export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePort
 
 export interface WalkResult { recorder: Recorder; finished: boolean; id?:string }
 
-export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
-  maze: Maze; onEnd: (result: WalkResult) => void; onError: (message: string) => void; onCheckpoint?: (result:WalkResult)=>void;
+export function WalkCanvas({ maze, onEnd, onError, onCheckpoint, inspection=false }: {
+  maze: Maze; onEnd: (result: WalkResult) => void; onError: (message: string) => void; onCheckpoint?: (result:WalkResult)=>void; inspection?:boolean;
 }) {
   const portals = mazePortals(maze);
   const startNumber = portals.findIndex(p => samePortal(p, maze.entrance))+1;
@@ -126,7 +126,7 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
       scene = new WalkScene(element); scene.setMaze(maze);
     }
     catch (error) { onError(`3D недоступен: ${error instanceof Error ? error.message : String(error)}`); return; }
-    const player = new Player(maze, new CollisionWorld([...walls(maze), ...supportColliders(maze)], maze.parameters.corridorWidth));
+    const player = new Player(maze, new CollisionWorld([...walls(maze), ...supportColliders(maze)], maze.parameters.corridorWidth),inspection?'inspection':'walk');
     playerRef.current = player;
     const keys = new Set<string>();
     const keyDown = (event: KeyboardEvent) => {
@@ -161,7 +161,7 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
       }
       scene.render(player);
       if (now-lastStats > 100) { setStats({ distance: player.recorder.distance, elapsed: player.recorder.elapsed }); lastStats = now; }
-      if(now-lastCheckpoint>10_000 && player.recorder.distance>savedDistance+.01) {
+      if(!inspection&&now-lastCheckpoint>10_000 && player.recorder.distance>savedDistance+.01) {
         onCheckpoint?.({id:runId.current,recorder:player.recorder,finished:false});lastCheckpoint=now;savedDistance=player.recorder.distance;
       }
       if (player.finished) { endedRef.current = true; suspend(); onEnd({ id:runId.current,recorder: player.recorder, finished: true }); return; }
@@ -170,7 +170,7 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
     function checkpoint() {
       // Native backgrounding can happen before the periodic save or pagehide.
       // Never create idle runs or emit an in-progress save after a terminal result.
-      if (endedRef.current || player.recorder.distance <= .01 || player.recorder.distance <= savedDistance) return;
+      if (inspection || endedRef.current || player.recorder.distance <= .01 || player.recorder.distance <= savedDistance) return;
       onCheckpoint?.({ id: runId.current, recorder: player.recorder, finished: false });
       savedDistance = player.recorder.distance; lastCheckpoint = performance.now();
     }
@@ -185,7 +185,7 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
     };
     })();
     return () => { cancelled = true; cleanup(); };
-  }, [maze, onEnd, onError, onCheckpoint]);
+  }, [maze, onEnd, onError, onCheckpoint,inspection]);
   const stop = () => {
     const player = playerRef.current;
     if (!player || endedRef.current) return;
@@ -194,18 +194,18 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint }: {
     onEnd({ id:runId.current,recorder: player.recorder, finished: false });
   };
   return <div className={`walk-view ${touch ? 'touch-walk' : ''}`}>
-    <canvas ref={canvas} className="walk-canvas" aria-label="Лабиринт от первого лица" onClick={() => { if (!locked && !touch) void lock(); }} />
-    <div className="walk-hud"><span><i className="live-dot" /> СТАРТ {startNumber} → ФИНИШ {finishNumber}</span><strong>{formatTime(stats.elapsed)}</strong><strong>{stats.distance.toFixed(1)} <small>м</small></strong></div>
+    <canvas ref={canvas} className="walk-canvas" aria-label={inspection?'Осмотр сооружения снаружи':'Лабиринт от первого лица'} onClick={() => { if (!locked && !touch) void lock(); }} />
+    <div className="walk-hud">{inspection?<span><i className="live-dot" /> ОСМОТР · БЕЗ ЗАПИСИ ПРОХОЖДЕНИЯ</span>:<><span><i className="live-dot" /> СТАРТ {startNumber} → ФИНИШ {finishNumber}</span><strong>{formatTime(stats.elapsed)}</strong><strong>{stats.distance.toFixed(1)} <small>м</small></strong></>}</div>
     <button className="back-map" onClick={stop}>← Вернуться к карте</button>
     {locked && <div className="crosshair">+</div>}
     {locked && touch && <><button className="walk-pause" onClick={pause}>Ⅱ Пауза</button><TouchControls onMove={setMove} onLook={setLook} onError={onError} /></>}
     {!locked && <div className="walk-overlay"><div className="walk-intro">
-      <span className="eyebrow">ПОЛЕВОЕ ИССЛЕДОВАНИЕ / 01</span>
-      <h2>{stats.elapsed > 0 ? 'Продолжим путь?' : 'Найди свой выход.'}</h2>
-      <p>Вход {startNumber} → выход {finishNumber}. Найди выбранный выход.<br />После прохождения сравним твой путь с кратчайшим.</p>
+      <span className="eyebrow">{inspection?'ОСМОТР СООРУЖЕНИЯ':'ПОЛЕВОЕ ИССЛЕДОВАНИЕ / 01'}</span>
+      <h2>{inspection?'Посмотри снаружи.':stats.elapsed > 0 ? 'Продолжим путь?' : 'Найди свой выход.'}</h2>
+      {inspection?<p>Обойди сооружение и осмотри каркас. Стены остаются препятствиями.<br />Осмотр не записывается как прохождение.</p>:<p>Вход {startNumber} → выход {finishNumber}. Найди выбранный выход.<br />После прохождения сравним твой путь с кратчайшим.</p>}
       {touch ? <div className="key-guide touch-guide"><span>ЛЕВЫЙ · ходьба / бег</span><span>ПРАВЫЙ · обзор</span></div> : <div className="key-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> движение</span><span><kbd>⇧</kbd> быстрее</span><span>МЫШЬ · обзор</span></div>}
       <label className="walk-touch-choice"><input type="checkbox" checked={touch} onChange={event => { clearTouch(); setTouch(event.target.checked); }} /> Управление двумя джойстиками</label>
-      <button className="primary" onClick={() => void lock()}>{stats.elapsed > 0 ? 'Продолжить' : 'Начать прохождение'} <span>↗</span></button>
+      <button className="primary" onClick={() => void lock()}>{inspection?'Начать осмотр':stats.elapsed > 0 ? 'Продолжить' : 'Начать прохождение'} <span>↗</span></button>
       <small>{touch ? 'Чем сильнее отклонён левый джойстик, тем быстрее движение: у края — бег. Кнопка «Пауза» останавливает таймер.' : 'Esc — пауза и освобождение курсора. Таймер на паузе не идёт.'}</small>
       {lockError && <p role="alert">{lockError}</p>}
     </div></div>}

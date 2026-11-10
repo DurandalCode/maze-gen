@@ -27,11 +27,12 @@ export function newFreeDraft(p?: Parameters): FreeDraft {
 }
 const points = (poly: Point[]) => poly.map(p => `${p.x},${p.z}`).join(' ');
 type Tool = 'select' | 'module' | 'connection' | 'wall' | 'opening';
-export function FreeEditor({ initial, onGrid }: { initial: FreeDraft; onGrid: () => void }) {
+export function FreeEditor({ initial, initialResult=null, onClose }: { initial: FreeDraft; initialResult?:WalkResult|null; onClose: (draft:FreeDraft,maze:Maze|null,result:WalkResult|null) => void }) {
   const [state, dispatch] = useReducer(editorReducer, initial, history), d = state.present, l = d.layout;
-  const [tool, setTool] = useState<Tool>('select'), [selected, setSelected] = useState(''), [moduleType, setModuleType] = useState<'2x2' | '2x6'>('2x2'), [snap, setSnap] = useState(false), [width, setWidth] = useState(1.4), [pending, setPending] = useState<Anchor | Point | null>(null), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showRoute, setShowRoute] = useState(false), [walk, setWalk] = useState<Maze | null>(null), [result, setResult] = useState<WalkResult | null>(null), [library, setLibrary] = useState(false), [revision, setRevision] = useState(0), [analysis, setAnalysis] = useState<ReturnType<typeof analyzeFree> | null>(null), [profile, setProfile] = useState<'explorer' | 'compass' | 'outline'>('explorer'), [shapeEditing, setShapeEditing] = useState(false), [shapeSelected, setShapeSelected] = useState<number | null>(null), [shapeTool, setShapeTool] = useState<ShapeTool>('select'), [restore, setRestore] = useState<string | null>(null), [storageReady, setStorageReady] = useState(false);
+  const [tool, setTool] = useState<Tool>('select'), [selected, setSelected] = useState(''), [moduleType, setModuleType] = useState<'2x2' | '2x6'>('2x2'), [snap, setSnap] = useState(false), [width, setWidth] = useState(1.4), [pending, setPending] = useState<Anchor | Point | null>(null), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showRoute, setShowRoute] = useState(false), [walk, setWalk] = useState<Maze | null>(null), [result, setResult] = useState<WalkResult | null>(initialResult), [library, setLibrary] = useState(false), [revision, setRevision] = useState(0), [analysis, setAnalysis] = useState<ReturnType<typeof analyzeFree> | null>(null), [profile, setProfile] = useState<'explorer' | 'compass' | 'outline'>('explorer'), [shapeEditing, setShapeEditing] = useState(false), [shapeSelected, setShapeSelected] = useState<number | null>(null), [shapeTool, setShapeTool] = useState<ShapeTool>('select'), [restore, setRestore] = useState<string | null>(null), [storageReady, setStorageReady] = useState(false);
   const worker = useRef<Worker | null>(null), svg = useRef<SVGSVGElement | null>(null), drag = useRef<{ id: string; start: Point; module: FreeModule; draft: FreeDraft } | null>(null), [preview, setPreview] = useState<FreeDraft | null>(null), [connectionPreview, setConnectionPreview] = useState<{ draft: FreeDraft; id: string } | null>(null), [view, setView] = useState({ x: -1, z: -1, width: d.parameters.columns + 2, height: d.parameters.rows + 2 });
   const current = preview ?? connectionPreview?.draft ?? d, phys = useMemo(() => physical(current.layout), [current]), issues = useMemo(() => validateFree(current), [current]), issueIds = new Set(issues.flatMap(i => i.ids)), ready = useMemo(() => issues.length || connectionPreview ? null : freeMaze(d, false), [d, issues.length, connectionPreview]), stats = useMemo(() => ready ? metrics(ready) : null, [ready]), materials = useMemo(() => ready ? materialEstimate(ready) : null, [ready]);
+  const [inspection,setInspection]=useState(false);
   const update = (draft: FreeDraft) => {
     if (worker.current) {
       worker.current.terminate();
@@ -250,9 +251,9 @@ export function FreeEditor({ initial, onGrid }: { initial: FreeDraft; onGrid: ()
   const begin = async (m: Maze) => {
     try {
       const prepared = await prepareLibraryWalk(m);
-      setWalk(prepared.maze);
+      setInspection(false);setWalk(prepared.maze);
     } catch {
-      setWalk({ ...m, roof: true });
+      setInspection(false);setWalk({ ...m, roof: true });
     }
   };
   const saveRun = (value: WalkResult, status: 'in-progress' | 'stopped' | 'finished') => {
@@ -265,16 +266,17 @@ export function FreeEditor({ initial, onGrid }: { initial: FreeDraft; onGrid: ()
     if (Number.isFinite(e.target.valueAsNumber)) onChange(e.target.valueAsNumber);
   }} /></label>;
   const anchorOptions = (value: Anchor, onChange: (a: Anchor) => void) => <><label className="field">Пространство<select aria-label="Пространство" value={value.room} onChange={e => onChange({ ...value, room: e.target.value, edge: 0, offset: 0 })}>{rooms(l).map(r => <option key={r.id} value={r.id}>{r.id}</option>)}</select></label>{numberField('Сторона', value.edge, v => onChange({ ...value, edge: v }), 1, 0, (rooms(l).find(r => r.id === value.room)?.polygon.length ?? 4) - 1)}{numberField('Смещение проёма, м', value.offset, v => onChange({ ...value, offset: v }))}</>;
-  if (walk) return <main className="walk-main"><WalkCanvas maze={walk} onError={e => {
+  if (walk) return <main className="walk-main"><WalkCanvas maze={walk} inspection={inspection} onError={e => {
     setNotice(e);
     setWalk(null);
   }} onCheckpoint={v => saveRun(v, 'in-progress')} onEnd={v => {
+    if(inspection){setWalk(null);return;}
     saveRun(v, v.finished ? 'finished' : 'stopped');
     setResult(v);
     setWalk(null);
     setShowRoute(true);
   }} /></main>;
-  return <div className="free-app"><header className="topbar"><div className="brand"><strong>MAZE <span>LAB</span></strong></div><label>Размещение <select aria-label="Размещение" value="free" onChange={onGrid}><option value="grid">По сетке</option><option value="free">Свободное размещение</option></select></label><span>Черновик сохраняется на устройстве</span></header><aside className="free-sidebar"><h2>Свободное размещение</h2><label className="field">Тип лабиринта<select aria-label="Тип лабиринта" value={d.parameters.generationType ?? 'classical'} onChange={e => mutate(n => n.parameters.generationType = e.target.value as Parameters['generationType'])}><option value="classical">Классический</option><option value="living">Живой</option><option value="corridor">Коридорный</option></select></label><label className="field">Алгоритм<select value={d.parameters.algorithm} onChange={e => mutate(n => n.parameters.algorithm = e.target.value as Parameters['algorithm'])}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
+  return <div className="free-app"><header className="topbar"><div className="brand"><strong>MAZE <span>LAB</span></strong></div><label className="route-toggle"><input type="checkbox" role="switch" aria-label="Редактор свободного размещения" checked onChange={()=>onClose(d,ready,result)}/> Редактор свободного размещения</label><span>Черновик сохраняется на устройстве</span></header><aside className="free-sidebar"><h2>Свободное размещение</h2><label className="field">Тип лабиринта<select aria-label="Тип лабиринта" value={d.parameters.generationType ?? 'classical'} onChange={e => mutate(n => n.parameters.generationType = e.target.value as Parameters['generationType'])}><option value="classical">Классический</option><option value="living">Живой</option><option value="corridor">Коридорный</option></select></label><label className="field">Алгоритм<select value={d.parameters.algorithm} onChange={e => mutate(n => n.parameters.algorithm = e.target.value as Parameters['algorithm'])}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
     {numberField('Разброс углов, °', d.parameters.freeAngleSpread ?? 100, v => mutate(n => n.parameters.freeAngleSpread = v), 5, 0, 120)}
     <label className="field">Центральный перекрёсток<select aria-label="Центральный перекрёсток" value={d.parameters.freeJunctionDegree ?? 'auto'} onChange={e => mutate(n => {
       if (e.target.value === 'auto') delete n.parameters.freeJunctionDegree; else n.parameters.freeJunctionDegree = Number(e.target.value) as 3 | 5;
@@ -316,7 +318,7 @@ export function FreeEditor({ initial, onGrid }: { initial: FreeDraft; onGrid: ()
         setRevision(n => n + 1);
         setNotice('Карта сохранена в библиотеке.');
       }).catch(e => setNotice(String(e)));
-    }}>В библиотеку</button><button disabled={!ready || busy} onClick={() => ready && void begin(ready)}>Пройти от первого лица</button></div>
+    }}>В библиотеку</button><button disabled={!ready || busy} onClick={()=>{if(ready){setInspection(true);setWalk(ready);}}}>Осмотреть снаружи</button><button disabled={!ready || busy} onClick={() => ready && void begin(ready)}>Пройти от первого лица</button></div>
       <LibraryPanel open={library} revision={revision} onClose={() => setLibrary(false)} onMaze={accept} onWalk={(m, v) => {
         accept(m);
         setResult(v);

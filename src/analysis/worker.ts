@@ -1,4 +1,5 @@
 import {sideDistricts} from './side-districts';
+import {freeHeatDisplay} from '../free/quality';
 import {analyzePotential} from './potential-difficulty';
 import { expectedExploration } from './expected-exploration';
 import { decisionDifficulty } from './decision-difficulty';
@@ -22,6 +23,7 @@ self.onmessage = (event: MessageEvent<Request>) => {
   try {
     const request = event.data;
     if (request.kind === 'analyze') {
+      if(request.maze.version===5){const result=freeHeatDisplay(request.maze,request.options);result.sideDistricts=sideDistricts(request.maze,result.probability,result.options.threshold);self.postMessage({kind:'analysis',result});return;}
       const result = analyzeColdspots(request.maze, request.options);
       result.potential=analyzePotential(request.maze,request.maze.parameters.design?{...request.options,samples:2048}:request.options,result);
       result.sideDistricts=sideDistricts(request.maze,result.probability,result.options.threshold);

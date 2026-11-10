@@ -1,4 +1,5 @@
 import {storeyView,floorOf,stairAt} from '../core/two-storey';
+import {freeRuntime} from '../free/layout';
 import {corridorSupports} from '../core/corridor-supports';
 import {corridorNavigation} from '../core/corridor-navigation';
 import type { HeatDisplay } from './coldspot-controls';
@@ -158,6 +159,10 @@ export class MapView {
     ctx.fillText('С ↑', 24, 90);
     const { scale: s, left, top } = this.layout();
     const px = (x: number) => left+x*s, py = (z: number) => top+z*s;
+    const free=maze.version===5?freeRuntime(maze):null;
+    const polygon=(points:readonly Point[],holes:readonly Point[][]=[])=>{
+      ctx.beginPath();for(const ring of [points,...holes]){ring.forEach((p,i)=>i?ctx.lineTo(px(p.x),py(p.z)):ctx.moveTo(px(p.x),py(p.z)));ctx.closePath();}
+    };
     const environment = this.preview ?? environmentOf(maze), forest = forestMapPoints(maze, environment);
     ctx.fillStyle = '#28422e'; ctx.strokeStyle = '#63865c'; ctx.lineWidth = 1.5;
     ctx.beginPath(); forest.forEach((point, i) => i ? ctx.lineTo(px(point.x), py(point.z)) : ctx.moveTo(px(point.x), py(point.z)));
@@ -172,10 +177,13 @@ export class MapView {
     ctx.fillText(sunPosition.elevation < 0 ? 'СОЛНЦЕ ЗА ГОРИЗОНТОМ' : `СОЛНЦЕ · ${Math.round(sunPosition.elevation)}°`,
       Math.max(100, Math.min(w-100, handles.sun.x)), handles.sun.y+25);
     ctx.fillStyle = '#1b211b';
-    for (const cell of floorCells) { const r=domainOf(maze).rectangles[cell]!; ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s); }
+    if(free){for(const room of free.rooms){polygon(room.polygon,room.holes);ctx.fill('evenodd');}for(const connection of free.connections){polygon(connection.polygon);ctx.fill();}}
+    else for (const cell of floorCells) { const r=domainOf(maze).rectangles[cell]!; ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s); }
     for (const m of moduleFootprints(maze.storeys?storeyView(maze,this.floor):maze)) {
-      ctx.fillStyle = '#293023'; ctx.fillRect(px(m.x), py(m.z), (m.width??m.size)*s, (m.depth??m.size)*s);
-      ctx.strokeStyle = '#576044'; ctx.lineWidth = 1; ctx.strokeRect(px(m.x), py(m.z), (m.width??m.size)*s, (m.depth??m.size)*s);
+      const width=m.width??m.size,depth=m.depth??m.size;
+      ctx.save();ctx.translate(px(m.x+width/2),py(m.z+depth/2));ctx.rotate((m.angle??0)*Math.PI/180);
+      ctx.fillStyle = '#293023'; ctx.fillRect(-width*s/2,-depth*s/2,width*s,depth*s);
+      ctx.strokeStyle = '#576044'; ctx.lineWidth = 1; ctx.strokeRect(-width*s/2,-depth*s/2,width*s,depth*s);ctx.restore();
     }
     if(this.heat) {
       const {analysis,layer,coldOnly}=this.heat;
@@ -187,13 +195,20 @@ export class MapView {
         const value=layer==='probability'?p:analysis.visits[cell]!/maximum,r=domainOf(maze).rectangles[cell]!;
         const red=Math.round(38+207*value),green=Math.round(97+39*value),blue=Math.round(150-100*value);
         ctx.fillStyle=`rgb(${red} ${green} ${blue} / 82%)`;
-        ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);
+        if(free){const room=free.rooms[cell]!;polygon(room.polygon,room.holes);ctx.fill('evenodd');}
+        else ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);
+      }
+      if(free)for(const connection of maze.free!.connections){
+        const a=free.rooms.findIndex(r=>r.id===connection.a.room),b=free.rooms.findIndex(r=>r.id===connection.b.room),p=(analysis.probability[a]!+analysis.probability[b]!)/2;
+        if(coldOnly&&p>=analysis.options.threshold)continue;
+        const value=layer==='probability'?p:(analysis.visits[a]!+analysis.visits[b]!)/(2*maximum),geometry=free.connections.find(c=>c.id===connection.id)!;
+        ctx.fillStyle=`rgb(${Math.round(38+207*value)} ${Math.round(97+39*value)} ${Math.round(150-100*value)} / 82%)`;polygon(geometry.polygon);ctx.fill();
       }
     }
     ctx.strokeStyle = '#293027'; ctx.lineWidth = 1;
     const cell = maze.parameters.corridorWidth;
     ctx.beginPath();
-    for(const cellIndex of maze.version===4?[]:floorCells) {
+    for(const cellIndex of maze.version===4||free?[]:floorCells) {
       const r=domainOf(maze).rectangles[cellIndex]!;
       ctx.rect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);
     }

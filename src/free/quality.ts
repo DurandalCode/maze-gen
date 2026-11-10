@@ -9,6 +9,19 @@ import { routeTraps } from '../analysis/route-traps';
 import { loopTraps } from '../analysis/loop-traps';
 import { routePoints, pathLength } from '../core/pathfinding';
 import { effectiveLimits } from '../core/design-limits';
+import type {AnalysisOptions,ColdspotAnalysis} from '../analysis/coldspots';
+/** Present the existing free-space model in the common heat-map interface. */
+export function freeHeatDisplay(maze:Maze,options:AnalysisOptions):ColdspotAnalysis {
+  const result=analyzeFree(maze,options.samples,options.profile),weights=freeAreaWeights(maze),seen=new Set<number>(),regions:{cells:number[];area:number}[]=[];
+  for(let cell=0;cell<maze.passages.length;cell++){
+    if(seen.has(cell)||result.probability[cell]!>=options.threshold)continue;
+    const cells=[cell];seen.add(cell);
+    for(const c of cells)for(const n of maze.passages[c]!)if(!seen.has(n)&&result.probability[n]!<options.threshold){seen.add(n);cells.push(n);}
+    regions.push({cells,area:cells.reduce((sum,c)=>sum+weights[c]!,0)});
+  }
+  const coldArea=regions.reduce((sum,r)=>sum+r.area,0),area=weights.reduce((a,b)=>a+b,0);
+  return {options:{...options},probability:result.probability,visits:result.visits,regions,coldArea,coldAreaRatio:area?coldArea/area:0,largestColdArea:Math.max(0,...regions.map(r=>r.area)),expectedLength:result.expectedLength,optimalLength:result.optimalLength,searchRatio:result.optimalLength?result.expectedLength/result.optimalLength:0,method:'sampled',samples:result.samples};
+}
 /** Policy sees only current neighbours, geometric heading and its visit history. */
 export function analyzeFree(maze: Maze, samples = 256, profile: 'explorer' | 'compass' | 'outline' = 'explorer') {
   const r = freeRuntime(maze), outline = outlineDistances(maze, r.centers), rng = random(maze.parameters.seed + profile), visits = new Float64Array(r.rooms.length), probability = new Float64Array(r.rooms.length), goal = r.centers[maze.exit.cell]!, length = (p: Point[]) => p.slice(1).reduce((n, v, i) => n + distance(v, p[i]!), 0);
