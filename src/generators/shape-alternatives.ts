@@ -2,11 +2,20 @@ import type {Maze} from '../core/maze';
 import {routingSize} from '../core/maze';
 import {shapeMask,domainOf} from '../core/domain';
 import {generateBase} from './generate';
-import {withPortals,mazePortals} from '../core/portals';
+import {withPortals,mazePortals,transferPortals} from '../core/portals';
 
 /** Conservative P-shape fallback: same module count first, then growth inside the user's budget. */
 export function shapeAlternatives(base:Maze):Maze[]{
-  const design=base.parameters.design;if(!design?.allowReshape||base.parameters.moduleSize===undefined||mazePortals(base).length!==2)return [];
+  const design=base.parameters.design;if(!design?.allowReshape||mazePortals(base).length!==2)return [];
+  if(base.parameters.generationType==='living'&&!base.parameters.shape){
+    const {columns,rows}=base.parameters,old=columns*rows,max=Math.floor(old*(1+design.maxModuleGrowth)+1e-8),choices:{columns:number;rows:number}[]=[];
+    for(let x=1;x<=Math.min(100,max);x++)for(let z=1;z<=Math.min(100,max);z++)if(x*z>=old&&x*z<=max&&(x!==columns||z!==rows))choices.push({columns:x,rows:z});
+    choices.sort((a,b)=>Number(a.columns*a.rows!==old)-Number(b.columns*b.rows!==old)||Math.abs(a.columns-columns)+Math.abs(a.rows-rows)-Math.abs(b.columns-columns)-Math.abs(b.rows-rows)||a.columns*a.rows-b.columns*b.rows||a.columns-b.columns);
+    const result:Maze[]=[];
+    for(const choice of choices.slice(0,16))try{const raw=generateBase({...base.parameters,...choice});result.push(transferPortals(base,{...raw,wallHeight:base.wallHeight,wallColor:base.wallColor,translucentFabric:base.translucentFabric,roof:base.roof,...(base.environment?{environment:base.environment}:{})}));}catch{/* This footprint cannot fit the requested number of cycles. */}
+    return result;
+  }
+  if(base.parameters.moduleSize===undefined)return [];
   const {columns:w,rows:h}=base.parameters,mask=shapeMask(base.parameters);
   let thickness=0;while(mask[(h-1)*w+thickness])thickness++;
   if(thickness<2||2*thickness>=w)return [];

@@ -18,7 +18,7 @@ export interface GuardConstraints {
   pockets: number[][];
 }
 /** Build opaque return pockets without changing the footprint or moving the selected portals. */
-function constraints(base: Maze): GuardConstraints {
+export function portalConstraints(base: Maze): GuardConstraints {
   const { columns } = routingSize(base), domain = domainOf(base), ports = [base.entrance, base.exit];
   const chains = (p: Portal) => {
     const inward = p.side === 'south' ? -columns : p.side === 'north' ? columns : p.side === 'east' ? -1 : 1;
@@ -68,7 +68,7 @@ export function guardedMaze(base: Maze, seed: string, inherit = false): {
 } {
   if (metrics(base).cycles !== 0 || metrics(base).components !== 1)
     throw new Error('Подбор сложности со скрытыми проёмами пока поддерживает связные деревья проходов.');
-  const guard = constraints(base), generated = inherit ? base : generateBase({ ...base.parameters, seed });
+  const guard = portalConstraints(base), generated = inherit ? base : generateBase({ ...base.parameters, seed });
   const maze: Maze = { ...base, parameters: generated.parameters, passages: base.passages.map(() => []) };
   const parent = maze.passages.map((_, i) => i), rng = random(seed + '|guarded-v1');
   const root = (x: number): number => { while (parent[x] !== x) {

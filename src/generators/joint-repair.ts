@@ -1,3 +1,4 @@
+import {effectiveLimits} from '../core/design-limits';
 import {cellCenter,cellSize,routingSize,type Maze} from '../core/maze';
 import {domainOf} from '../core/domain';
 import {shortestPath} from '../core/pathfinding';
@@ -29,12 +30,12 @@ function longEdges(maze:Maze,limit:number):[number,number][]{
 export function jointRepair(base:Maze,seed:string,steps=320,onProgress?:(state:{attempted:number;geometry:number;coldPenalty:number})=>void):Maze[]{
   // Ordinary trap generation has the same default 12m/20m passage bounds,
   // without additional design-only perspective or cold-area constraints.
-  const limits=base.parameters.design??{maxForcedStraight:12,maxForcedRun:20,maxVisibleStraight:Infinity,maxColdRatio:1,maxColdRegion:Infinity};
+  const limits=effectiveLimits(base.parameters);
   const guard=guardedMaze(base,seed,true).constraints,rng=random(seed+'|joint-repair'),domain=domainOf(base);
   const requested=base.parameters.routeTrapCount??0,area=domain.area;
   const routeArea=(m:Maze)=>shortestPath(m).reduce((sum,n)=>{const s=cellSize(m,n);return sum+s.width*s.depth;},0)/area;
   const initialArea=routeArea(base),retainArea=initialArea>=.35&&initialArea<=.55;
-  const geometry=(m:Maze)=>{const c=corridorQuality(m,limits.maxForcedStraight),route=shortestPath(m),ratio=route.reduce((sum,n)=>{const s=cellSize(m,n);return sum+s.width*s.depth;},0)/area;return Math.max(0,c.longestForcedStraight/limits.maxForcedStraight-1)+Math.max(0,c.longestForcedRun/limits.maxForcedRun-1)+2*Math.max(0,c.longestVisibleStraight/limits.maxVisibleStraight-1)+10*Math.max(0,.35-ratio,ratio-.55);};
+  const geometry=(m:Maze)=>{const c=corridorQuality(m,Math.min(40,limits.maxForcedStraight)),route=shortestPath(m),ratio=route.reduce((sum,n)=>{const s=cellSize(m,n);return sum+s.width*s.depth;},0)/area;return Math.max(0,c.longestForcedStraight/limits.maxForcedStraight-1)+Math.max(0,c.longestForcedRun/limits.maxForcedRun-1)+2*Math.max(0,c.longestVisibleStraight/limits.maxVisibleStraight-1)+10*Math.max(0,.35-ratio,ratio-.55);};
   const assess=(m:Maze)=>analyzePotential(m,{...DEFAULT_ANALYSIS,samples:32,routeMemory:1},undefined,false);
   const cold=(p:ReturnType<typeof assess>)=>Math.max(0,p.worstColdRatio/Math.max(.001,limits.maxColdRatio)-1)+Math.max(0,p.worstColdRegion/Math.max(.1,limits.maxColdRegion)-1)-.05*p.minOptionalCoverage;
   let current=base,g=geometry(base),p=g<1e-8?assess(base):null,c=p?cold(p):0;

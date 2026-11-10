@@ -1,3 +1,4 @@
+import {effectiveLimits} from '../core/design-limits';
 import {neighbors,type Maze} from '../core/maze';
 import {metrics} from '../core/metrics';
 import {obviousForkDeadEnds} from '../analysis/visible-deadends';
@@ -12,20 +13,21 @@ import {DEFAULT_ANALYSIS} from '../analysis/coldspots';
  * fork and return-loop fork. Leaf relocation can preserve pendant tree traps. Additional cycles are explicit in the returned parameters.
  * Heat remains physical; every returned edit passes the original quality limits.
  */
-export function braidObviousPockets(base:Maze,targetRatio=.12,maxAdditionalCycles=24,onProgress?:(message:string)=>void):Maze {
+export function braidObviousPockets(base:Maze,targetRatio=.12,maxAdditionalCycles=24,onProgress?:(message:string)=>void,accept:(maze:Maze)=>boolean=()=>true):Maze {
  if(!Number.isFinite(targetRatio)||targetRatio<0||targetRatio>1||!Number.isInteger(maxAdditionalCycles)||maxAdditionalCycles<0||maxAdditionalCycles>20000)throw new Error('Некорректная цель сокращения очевидных карманов.');
  const originalTraps=new Set(routeTraps(base).candidates.filter(t=>t.qualifies).map(t=>t.fork));
  const originalLoops=new Set(loopTraps(base).candidates.filter(t=>t.qualifies).map(t=>t.fork));
  const privacy=mazePortalPrivacy(base,false),protectedCells=new Set([...privacy.entrance.pocket,...privacy.exit.pocket]);
- const limits=base.parameters.design;
+ const bounds=effectiveLimits(base.parameters);
  const assess=(maze:Maze,samples:number)=>analyzePotential(maze,{...DEFAULT_ANALYSIS,samples,routeMemory:1},undefined,false);
  let current=base,ratio=obviousForkDeadEnds(base).ratio;
  for(let step=0;step<maxAdditionalCycles&&ratio>targetRatio;step++){
   const candidates:{maze:Maze;ratio:number}[]=[],keys=new Set<string>();
   const offer=(maze:Maze)=>{
+   if(!accept(maze))return;
    const nextRatio=obviousForkDeadEnds(maze).ratio;if(nextRatio>=ratio-1e-9)return;
-   const c=corridorQuality(maze,limits?.maxForcedStraight??12);
-   if(c.longestForcedStraight>c.straightLimit||c.longestForcedRun>(limits?.maxForcedRun??20)||c.longestVisibleStraight>(limits?.maxVisibleStraight??Infinity))return;
+   const c=corridorQuality(maze,Math.min(40,bounds.maxForcedStraight));
+   if(c.longestForcedStraight>bounds.maxForcedStraight||c.longestForcedRun>(bounds.maxForcedRun)||c.longestVisibleStraight>(bounds.maxVisibleStraight))return;
    const traps=new Set(routeTraps(maze).candidates.filter(t=>t.qualifies).map(t=>t.fork));if([...originalTraps].some(f=>!traps.has(f)))return;
    const loops=new Set(loopTraps(maze).candidates.filter(t=>t.qualifies).map(t=>t.fork));if([...originalLoops].some(f=>!loops.has(f)))return;
    candidates.push({maze,ratio:nextRatio});

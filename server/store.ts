@@ -8,7 +8,7 @@ import { domainOf } from '../src/core/domain';
 import type { Maze } from '../src/core/maze';
 
 export interface SavedMaze {id:string;title:string;createdAt:string;updatedAt:string;maze:Maze;status?:'candidate'|'rejected';rejectionReason?:string}
-export function topologyId(maze:Maze):string {const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,loopTrapCount:______,...geometry}=maze.parameters;return createHash('sha256').update(canonical({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]})).digest('hex').slice(0,24);}
+export function topologyId(maze:Maze):string {const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,loopTrapCount:______,generationType:_______,...geometry}=maze.parameters;return createHash('sha256').update(canonical({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]})).digest('hex').slice(0,24);}
 export interface SavedWalk {id:string;mazeId:string;createdAt:string;updatedAt:string;walk:WalkData;assessment:WalkAssessment}
 const validId=(id:string)=>/^[a-zA-Z0-9_-]{1,80}$/.test(id);
 function canonical(value:unknown):string {
@@ -69,7 +69,7 @@ export class FileStore {
   }
   async listMazes() {
     return (await this.list<SavedMaze>('mazes')).sort((a,b)=>(a.status==='rejected'?1:0)-(b.status==='rejected'?1:0)||b.updatedAt.localeCompare(a.updatedAt)).map(row=>({id:row.id,title:row.title,createdAt:row.createdAt,updatedAt:row.updatedAt,status:row.status??'candidate',rejectionReason:row.rejectionReason,
-      columns:row.maze.parameters.columns,rows:row.maze.parameters.rows,modules:row.maze.parameters.moduleSize===undefined?null:domainOf(row.maze).modules.reduce((a,b)=>a+b,0)}));
+      columns:row.maze.parameters.columns,rows:row.maze.parameters.rows,generationType:row.maze.parameters.generationType??'classical',modules:row.maze.parameters.moduleSize===undefined?null:domainOf(row.maze).modules.reduce((a,b)=>a+b,0)}));
   }
   async listWalks() {
     return (await this.list<SavedWalk>('walks')).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).map(row=>({id:row.id,mazeId:row.mazeId,createdAt:row.createdAt,updatedAt:row.updatedAt,

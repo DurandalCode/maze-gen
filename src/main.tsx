@@ -19,6 +19,8 @@ import { PortalControls, type PortalEdit } from './ui/portal-controls';
 import { EnvironmentControls } from './ui/environment-controls';
 import type { Environment } from './core/environment';
 import './style.css';
+import {contourQuality} from './generators/contours';
+import {generationName,type GenerationType} from './core/maze';
 import {DesignControls} from './ui/design-controls';
 
 const initial: Parameters = { columns: 5, rows: 5, corridorWidth: 2, moduleSize: 2, extraConnections: 0, seed: 'FIELD-024', algorithm: 'backtracker' };
@@ -53,6 +55,7 @@ function App() {
   const [generationMs, setGenerationMs] = useState<number | null>(null);
   const [portalEdit, setPortalEdit] = useState<PortalEdit>(null);
   const analysis = useMemo(() => metrics(maze), [maze]);
+  const livingInfo=useMemo(()=>maze.parameters.generationType==='living'?contourQuality(maze):null,[maze]);
   const moduleCount=useMemo(()=>domainOf(maze).modules.reduce((sum,active)=>sum+active,0),[maze]);
   const walkAssessment=useMemo(()=>result?assessWalk(maze,result.recorder.samples,result.recorder.distance,result.finished):null,[maze,result]);
   useEffect(()=> {
@@ -92,7 +95,7 @@ function App() {
     setBusy(true);
     try {
       const start = performance.now();
-      const generated=((draft.routeTrapCount??0)>0 || (draft.loopTrapCount??0)>0 || draft.design) ? await new Promise<Maze>((resolve,reject)=>{
+      const generated=(draft.generationType==='living'||(draft.routeTrapCount??0)>0 || (draft.loopTrapCount??0)>0 || draft.design) ? await new Promise<Maze>((resolve,reject)=>{
         const worker=new Worker(new URL('./generators/worker.ts',import.meta.url),{type:'module'});
         generationCancel.current=()=>{worker.terminate();generationCancel.current=null;reject(new Error('Генерация отменена. Текущий лабиринт сохранён.'));};
         worker.onmessage=e=>{if(e.data.progress){setMessage(e.data.progress);return;}worker.terminate();generationCancel.current=null;e.data.error?reject(new Error(e.data.error)):resolve(e.data.maze);};
@@ -179,13 +182,15 @@ function App() {
         <div id="maze-settings-panel" hidden={section!=='settings'}>
         <form onSubmit={e => { e.preventDefault(); regenerate(); }}>
           <div className="section-label"><span>ПАРАМЕТРЫ ГЕНЕРАЦИИ</span><span>↘</span></div>
+          <label className="field"><span>Тип лабиринта</span><select aria-label="Тип лабиринта" value={draft.generationType??'classical'} onChange={e=>patch('generationType',e.target.value as GenerationType)}><option value="classical">Классический</option><option value="living">Живой</option></select></label>
+          {draft.generationType==='living'&&<p className="field-note">Вложенные контуры повторяют форму площадки. Переходы, перегородки и дополнительные соединения образуют развилки и кольца.</p>}
           <label className="field"><span>Конструкция</span><select aria-label="Конструкция" value={draft.moduleSize === undefined ? 'grid' : 'modules'} onChange={event => setDraft(p => {
             const { moduleSize, ...rest } = p;
             return event.target.value === 'modules' ? { ...rest, moduleSize: moduleSize ?? 2 } : rest;
           })}><option value="modules">Отдельные квадратные модули</option><option value="grid">Классическая сетка</option></select></label>
           <ShapeControls value={draft} onChange={setDraft} editing={shapeEditing} onEditing={value=>{setShapeEditing(value);setPortalEdit(null);}} selected={shapeSelected} onSelect={setShapeSelected} tool={shapeTool} onTool={setShapeTool}/>
-          <label className="field"><span>Алгоритм</span><select aria-label="Алгоритм" value={draft.algorithm} onChange={e => patch('algorithm', e.target.value as Algorithm)}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
-          <p className="field-note algorithm-note">{draft.algorithm === 'backtracker' ? 'Длинные извилистые пути и глубокие тупики.' : 'Много коротких ответвлений и частых развилок.'}</p>
+          {draft.generationType!=='living'&&<><label className="field"><span>Алгоритм</span><select aria-label="Алгоритм" value={draft.algorithm} onChange={e => patch('algorithm', e.target.value as Algorithm)}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
+          <p className="field-note algorithm-note">{draft.algorithm === 'backtracker' ? 'Длинные извилистые пути и глубокие тупики.' : 'Много коротких ответвлений и частых развилок.'}</p></>}
           <div className="field-pair">{parameterNumber('Столбцы', 'columns', 1, 100)}{parameterNumber('Строки', 'rows', 1, 100)}</div>
           {draft.moduleSize !== undefined && parameterNumber('Размер модуля', 'moduleSize', 0.8, 10, 0.1, 'м')}
           {parameterNumber(draft.moduleSize === undefined ? 'Ширина коридора' : 'Проход между модулями', 'corridorWidth', 0.8, 10, 0.1, 'м')}
@@ -195,7 +200,7 @@ function App() {
           <p className="hint">Кольцевая ловушка: два выхода с одной развилки соединены обходом и возвращают на неё. Требует дополнительных соединений.</p>
           <p className="field-note">{draft.moduleSize === undefined ? 'Добавляют циклы между существующими путями.' : 'Стены на модулях и между ними образуют единый лабиринт. Дополнительные связи добавляют циклы.'}</p>
           <p className="field-note">Разные развилки с ложным приближением к выходу. 0 — без требования к количеству. Если места недостаточно, генерация сообщит об этом.</p>
-          <DesignControls value={draft.design} onChange={value=>patch('design',value)}/>
+          <DesignControls living={draft.generationType==='living'} value={draft.design} onChange={value=>patch('design',value)}/>
           <label className="field seed-field"><span>Seed <small>ВОСПРОИЗВОДИМОСТЬ</small></span><div className="seed-input"><input value={draft.seed} maxLength={256} onChange={e => patch('seed', e.target.value)} spellCheck={false} /><button type="button" title="Новый seed" aria-label="Новый seed" onClick={() => patch('seed', `FIELD-${Date.now().toString(36).toUpperCase()}`)}>⟳</button></div></label>
           <button className="primary generate" disabled={busy||!!draftStatus.error} type="submit" aria-label="Сгенерировать">Сгенерировать <span aria-hidden="true">↗</span></button>
           {busy&&generationCancel.current&&<button className="blind-button" type="button" onClick={()=>generationCancel.current?.()}>Отменить генерацию</button>}
@@ -214,7 +219,7 @@ function App() {
           <button type="button" aria-pressed={section==='maze'} onClick={()=>switchSection('maze')}>Лабиринт</button>
           <button type="button" aria-pressed={section==='settings'} onClick={()=>switchSection('settings')}>Настройки</button>
         </nav>
-        <div className="workspace-header"><div><div className="eyebrow">РАБОЧАЯ ОБЛАСТЬ</div><h2>План лабиринта <span>{maze.parameters.columns} × {maze.parameters.rows}</span></h2><div className="workspace-module-count" aria-label={maze.parameters.moduleSize===undefined?"Количество клеток":"Количество модулей"}>{maze.parameters.moduleSize===undefined?"Клетки":"Модули"}: <strong>{number(maze.parameters.moduleSize===undefined?analysis.cells:moduleCount)}</strong></div></div><div className="file-actions"><button onClick={()=>setLibraryOpen(true)}>Библиотека</button><button disabled={busy} onClick={()=>void saveShared()}>В библиотеку</button><button disabled={busy} onClick={() => void load()}><span aria-hidden="true">↥</span> Открыть</button><button disabled={busy} onClick={() => void save()}><span aria-hidden="true">↧</span> Сохранить</button></div></div>
+        <div className="workspace-header"><div><div className="eyebrow">РАБОЧАЯ ОБЛАСТЬ</div><h2>{generationName(maze.parameters)} лабиринт <span>{maze.parameters.columns} × {maze.parameters.rows}</span></h2><div className="workspace-module-count" aria-label={maze.parameters.moduleSize===undefined?"Количество клеток":"Количество модулей"}>{maze.parameters.moduleSize===undefined?"Клетки":"Модули"}: <strong>{number(maze.parameters.moduleSize===undefined?analysis.cells:moduleCount)}</strong></div>{livingInfo&&<p className="living-summary">{livingInfo.layers} слоёв · {livingInfo.ratio===null?'нет контурных связей':number(livingInfo.ratio*100)+'% контурных связей'}{livingInfo.layers<2?' · Недостаточно места для нескольких вложенных контуров.':''}</p>}</div><div className="file-actions"><button onClick={()=>setLibraryOpen(true)}>Библиотека</button><button disabled={busy} onClick={()=>void saveShared()}>В библиотеку</button><button disabled={busy} onClick={() => void load()}><span aria-hidden="true">↥</span> Открыть</button><button disabled={busy} onClick={() => void save()}><span aria-hidden="true">↧</span> Сохранить</button></div></div>
         <LibraryPanel open={libraryOpen} revision={libraryRevision} onClose={()=>setLibraryOpen(false)} onMaze={openLibraryMaze} onWalk={openLibraryWalk} onPlay={next=>{openLibraryMaze(next);void beginWalk(next);}}/>
         <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable||busy} onClick={() => { resetNotice(); void beginWalk(maze); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><button type="button" className="analyze-shortcut" onClick={requestAnalysis}>Проанализировать</button><label className="route-toggle"><input type="checkbox" checked={!!maze.roof} onChange={e=>setMaze(current=>({...current,roof:e.target.checked}))}/><span className="switch"/>Крыша</label><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
         <div className={`map-panel ${shapeEditing ? 'editing-shape' : ''} ${portalEdit!==null?'editing-portals':''}`}>
@@ -230,7 +235,7 @@ function App() {
           <Metric label="КРАТЧАЙШИЙ ПУТЬ" value={number(analysis.optimalLength, 1)} unit="м" detail={`${number(analysis.routeAreaRatio, 3)} м/м² · по центрам клеток`} accent />
         </div></section>
         {result && <section className="results" aria-label="Результаты прохождения"><div className="result-heading"><span className="eyebrow">{result.finished ? 'ВЫХОД НАЙДЕН' : 'ПРОХОЖДЕНИЕ ОСТАНОВЛЕНО'}</span><button aria-label="Закрыть результаты" onClick={() => setResult(null)}>×</button></div><div className="result-values"><div><strong>{formatTime(result.recorder.elapsed)}</strong><span>время в движении и исследовании</span></div><div><strong>{number(result.recorder.distance, 1)} <small>м</small></strong><span>твой путь</span></div><div><strong>{number(analysis.optimalLength, 1)} <small>м</small></strong><span>кратчайший путь по центрам клеток</span></div><div><strong>{result.finished ? `${number(result.recorder.distance/analysis.optimalLength, 2)}×` : '—'}</strong><span>отношение к кратчайшему</span></div></div>{walkAssessment?.exploration&&<><div className="result-values exploration-values" aria-label="Разведка боковых веток"><div><strong>{number(walkAssessment.exploration.exploredOptionalRatio*100)}%</strong><span>боковой площади разведано</span></div><div><strong>{walkAssessment.exploration.firstDetourChoices}/{walkAssessment.exploration.assessedFirstChoices}</strong><span>первый выбор боковой ветки</span></div><div><strong>{walkAssessment.exploration.deepBranches}</strong><span>веток глубиной ≥6 м</span></div><div><strong>{number(walkAssessment.exploration.uniqueExplorationRatio*100)}%</strong><span>разведка сверх кратчайшего пути</span></div></div><p className="walk-observations">Повторы: {number(walkAssessment.exploration.repeatedLength)} м по центрам. Обязательный маршрут занимает {number(walkAssessment.exploration.mandatoryAreaRatio*100)}% площади. Эти метрики отделяют разведку от обязательного пути и повторов.</p></>}<p>{walkAssessment && <span className="walk-observations">По записи: посещено {number(walkAssessment.coveredAreaRatio*100)}% площади; на {walkAssessment.decisionCount} развилках продолжил прямо {walkAssessment.continuedStraight} раз; из {walkAssessment.comparableCorridorChoices} выборов с разной видимой длиной выбрал длиннейший {walkAssessment.longestCorridorChoices} раз. Оценка по движению, направление взгляда не записано.</span>}Маршрут-эталон идёт по центрам клеток; свободное движение со срезанием углов может дать отношение меньше 1.</p></section>}
-        <footer className="workspace-footer"><span>{maze.parameters.algorithm === 'backtracker' ? 'Recursive Backtracker' : 'Randomized Prim'} <b>·</b> Seed: {maze.parameters.seed || '(пустой)'}</span><span>{generationMs === null ? 'ЛОКАЛЬНО · БЕЗ ТЕЛЕМЕТРИИ' : `ГЕНЕРАЦИЯ ${number(generationMs, 1)} мс`}</span></footer>
+        <footer className="workspace-footer"><span>{maze.parameters.generationType==='living'?'Живой · вложенные контуры':maze.parameters.algorithm === 'backtracker' ? 'Классический · Recursive Backtracker' : 'Классический · Randomized Prim'} <b>·</b> Seed: {maze.parameters.seed || '(пустой)'}</span><span>{generationMs === null ? 'ЛОКАЛЬНО · БЕЗ ТЕЛЕМЕТРИИ' : `ГЕНЕРАЦИЯ ${number(generationMs, 1)} мс`}</span></footer>
       </main>
     </> : <main className="walk-main"><WalkCanvas maze={maze} onEnd={onEnd} onError={onWalkError} onCheckpoint={onCheckpoint} /></main>}
     {(message || error) && <div className={`notification ${error ? 'error' : ''}`} role={error ? 'alert' : 'status'}><span>{error || message}</span><button onClick={resetNotice} aria-label="Закрыть уведомление">×</button></div>}

@@ -1,19 +1,25 @@
 import {DEFAULT_DESIGN_LIMITS,type DesignLimits} from '../core/maze';
-export function DesignControls({value,onChange}:{value:DesignLimits|undefined;onChange:(value:DesignLimits|undefined)=>void}){
- const field=(label:string,key:keyof Omit<DesignLimits,'allowReshape'>,min:number,max:number,scale=1,unit='')=><label className="field"><span>{label}</span><div className="input-unit"><input aria-label={label} type="number" min={min} max={max} step={key==='maxColdRegion'?4:1} value={Number.isNaN(value![key])?'':(value![key]??1)*scale} onChange={e=>onChange({...value!,[key]:e.target.valueAsNumber/scale})}/>{unit&&<em>{unit}</em>}</div></label>;
+import {defaultDesign,type LimitKey} from '../core/design-limits';
+export function DesignControls({value,onChange,living=false}:{value:DesignLimits|undefined;onChange:(value:DesignLimits|undefined)=>void;living?:boolean}){
+ const enabled=(key:LimitKey)=>!value?.disabledLimits?.includes(key)&&(key!=='maxUnavoidableRouteRatio'||value?.maxUnavoidableRouteRatio!==undefined);
+ const toggle=(key:LimitKey,on:boolean)=>{
+  const disabled=new Set(value?.disabledLimits??[]);if(on)disabled.delete(key);else disabled.add(key);
+  const next={...value!,...(key==='maxUnavoidableRouteRatio'&&on?{maxUnavoidableRouteRatio:value?.maxUnavoidableRouteRatio??.7}:{}),...(disabled.size?{disabledLimits:[...disabled]}:{})};
+  if(!disabled.size)delete next.disabledLimits;onChange(next);
+ };
+ const field=(label:string,key:LimitKey,min:number,max:number,scale=1,unit='')=><div className="quality-bound"><label className="coldspot-check"><input type="checkbox" aria-label={'Ограничивать: '+label} checked={enabled(key)} onChange={e=>toggle(key,e.target.checked)}/>{label}</label>{enabled(key)&&<label className="field"><div className="input-unit"><input aria-label={label} type="number" min={min} max={max} step={key==='maxColdRegion'?4:1} value={Number.isNaN(value![key])?'':(value![key]??1)*scale} onChange={e=>onChange({...value!,[key]:e.target.valueAsNumber/scale})}/>{unit&&<em>{unit}</em>}</div></label>}</div>;
  return <fieldset className="design-controls"><legend>Пределы качества</legend>
-  <label className="coldspot-check"><input type="checkbox" aria-label="Применять пределы качества" checked={!!value} onChange={e=>onChange(e.target.checked?{...DEFAULT_DESIGN_LIMITS}:undefined)}/> Применять пределы качества вместе</label>
+  <label className="coldspot-check"><input type="checkbox" aria-label="Применять пределы качества" checked={!!value} onChange={e=>onChange(e.target.checked?defaultDesign(living,DEFAULT_DESIGN_LIMITS):undefined)}/> Применять пределы качества вместе</label>
   {value&&<><div className="design-grid">
    {field('Прямая без выбора, максимум','maxForcedStraight',2,40,1,'м')}
    {field('Проход без развилок, максимум','maxForcedRun',2,100,1,'м')}
    {field('Видимая прямая, максимум','maxVisibleStraight',2,24,1,'м')}
    {field('Холодная площадь, максимум','maxColdRatio',0,100,100,'%')}
-   <label className="coldspot-check"><input type="checkbox" aria-label="Ограничивать долю маршрута без обхода" checked={value.maxUnavoidableRouteRatio!==undefined} onChange={e=>{const {maxUnavoidableRouteRatio:_,...rest}=value;onChange(e.target.checked?{...value,maxUnavoidableRouteRatio:.7}:rest);}}/> Ограничивать долю маршрута без обхода</label>
-   {value.maxUnavoidableRouteRatio!==undefined&&field('Маршрут без обхода, максимум','maxUnavoidableRouteRatio',0,100,100,'%')}
    {field('Крупнейший колдспот, максимум','maxColdRegion',0,10000,1,'м²')}
-  </div><p className="field-note">Ловушки, длины проходов и холодные области должны одновременно пройти проверку. Ограничение доли маршрута применяется при дополнительных соединениях. Для циклов дополнительно оцениваются обходы на основном маршруте; отдельная тупиковая петля не считается обходом. Холодные области оцениваются для трёх стратегий отношения к границе; берётся худший результат модели.</p>
+   {field('Маршрут без обхода, максимум','maxUnavoidableRouteRatio',0,100,100,'%')}
+  </div><p className="field-note">Включённые ограничения проверяются одновременно. Ограничение доли маршрута применяется при дополнительных соединениях. Для живого типа длинные контуры разрешены, пока вы явно не включите пределы длины. Отдельная тупиковая петля не считается обходом. Холодные области оцениваются для трёх стратегий отношения к границе.</p>
   <label className="coldspot-check"><input type="checkbox" aria-label="Разрешить изменение формы при подборе" checked={value.allowReshape} onChange={e=>onChange({...value,allowReshape:e.target.checked})}/> Если текущая форма не подходит, менять пропорции или расширять</label>
-  {value.allowReshape&&field('Увеличение модулей, не более','maxModuleGrowth',0,100,100,'%')}
+  {value.allowReshape&&<label className="field"><span>Увеличение модулей, не более</span><input aria-label="Увеличение модулей, не более" type="number" min="0" max="100" value={value.maxModuleGrowth*100} onChange={e=>onChange({...value,maxModuleGrowth:e.target.valueAsNumber/100})}/></label>}
   </>}
  </fieldset>;
 }

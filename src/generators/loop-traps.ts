@@ -1,3 +1,4 @@
+import {effectiveLimits} from '../core/design-limits';
 import {neighbors,routingSize,validateParameters,type Maze} from '../core/maze';
 import {domainOf} from '../core/domain';
 import {metrics} from '../core/metrics';
@@ -27,14 +28,14 @@ export function loopTrapCandidates(tree:Maze,guard:GuardConstraints,limit=8):Maz
  return archive.map(r=>r.maze);
 }
 /** Cyclic wall exchanges can fix long passages/cold spots while retaining a genuine return loop. */
-function repair(base:Maze,guard:GuardConstraints,seed:string,steps:number,progress?:(message:string)=>void):Maze|null {
- const limits=base.parameters.design,rng=random(seed+'|loop-repair'),requested=base.parameters.loopTrapCount??0,requestedDead=base.parameters.routeTrapCount??0;
+export function repairCyclicGeometry(base:Maze,guard:GuardConstraints,seed:string,steps:number,progress?:(message:string)=>void,accept:(maze:Maze)=>boolean=()=>true):Maze|null {
+ const limits=base.parameters.design,bounds=effectiveLimits(base.parameters),rng=random(seed+'|loop-repair'),requested=base.parameters.loopTrapCount??0,requestedDead=base.parameters.routeTrapCount??0;
  const protectedCells=new Set(guard.pockets.flat()),pairs=guard.allowed.filter(([a,b])=>!protectedCells.has(a)&&!protectedCells.has(b));
- const geometry=(m:Maze)=>{const c=corridorQuality(m,limits?.maxForcedStraight??12);return Math.max(0,c.longestForcedStraight/(limits?.maxForcedStraight??12)-1)+Math.max(0,c.longestForcedRun/(limits?.maxForcedRun??20)-1)+2*Math.max(0,c.longestVisibleStraight/(limits?.maxVisibleStraight??Infinity)-1);};
+ const geometry=(m:Maze)=>{const c=corridorQuality(m,Math.min(40,bounds.maxForcedStraight));return Math.max(0,c.longestForcedStraight/(bounds.maxForcedStraight)-1)+Math.max(0,c.longestForcedRun/(bounds.maxForcedRun)-1)+2*Math.max(0,c.longestVisibleStraight/(bounds.maxVisibleStraight)-1);};
  const assess=(m:Maze,samples:number)=>analyzePotential(m,{...DEFAULT_ANALYSIS,samples,routeMemory:1},undefined,false);
- const cold=(p:ReturnType<typeof assess>)=>limits?Math.max(0,p.worstColdRatio/Math.max(.001,limits.maxColdRatio)-1)+Math.max(0,p.worstColdRegion/Math.max(.1,limits.maxColdRegion)-1):0;
+ const cold=(p:ReturnType<typeof assess>)=>limits?Math.max(0,p.worstColdRatio/Math.max(.001,bounds.maxColdRatio)-1)+Math.max(0,p.worstColdRegion/Math.max(.1,bounds.maxColdRegion)-1):0;
  let current=base,g=geometry(current),p=g<1e-8?assess(current,32):null,c=p?cold(p):0;
- if(p?.eligible&&assess(current,128).eligible&&assess(current,2048).eligible)return current;
+ if(p?.eligible&&accept(current)&&assess(current,128).eligible&&assess(current,2048).eligible)return current;
  for(let i=0;i<steps;i++){
   if(i%100===0)progress?.(`Кольцевая ловушка: проверка проходов и тепла · ${i}/${steps}`);
   const closed=pairs.filter(([a,b])=>!current.passages[a]!.includes(b));if(!closed.length)break;
@@ -45,12 +46,12 @@ function repair(base:Maze,guard:GuardConstraints,seed:string,steps:number,progre
   passages[a]!.push(b);passages[b]!.push(a);passages[x]=passages[x]!.filter(n=>n!==y);passages[y]=passages[y]!.filter(n=>n!==x);
   for(const n of new Set([a,b,x,y]))passages[n]!.sort((a,b)=>a-b);
   const maze={...current,passages},nextG=geometry(maze);
-  if(g<1e-8&&nextG>1e-8)continue;
+  if(!accept(maze)||g<1e-8&&nextG>1e-8)continue;
   const temperature=.12*(1-i/steps)+.01;
   if(nextG>g&&rng()>Math.exp(-10*(nextG-g)/temperature))continue;
   if(loopTraps(maze).qualifiedCount<requested||routeTraps(maze).qualifiedCount<requestedDead)continue;
   const nextP=nextG<1e-8?assess(maze,32):null,nextC=nextP?cold(nextP):0,delta=10*(nextG-g)+(nextG<1e-8?nextC-c:0);
-  if(nextP?.eligible&&assess(maze,128).eligible&&assess(maze,2048).eligible)return maze;
+  if(nextP?.eligible&&accept(maze)&&assess(maze,128).eligible&&assess(maze,2048).eligible)return maze;
   if(delta<=0||rng()<Math.exp(-delta/temperature)){current=maze;g=nextG;p=nextP;c=nextC;}
  }
  return null;
@@ -78,7 +79,7 @@ export function generateLoopTraps(base:Maze,onProgress?:(message:string)=>void):
    if(metrics(candidate).cycles!==requested)continue;
    // Route-alternative bounds apply to the final graph, after all requested links exist.
    const design=base.parameters.design;
-   const m={...candidate,parameters:{...base.parameters,extraConnections:requested,...(design?{design:{...design,maxUnavoidableRouteRatio:1}}:{})}},repaired=repair(m,guard,seed,1200,onProgress);
+   const m={...candidate,parameters:{...base.parameters,extraConnections:requested,...(design?{design:{...design,maxUnavoidableRouteRatio:1}}:{})}},repaired=repairCyclicGeometry(m,guard,seed,1200,onProgress);
    if(!repaired)continue;
    const restored={...repaired,parameters:{...base.parameters,extraConnections:requested}};
    const result=base.parameters.extraConnections>requested?addConstrainedConnections(restored,base.parameters.extraConnections,base.parameters.seed,onProgress):restored;

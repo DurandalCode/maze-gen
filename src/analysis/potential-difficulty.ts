@@ -1,3 +1,7 @@
+import {compassProbe,type CompassProbe} from './compass-probe';
+import {networkStructure,coldNearExit,type NetworkStructure} from './network-structure';
+import {effectiveLimits} from '../core/design-limits';
+import {contourQuality,type ContourQuality} from '../generators/contours';
 import type { Maze,DesignLimits } from '../core/maze';
 import {routeAlternatives,type RouteAlternatives} from './route-alternatives';
 import {obviousForkDeadEnds,recognitionAdjustedColdspots} from './visible-deadends';
@@ -10,6 +14,7 @@ import { expectedExploration } from './expected-exploration';
 import { corridorQuality, type CorridorQuality } from './corridor-quality';
 import { analyzeColdspots, validateAnalysisOptions, type AnalysisOptions, type ColdspotAnalysis } from './coldspots';
 export interface PotentialScenario {
+  finishColdArea:number;
   strategy: string;
   optionalCoverage: number;
   uniqueExplorationLength: number;
@@ -25,7 +30,12 @@ export interface PotentialScenario {
   typicalDepth: number;
 }
 export interface PotentialDifficulty {
+  compass:CompassProbe;
+  network:NetworkStructure;
+  finishColdArea:number; finishArea:number;
   design?:DesignLimits;
+  contours?:ContourQuality;
+  appliedLimits:ReturnType<typeof effectiveLimits>;
   alternatives:RouteAlternatives;
   obviousDeadEnds:{count:number;area:number;ratio:number};
   /** Effective quality bounds; raw heat remains in each scenario and these raw maxima. */
@@ -62,9 +72,10 @@ export interface PotentialDifficulty {
 /** Shared by the interactive assessment and optimizer. A comparative forecast, not a calibrated human grade. */
 export function analyzePotential(maze: Maze, options: AnalysisOptions, primary?: ColdspotAnalysis, findWitness = true): PotentialDifficulty {
   validateAnalysisOptions(options);
-  const m = metrics(maze), privacy = mazePortalPrivacy(maze, findWitness), corridors = corridorQuality(maze, maze.parameters.design?.maxForcedStraight ?? options.maxForcedStraight ?? 12);
+  const appliedLimits=effectiveLimits(maze.parameters),living=maze.parameters.generationType==='living';
+  const m = metrics(maze), privacy = mazePortalPrivacy(maze, findWitness), corridors = corridorQuality(maze, Math.min(40,maze.parameters.design||living?(appliedLimits.maxForcedStraight===Infinity?12:appliedLimits.maxForcedStraight):options.maxForcedStraight??12));
   const blind=obviousForkDeadEnds(maze);
-  const result: PotentialDifficulty = { alternatives:routeAlternatives(maze), obviousDeadEnds:{count:blind.branches.length,area:blind.area,ratio:blind.ratio}, treeForecast:m.cycles===0,cycles:m.cycles,design:maze.parameters.design,worstColdRatio:0,worstColdRegion:0,rawWorstColdRatio:0,rawWorstColdRegion:0,traps:routeTraps(maze), loops:loopTraps(maze), requestedLoopTraps:maze.parameters.loopTrapCount??0, requestedRouteTraps:maze.parameters.routeTrapCount??0, supported: false, eligible: false, score: null, issues: [], privacy, corridors, forcedRunLimit: maze.parameters.design?.maxForcedRun ?? options.maxForcedRun ?? 20, mandatoryAreaRatio: 0, minMandatoryRatio: .35, maxMandatoryRatio: .55, scenarios: [], minOptionalCoverage: 0, maxOptionalCoverage: 0, minUniqueExplorationRatio: 0, maxUniqueExplorationRatio: 0, minFirstDetourRate: 0, maxFirstDetourRate: 0, minDeepBranches: 0, maxDeepBranches: 0, minTypicalDepth: 0, maxTypicalDepth: 0 };
+  const result: PotentialDifficulty = { compass:compassProbe(maze),network:networkStructure(maze),finishColdArea:0,finishArea:0,appliedLimits,...(living?{contours:contourQuality(maze)}:{}),alternatives:routeAlternatives(maze), obviousDeadEnds:{count:blind.branches.length,area:blind.area,ratio:blind.ratio}, treeForecast:m.cycles===0,cycles:m.cycles,design:maze.parameters.design,worstColdRatio:0,worstColdRegion:0,rawWorstColdRatio:0,rawWorstColdRegion:0,traps:routeTraps(maze), loops:loopTraps(maze), requestedLoopTraps:maze.parameters.loopTrapCount??0, requestedRouteTraps:maze.parameters.routeTrapCount??0, supported: false, eligible: false, score: null, issues: [], privacy, corridors, forcedRunLimit: maze.parameters.design||living?appliedLimits.maxForcedRun:options.maxForcedRun??20, mandatoryAreaRatio: 0, minMandatoryRatio: .35, maxMandatoryRatio: .55, scenarios: [], minOptionalCoverage: 0, maxOptionalCoverage: 0, minUniqueExplorationRatio: 0, maxUniqueExplorationRatio: 0, minFirstDetourRate: 0, maxFirstDetourRate: 0, minDeepBranches: 0, maxDeepBranches: 0, minTypicalDepth: 0, maxTypicalDepth: 0 };
   if (m.components !== 1) {
     result.reason = 'Прогноз боковой разведки пока доступен для связного дерева проходов.';
     return result;
@@ -82,8 +93,10 @@ export function analyzePotential(maze: Maze, options: AnalysisOptions, primary?:
     const e = m.cycles===0?expectedExploration(maze, analysis.probability):null;
     const forecast = analysis.explorationForecast;
     const effective=recognitionAdjustedColdspots(maze,analysis.probability,analysis.options.threshold);
-    return { strategy: forecastOptions.profile === 'outline' ? boundaryStrategy : forecastOptions.profile, optionalCoverage: e?.visitedRatio ?? 0, uniqueExplorationLength: e?.uniqueLength ?? 0, uniqueExplorationRatio: e?.uniqueRatio ?? 0, effectiveColdArea:effective.coldArea,effectiveLargestColdArea:effective.largestColdArea,recognizedTerminalArea:effective.recognizedTerminalArea,coldArea: analysis.coldArea, largestColdArea: analysis.largestColdArea, firstDetourRate: forecast?.firstDetourRate ?? 0, deepBranches: forecast?.expectedDeepBranches ?? 0, typicalDepth: forecast?.medianBranchDepth ?? 0 };
+    const finish=coldNearExit(maze,analysis.probability,analysis.options.threshold);result.finishArea=finish.area;
+    return { finishColdArea:finish.coldArea,strategy: forecastOptions.profile === 'outline' ? boundaryStrategy : forecastOptions.profile, optionalCoverage: e?.visitedRatio ?? 0, uniqueExplorationLength: e?.uniqueLength ?? 0, uniqueExplorationRatio: e?.uniqueRatio ?? 0, effectiveColdArea:effective.coldArea,effectiveLargestColdArea:effective.largestColdArea,recognizedTerminalArea:effective.recognizedTerminalArea,coldArea: analysis.coldArea, largestColdArea: analysis.largestColdArea, firstDetourRate: forecast?.firstDetourRate ?? 0, deepBranches: forecast?.expectedDeepBranches ?? 0, typicalDepth: forecast?.medianBranchDepth ?? 0 };
   });
+  result.finishColdArea=Math.max(...result.scenarios.map(s=>s.finishColdArea));
   result.minOptionalCoverage = Math.min(...result.scenarios.map(s => s.optionalCoverage));
   result.maxOptionalCoverage = Math.max(...result.scenarios.map(s => s.optionalCoverage));
   result.minUniqueExplorationRatio = Math.min(...result.scenarios.map(s => s.uniqueExplorationRatio));
@@ -94,11 +107,11 @@ export function analyzePotential(maze: Maze, options: AnalysisOptions, primary?:
   result.maxDeepBranches = Math.max(...result.scenarios.map(s => s.deepBranches));
   result.minTypicalDepth = Math.min(...result.scenarios.map(s => s.typicalDepth));
   result.maxTypicalDepth = Math.max(...result.scenarios.map(s => s.typicalDepth));
-  if (!privacy.certified)
+  if (!privacy.certified&&(!living||maze.parameters.design||(maze.parameters.routeTrapCount??0)>0||(maze.parameters.loopTrapCount??0)>0))
     result.issues.push('Скрытность входа и выхода не доказана.');
-  if (result.treeForecast && (result.mandatoryAreaRatio < result.minMandatoryRatio || result.mandatoryAreaRatio > result.maxMandatoryRatio))
+  if (!living && result.treeForecast && (result.mandatoryAreaRatio < result.minMandatoryRatio || result.mandatoryAreaRatio > result.maxMandatoryRatio))
     result.issues.push('Обязательный маршрут вне диапазона 35–55% площади.');
-  if (corridors.longestForcedStraight > corridors.straightLimit)
+  if (corridors.longestForcedStraight > (maze.parameters.design||living?appliedLimits.maxForcedStraight:options.maxForcedStraight??12))
     result.issues.push(`Прямая без выбора ${corridors.longestForcedStraight.toFixed(1)} м превышает предел ${corridors.straightLimit} м.`);
   if (corridors.longestForcedRun > result.forcedRunLimit)
     result.issues.push(`Участок без развилок ${corridors.longestForcedRun.toFixed(1)} м превышает предел ${result.forcedRunLimit} м.`);
@@ -110,16 +123,20 @@ export function analyzePotential(maze: Maze, options: AnalysisOptions, primary?:
   result.worstColdRatio=Math.max(...result.scenarios.map(s=>s.effectiveColdArea/m.area));
   result.worstColdRegion=Math.max(...result.scenarios.map(s=>s.effectiveLargestColdArea));
   if(result.design){
-    if(corridors.longestVisibleStraight>result.design.maxVisibleStraight)result.issues.push('Слишком длинная видимая прямая, включая развилки.');
-    if(result.worstColdRatio>result.design.maxColdRatio+1e-9)result.issues.push('Превышена допустимая холодная доля площади.');
-    if(result.worstColdRegion>result.design.maxColdRegion+1e-9)result.issues.push('Слишком крупный связный колдспот.');
+    if(corridors.longestVisibleStraight>appliedLimits.maxVisibleStraight)result.issues.push('Слишком длинная видимая прямая, включая развилки.');
+    if(result.worstColdRatio>appliedLimits.maxColdRatio+1e-9)result.issues.push('Превышена допустимая холодная доля площади.');
+    if(result.worstColdRegion>appliedLimits.maxColdRegion+1e-9)result.issues.push('Слишком крупный связный колдспот.');
   }
-  if(result.design?.maxUnavoidableRouteRatio!==undefined&&maze.parameters.extraConnections>0&&result.alternatives.unavoidableRatio>result.design.maxUnavoidableRouteRatio+1e-9)result.issues.push('Слишком большая доля основного маршрута не имеет альтернативного обхода.');
+  if(result.design?.maxUnavoidableRouteRatio!==undefined&&maze.parameters.extraConnections>0&&result.alternatives.unavoidableRatio>appliedLimits.maxUnavoidableRouteRatio+1e-9)result.issues.push('Слишком большая доля основного маршрута не имеет альтернативного обхода.');
+  if(result.contours&&!result.contours.certified)result.issues.push('Нарушен контурный рисунок: нужно сохранить минимум 80% контурных связей и межслойных стен.');
   result.eligible = result.issues.length === 0;
   result.score = result.minUniqueExplorationRatio + .5 * result.minOptionalCoverage + .025 * Math.min(8, decisions?.credibleDecoys ?? 0) - .002 * Math.max(...result.scenarios.map(s => s.effectiveLargestColdArea));
   if(!result.treeForecast)result.score=1-result.worstColdRatio-.5*result.worstColdRegion/m.area;
   if(result.requestedRouteTraps>0 && result.traps.best?.qualifies)result.score! += .2 * result.traps.best.score;
   result.score! -= blind.ratio;
   if(!result.treeForecast)result.score! += .35*result.alternatives.alternativeRatio;
+  if(result.cycles)result.score! += .08*Math.min(3,Math.max(0,result.network.interlinkedCycles-1))+.015*Math.min(8,result.network.junctions);
+  if(result.compass.bestRatio!==null)result.score! -= .5*Math.max(0,2-result.compass.bestRatio);
+  result.score! -= .4*(result.finishArea?result.finishColdArea/result.finishArea:0);
   return result;
 }

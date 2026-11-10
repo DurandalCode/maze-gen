@@ -1,3 +1,4 @@
+import {optimizeLiving} from '../generators/living';
 import { optimizePotential } from './potential-optimize';
 import type { PotentialDifficulty } from './potential-difficulty';
 import { domainOf } from '../core/domain';
@@ -47,6 +48,7 @@ export function optimizeColdspots(base: Maze, options: AnalysisOptions, method: 
     throw new Error('Некорректные параметры оптимизации.');
   if (!['coldspots', 'exploration'].includes(objective))
     throw new Error('Неизвестная цель подбора.');
+  if(base.parameters.generationType==='living')return optimizeLiving(base,options,method,attempts,progress,objective);
   if (objective === 'exploration')
     return optimizePotential(base, options, method, attempts, progress);
   if (componentCount(base) !== 1)

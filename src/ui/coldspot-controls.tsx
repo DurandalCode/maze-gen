@@ -86,11 +86,11 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
       const result = data.result as OptimizationResult;
       if (result.objective === 'exploration') {
         if (result.changed) {
-          setNotice(result.afterPotential?.treeForecast===false?`Проверено ${result.attempted} вариантов. Кольца и защиты сохранены; холодная площадь ${fmt(result.afterPotential.worstColdRatio*100)}%.`:`Проверено ${result.attempted} вариантов. Проёмы скрыты; прогноз разведки боковой площади ${fmt((result.afterPotential?.minOptionalCoverage ?? 0) * 100)}–${fmt((result.afterPotential?.maxOptionalCoverage ?? 0) * 100)}%.`);
+          setNotice(maze.parameters.generationType==='living'?`Проверено ${result.attempted} вариантов. Контуры сохранены; неразведанная площадь для подбора ${fmt((result.afterPotential?.worstColdRatio??0)*100)}%.`:result.afterPotential?.treeForecast===false?`Проверено ${result.attempted} вариантов. Кольца и защиты сохранены; холодная площадь ${fmt(result.afterPotential.worstColdRatio*100)}%.`:`Проверено ${result.attempted} вариантов. Проёмы скрыты; прогноз разведки боковой площади ${fmt((result.afterPotential?.minOptionalCoverage ?? 0) * 100)}–${fmt((result.afterPotential?.maxOptionalCoverage ?? 0) * 100)}%.`);
           onOptimized(result);
         }
         else
-          setNotice(`Проверено ${result.attempted} вариантов. Улучшения, проходящего ограничения скрытности, обязательной площади и длины проходов без выбора, не найдено.`);
+          setNotice(`Проверено ${result.attempted} вариантов. Улучшения, сохраняющего тип лабиринта, ловушки и включённые ограничения качества, не найдено.`);
         return;
       }
       if (result.changed) {
@@ -141,9 +141,9 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
   <details className="analysis-options"><summary>Улучшение лабиринта</summary>
   <div className="section-label"><span>АВТОПОДБОР ПЛАНИРОВКИ</span></div>
   <label className="field"><span>Цель подбора</span><select aria-label="Цель подбора" value={objective} disabled={optimizing} onChange={e => setObjective(e.target.value as OptimizationObjective)}><option value="exploration">Сложные решения и скрытые проёмы</option><option value="coldspots">Меньше колдспотов</option></select></label>
-  <label className="field"><span>Способ улучшения</span><select aria-label="Способ улучшения" value={method} disabled={optimizing} onChange={e => setMethod(e.target.value as OptimizationMethod)}><option value="seeds" disabled={!!analysis?.potential?.cycles}>Подобрать seed</option><option value="walls">Переставить стены</option></select></label>
+  <label className="field"><span>Способ улучшения</span><select aria-label="Способ улучшения" value={method} disabled={optimizing} onChange={e => setMethod(e.target.value as OptimizationMethod)}><option value="seeds" disabled={!!analysis?.potential?.cycles&&maze.parameters.generationType!=='living'}>Подобрать seed</option><option value="walls">Переставить стены</option></select></label>
   <label className="field"><span>Вариантов до</span><select aria-label="Бюджет оптимизации" value={attempts} disabled={optimizing} onChange={e => setAttempts(Number(e.target.value))}>{[16, 32, 64].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
-  <p className="field-note">{analysis.potential?.cycles ? 'Подбор перестановкой стен сохраняет число колец, защищённые элементы и пределы качества. Новый seed выбирается обычной генерацией.' : objective === 'exploration' ? 'Подбор по прогнозу боковой разведки без повторов. Вход и выход экранируются; обязательный маршрут занимает 35–55% площади. Форма и места проёмов сохраняются.' : 'Оценка колдспотов по трём профилям. Сохраняем форму, проёмы и циклы; не менее 80% развилок и тупиков.'} На больших лабиринтах бюджет ограничен объёмом расчёта. Изменённые стены сохраняются в JSON.</p>
+  <p className="field-note">{maze.parameters.generationType==='living'?'Подбор сохраняет минимум 80% достижимых контурных связей, заданные ловушки, число колец и включённые пределы качества.':analysis.potential?.cycles ? 'Подбор перестановкой стен сохраняет число колец, защищённые элементы и пределы качества. Новый seed выбирается обычной генерацией.' : objective === 'exploration' ? 'Подбор по прогнозу боковой разведки без повторов. Вход и выход экранируются; обязательный маршрут занимает 35–55% площади. Форма и места проёмов сохраняются.' : 'Оценка колдспотов по трём профилям. Сохраняем форму, проёмы и циклы; не менее 80% развилок и тупиков.'} На больших лабиринтах бюджет ограничен объёмом расчёта. Изменённые стены сохраняются в JSON.</p>
   <button type="button" className="coldspot-action" disabled={optimizing || calculating} onClick={optimize}>Улучшить лабиринт</button>
   {optimizing && <div className="coldspot-progress" role="status">{progress}<button type="button" onClick={cancel}>Отмена</button></div>}
   </details>

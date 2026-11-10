@@ -1,3 +1,4 @@
+import {effectiveLimits} from '../core/design-limits';
 import {neighbors,validateParameters,type Maze} from '../core/maze';
 import {domainOf} from '../core/domain';
 import {metrics} from '../core/metrics';
@@ -23,7 +24,7 @@ export function addConstrainedConnections(base:Maze,count:number,seed=base.param
   const protectedEdges=new Set(criticalWalls(base).map(w=>`${w.a}:${w.b}`));
   const pairs:[number,number][]=[];
   for(const a of domainOf(base).cells)for(const b of neighbors(base,a))if(b>a&&!protectedCells.has(a)&&!protectedCells.has(b)&&!protectedEdges.has(`${a}:${b}`))pairs.push([a,b]);
-  const requested=base.parameters.routeTrapCount??0,limits=base.parameters.design;
+  const requested=base.parameters.routeTrapCount??0,limits=base.parameters.design,bounds=effectiveLimits(base.parameters);
   const originalForks=new Set(routeTraps(base).candidates.filter(t=>t.qualifies).map(t=>t.fork));
   const originalLoops=new Set(loopTraps(base).candidates.filter(t=>t.qualifies).map(t=>t.fork));
   const assess=(maze:Maze,samples:number)=>analyzePotential(maze,{...DEFAULT_ANALYSIS,routeMemory:1,samples},undefined,false);
@@ -44,14 +45,14 @@ export function addConstrainedConnections(base:Maze,count:number,seed=base.param
           if(assessed>=32)break;
           const passages=[...state.maze.passages];passages[a]=[...passages[a]!,b].sort((x,y)=>x-y);passages[b]=[...passages[b]!,a].sort((x,y)=>x-y);
           const maze={...state.maze,parameters:{...base.parameters,extraConnections:cycles,seed},passages};
-          const c=corridorQuality(maze,limits?.maxForcedStraight??12);
-          if(c.longestForcedStraight>(limits?.maxForcedStraight??12)||c.longestForcedRun>(limits?.maxForcedRun??20)||c.longestVisibleStraight>(limits?.maxVisibleStraight??Infinity))continue;
+          const c=corridorQuality(maze,Math.min(40,bounds.maxForcedStraight));
+          if(c.longestForcedStraight>(bounds.maxForcedStraight)||c.longestForcedRun>(bounds.maxForcedRun)||c.longestVisibleStraight>(bounds.maxVisibleStraight))continue;
           const traps=routeTraps(maze),forks=new Set(traps.candidates.filter(t=>t.qualifies).map(t=>t.fork));
           const loops=loopTraps(maze);
           if(loops.qualifiedCount<(base.parameters.loopTrapCount??0)||[...originalLoops].some(fork=>!loops.candidates.some(t=>t.qualifies&&t.fork===fork))||traps.qualifiedCount<requested||[...originalForks].some(fork=>!forks.has(fork)))continue;
           assessed++;
           const value=assess(maze,64);
-          if(!value.privacy.certified||limits&&(value.worstColdRatio>limits.maxColdRatio+.04||value.worstColdRegion>limits.maxColdRegion+8))continue;
+          if(!value.privacy.certified||limits&&(value.worstColdRatio>bounds.maxColdRatio+.04||value.worstColdRegion>bounds.maxColdRegion+8))continue;
           const score=value.score!+.002*gains.get(a+':'+b)!;
           next.set(JSON.stringify(passages),{maze,score});
           if(!limits)break;

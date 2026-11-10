@@ -16,6 +16,7 @@ export function deserialize(json: string): Maze {
   if (data.version !== 1 && data.version !== 2 && data.version !== 3) throw new Error('Неподдерживаемая версия формата.');
   const raw = object(data.parameters);
   const p = {
+    ...(raw.generationType===undefined?{}:{generationType:raw.generationType}),
     ...(raw.design === undefined ? {} : {design:raw.design}),
     ...(raw.loopTrapCount === undefined ? {} : {loopTrapCount:raw.loopTrapCount}),
     ...(raw.routeTrapCount === undefined ? {} : {routeTrapCount:raw.routeTrapCount}),
