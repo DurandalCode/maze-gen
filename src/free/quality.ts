@@ -10,7 +10,8 @@ import { loopTraps } from '../analysis/loop-traps';
 import { routePoints, pathLength } from '../core/pathfinding';
 import { effectiveLimits } from '../core/design-limits';
 import type {AnalysisOptions,ColdspotAnalysis} from '../analysis/coldspots';
-/** Present the existing free-space model in the common heat-map interface. */
+import {LearnedGraph} from '../analysis/learned-graph';
+/** Present completed free-space searches in the common heat-map interface. */
 export function freeHeatDisplay(maze:Maze,options:AnalysisOptions):ColdspotAnalysis {
   const result=analyzeFree(maze,options.samples,options.profile),weights=freeAreaWeights(maze),seen=new Set<number>(),regions:{cells:number[];area:number}[]=[];
   for(let cell=0;cell<maze.passages.length;cell++){
@@ -19,39 +20,44 @@ export function freeHeatDisplay(maze:Maze,options:AnalysisOptions):ColdspotAnaly
     for(const c of cells)for(const n of maze.passages[c]!)if(!seen.has(n)&&result.probability[n]!<options.threshold){seen.add(n);cells.push(n);}
     regions.push({cells,area:cells.reduce((sum,c)=>sum+weights[c]!,0)});
   }
+  if(result.finishedRatio<1)throw Error('Не все симуляции дошли до выхода. Тепловой прогноз не показан.');
   const coldArea=regions.reduce((sum,r)=>sum+r.area,0),area=weights.reduce((a,b)=>a+b,0);
-  return {options:{...options},probability:result.probability,visits:result.visits,regions,coldArea,coldAreaRatio:area?coldArea/area:0,largestColdArea:Math.max(0,...regions.map(r=>r.area)),expectedLength:result.expectedLength,optimalLength:result.optimalLength,searchRatio:result.optimalLength?result.expectedLength/result.optimalLength:0,method:'sampled',samples:result.samples};
+  return {completionRatio:result.finishedRatio,options:{...options},probability:result.probability,visits:result.visits,regions,coldArea,coldAreaRatio:area?coldArea/area:0,largestColdArea:Math.max(0,...regions.map(r=>r.area)),expectedLength:result.expectedLength,optimalLength:result.optimalLength,searchRatio:result.optimalLength?result.expectedLength/result.optimalLength:0,method:'sampled',samples:result.samples};
 }
 /** Policy sees only current neighbours, geometric heading and its visit history. */
 export function analyzeFree(maze: Maze, samples = 256, profile: 'explorer' | 'compass' | 'outline' = 'explorer') {
   const r = freeRuntime(maze), outline = outlineDistances(maze, r.centers), rng = random(maze.parameters.seed + profile), visits = new Float64Array(r.rooms.length), probability = new Float64Array(r.rooms.length), goal = r.centers[maze.exit.cell]!, length = (p: Point[]) => p.slice(1).reduce((n, v, i) => n + distance(v, p[i]!), 0);
+  const cells=r.rooms.map((_,i)=>i),edgeLengths=new Map<string,number>();
+  for(const [key,points]of r.edgePaths)edgeLengths.set(key,length(points));
+  const edge=(a:number,b:number)=>edgeLengths.get(`${a}:${b}`)!;
+  const endpoints=length(r.portalPaths.get(maze.free!.entrance)!)+length(r.portalPaths.get(maze.free!.exit)!);
   let expectedLength = 0, finished = 0;
   for (let sample = 0; sample < samples; sample++) {
-    const seen = new Set<number>(), counts = new Uint16Array(r.rooms.length);
-    let at = maze.entrance.cell, previous = -1, total = 0;
-    for (let step = 0; step < r.rooms.length * 100; step++) {
-      visits[at]!++;
-      seen.add(at);
-      counts[at]!++;
-      if (at === maze.exit.cell) {
-        finished++;
-        break;
+    const seen = new Set<number>(),learned=new LearnedGraph(r.rooms.length,cells,edge);
+    let at=maze.entrance.cell,total=endpoints;
+    const enter=(cell:number)=>{at=cell;visits[cell]!++;seen.add(cell);learned.observe(cell,r.passages[cell]!);};
+    enter(at);
+    // Each exploration enters a new room; each remembered return is a simple
+    // path through observed rooms. This is a guard, not a random-walk budget.
+    for(let step=0;step<r.rooms.length*(r.rooms.length+2);step++){
+      if(at===maze.exit.cell){finished++;break;}
+      const choices=learned.neighbors(at).filter(n=>!seen.has(n));
+      if(choices.length){
+        const a=r.centers[at]!,weights=choices.map(b=>{
+          const p=r.centers[b]!,g=profile==='outline'?outline[at]!-outline[b]!:distance(a,goal)-distance(p,goal);
+          return Math.exp(profile==='explorer'?0:Math.max(-2,Math.min(2,g)));
+        });
+        let pick=rng()*weights.reduce((a,b)=>a+b,0),index=0;
+        for(;index<weights.length-1;index++){pick-=weights[index]!;if(pick<=0)break;}
+        const next=choices[index]!;total+=edge(at,next);enter(next);continue;
       }
-      const choices = r.passages[at]!;
-      if (!choices.length) break;
-      const a = r.centers[at]!, weights = choices.map(b => {
-        const p = r.centers[b]!, g = profile === 'outline' ? outline[at]! - outline[b]! : distance(a, goal) - distance(p, goal);
-        return Math.exp(profile === 'explorer' ? 0 : Math.max(-2, Math.min(2, g))) * Math.pow(.3, Math.min(5, counts[b]!)) * (b === previous ? .2 : 1);
-      }), sum = weights.reduce((a, b) => a + b, 0);
-      let pick = rng() * sum, index = 0;
-      for (; index < weights.length - 1; index++) {
-        pick -= weights[index]!;
-        if (pick <= 0) break;
-      }
-      const next = choices[index]!;
-      total += length(r.edgePaths.get(`${at}:${next}`)!);
-      previous = at;
-      at = next;
+      // Find another remembered junction with a still-unexplored door. No hidden
+      // adjacency is queried, and learned loops are available as return shortcuts.
+      const known=learned.routesFrom(at);let target=-1,best=Infinity;
+      for(const cell of seen)if(learned.neighbors(cell).some(n=>!seen.has(n))){const d=known.distanceTo(cell);if(d<best){best=d;target=cell;}}
+      if(target<0)break;
+      const back=known.routeTo(target);if(!back||back.cells.length<2)break;
+      for(const next of back.cells.slice(1)){total+=edge(at,next);enter(next);}
     }
     for (const c of seen) probability[c]!++;
     expectedLength += total;
@@ -110,6 +116,7 @@ export function checkFreeQuality(maze: Maze): string[] {
   if (straight > limits.maxForcedStraight) errors.push('Превышен предел прямого прохода.');
   if (run > limits.maxForcedRun) errors.push('Превышен предел прохода без выбора.');
   const analyses = (['explorer', 'compass', 'outline'] as const).map(profile => analyzeFree(maze, 2048, profile));
+  if (analyses.some(a => a.finishedRatio < 1)) errors.push('Не все симуляции поиска дошли до выхода.');
   if (analyses.some(a => a.coldAreaRatio > limits.maxColdRatio || a.largestColdArea > limits.maxColdRegion)) errors.push('Превышены ограничения холодных областей.');
   if (analyses.some(a => sideDistricts(maze, a.probability).largestProblemArea / metricsArea(maze) > limits.maxColdSideRatio)) errors.push('Превышен предел холодного бокового района.');
   const route = shortestPath(maze);

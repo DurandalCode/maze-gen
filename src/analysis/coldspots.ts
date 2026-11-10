@@ -32,6 +32,7 @@ export interface ColdRegion {
   area: number;
 }
 export interface ColdspotAnalysis {
+  completionRatio?:number;
   modelVersion?:number;
   sideDistricts?:SideDistricts;
   options: AnalysisOptions;
