@@ -5,6 +5,8 @@ export type Algorithm = 'backtracker' | 'prim';
 export interface DesignLimits {
   maxForcedStraight:number; maxForcedRun:number; maxVisibleStraight:number;
   maxColdRatio:number; maxColdRegion:number;
+  /** Optional bound for cyclic designs; absent keeps the legacy feasibility contract. */
+  maxUnavoidableRouteRatio?:number;
   allowReshape:boolean; maxModuleGrowth:number;
 }
 export const DEFAULT_DESIGN_LIMITS:Readonly<DesignLimits>={maxForcedStraight:8,maxForcedRun:16,maxVisibleStraight:12,maxColdRatio:.12,maxColdRegion:16,allowReshape:false,maxModuleGrowth:.25};
@@ -62,6 +64,7 @@ export function validateParameters(p: Parameters): void {
   if(p.design!==undefined){
     const d=p.design;
     if(!d||typeof d!=='object'||typeof d.allowReshape!=='boolean')throw new Error('Некорректные ограничения качества.');
+    if(d.maxUnavoidableRouteRatio!==undefined&&(!Number.isFinite(d.maxUnavoidableRouteRatio)||d.maxUnavoidableRouteRatio<0||d.maxUnavoidableRouteRatio>1))throw new Error('Доля маршрута без обхода должна быть от 0 до 100%.');
     for(const [key,min,max] of [['maxForcedStraight',2,40],['maxForcedRun',2,100],['maxVisibleStraight',2,24],['maxColdRatio',0,1],['maxColdRegion',0,10000],['maxModuleGrowth',0,1]] as const)
       if(!Number.isFinite(d[key])||d[key]<min||d[key]>max)throw new Error('Некорректные ограничения качества.');
   }

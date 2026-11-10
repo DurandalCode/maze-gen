@@ -1,7 +1,6 @@
 import {neighbors,validateParameters,type Maze} from '../core/maze';
 import {domainOf} from '../core/domain';
 import {metrics} from '../core/metrics';
-import {shortestPath} from '../core/pathfinding';
 import {random,shuffle} from '../core/random';
 import {loopTraps} from '../analysis/loop-traps';
 import {routeTraps} from '../analysis/route-traps';
@@ -9,6 +8,7 @@ import {corridorQuality} from '../analysis/corridor-quality';
 import {mazePortalPrivacy} from '../analysis/portal-privacy';
 import {analyzePotential} from '../analysis/potential-difficulty';
 import {DEFAULT_ANALYSIS} from '../analysis/coldspots';
+import {connectionRouteGain} from '../analysis/route-alternatives';
 import {criticalWalls} from '../analysis/critical-walls';
 
 /** Add exactly the requested independent cycles, keeping real blind traps and portal shielding.
@@ -37,6 +37,8 @@ export function addConstrainedConnections(base:Maze,count:number,seed=base.param
       const next=new Map<string,{maze:Maze;score:number}>();
       for(const state of beam){
         const closed=pairs.filter(([a,b])=>!state.maze.passages[a]!.includes(b));shuffle(closed,rng);
+        const gains=new Map(closed.map(([a,b])=>[a+':'+b,connectionRouteGain(state.maze,a,b)]));
+        closed.sort(([a,b],[c,d])=>gains.get(c+':'+d)!-gains.get(a+':'+b)!);
         let assessed=0;
         for(const [a,b] of closed){
           if(assessed>=32)break;
@@ -50,8 +52,7 @@ export function addConstrainedConnections(base:Maze,count:number,seed=base.param
           assessed++;
           const value=assess(maze,64);
           if(!value.privacy.certified||limits&&(value.worstColdRatio>limits.maxColdRatio+.04||value.worstColdRegion>limits.maxColdRegion+8))continue;
-          const cycleLength=shortestPath(state.maze,a,b).length;
-          const score=value.score!+.001*Math.min(32,cycleLength);
+          const score=value.score!+.002*gains.get(a+':'+b)!;
           next.set(JSON.stringify(passages),{maze,score});
           if(!limits)break;
         }

@@ -100,7 +100,9 @@ test('fresh module connection lists persisted maze and raw recordings; full expo
   const list = await restarted.offlineRequest('/api/walks') as { walks: { id: string; finished: boolean }[] };
   expect(list.walks.some(row => row.id === finished.id && row.finished)).toBe(true);
   const exported = await buildLibraryExport();
+  expect(exported.modelVersion).toBe(9);
   const decoded = validateLibraryExport(JSON.parse(JSON.stringify(exported)));
+  expect(decoded.modelVersion).toBe(9);
   expect(decoded.walks.find(row => row.id === finished.id)).toEqual(finished);
   expect(decoded.mazes.find(row => row.title === 'Тест перезапуска')?.maze).toEqual(maze);
   // Reimporting snapshots keeps the exact same route and content identity.
@@ -113,6 +115,7 @@ test('export validation rejects malformed samples, conflicting IDs, and corrupt 
   const { maze, finished, early } = fixture('offline-validation');
   const data: LibraryExport = { kind: 'maze-lab-library-export', version: 1, modelVersion: 8, createdAt: new Date().toISOString(), platform: 'android', mazes: [{ title: 'Экспорт', maze }], walks: [finished] };
   expect(validateLibraryExport(data).walks).toEqual([finished]);
+  expect(validateLibraryExport(data).modelVersion).toBe(8);
   expect(() => validateLibraryExport({ ...data, walks: [finished, early] })).toThrow('одинаковым идентификатором');
   expect(() => validateLibraryExport({ ...data, walks: [{ ...finished, recording: { ...finished.recording, samples: [{ x: 1, z: 1, time: -1 }] } }] })).toThrow();
   expect(() => validateLibraryExport({ ...data, mazes: [{ title: 'broken', maze: { ...maze, passages: [[9999]] } }] })).toThrow();

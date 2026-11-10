@@ -8,6 +8,7 @@ import {analyzePotential} from '../analysis/potential-difficulty';
 import {DEFAULT_ANALYSIS} from '../analysis/coldspots';
 import {domainOf} from '../core/domain';
 import {jointGenerate} from './joint-generate';
+import {jointRepair} from './joint-repair';
 
 /** The ordinary generator's numeric trap constraint. No hand-edited topology is required. */
 export function standardTraps(base:Maze,onProgress?:(message:string)=>void):Maze {
@@ -16,11 +17,16 @@ export function standardTraps(base:Maze,onProgress?:(message:string)=>void):Maze
   if(!requested)return base;
   const ranking={...DEFAULT_ANALYSIS,samples:32,routeMemory:1};
   let best:Maze|undefined,bestScore=-Infinity,qualified=0;
+  const repairable:{maze:Maze;penalty:number}[]=[];
   const consider=(candidate:Maze)=>{
     const maze={...candidate,parameters:{...base.parameters}};
     if(routeTraps(maze).qualifiedCount<requested)return;
     const c=corridorQuality(maze);
-    if(c.longestForcedStraight>12||c.longestForcedRun>20)return;
+    if(c.longestForcedStraight>12||c.longestForcedRun>20){
+      const penalty=Math.max(0,c.longestForcedStraight/12-1)+Math.max(0,c.longestForcedRun/20-1);
+      repairable.push({maze,penalty});repairable.sort((a,b)=>a.penalty-b.penalty);if(repairable.length>4)repairable.pop();
+      return;
+    }
     const p=analyzePotential(maze,ranking,undefined,false);
     if(!p.eligible)return;
     qualified++;
@@ -37,6 +43,13 @@ export function standardTraps(base:Maze,onProgress?:(message:string)=>void):Maze
       if(i<4&&cells<=800)for(const candidate of routeTrapCandidates(guarded.maze,guarded.constraints,12,20,4))consider(candidate);
     }
     if(qualified>=8)break;
+  }
+  // A valid trap template can still contain a long run masked by obvious blind
+  // pockets. Repair a bounded set of near misses rather than weakening its limits.
+  if(!best)for(const [index,{maze}] of [...repairable].entries()){
+    onProgress?.(`Сокращение проходов без содержательного выбора · вариант ${index+1}/${repairable.length}`);
+    for(const candidate of jointRepair(maze,base.parameters.seed+`|ordinary-corridor-repair-${index}`,640))consider(candidate);
+    if(best)break;
   }
   if(!best)throw new Error(`Не удалось разместить ловушки: нужно не менее ${requested} разных развилок. Измените seed, форму или уменьшите количество. Текущий лабиринт сохранён.`);
   return best;

@@ -6,7 +6,7 @@ import {downloadJson,pickJsonFile,isAndroidApp} from './platform';
 import {getLibraryMaze,getLibraryWalk,listLibraryMazes,listLibraryWalks,saveLibraryMaze,saveLibraryWalk,flushPendingWalks} from './library';
 export const LIBRARY_EXPORT_LIMIT=64_000_000;
 export interface LibraryExport {
- kind:'maze-lab-library-export';version:1;createdAt:string;modelVersion:8;platform:string;
+ kind:'maze-lab-library-export';version:1;createdAt:string;modelVersion:number;platform:string;
  mazes:{id?:string;title:string;maze:Maze}[];walks:WalkData[];
 }
 export function validateLibraryExport(raw:unknown):LibraryExport {
@@ -20,7 +20,7 @@ export function validateLibraryExport(raw:unknown):LibraryExport {
   const text=JSON.stringify(raw);if(text.length>WALK_LIMIT)throw new Error('Одна из записей больше 12 МБ.');
   const walk=validateWalk(raw),known=ids.get(walk.id);if(known&&known!==text)throw new Error('В файле разные записи с одинаковым идентификатором.');ids.set(walk.id,text);return walk;
  });
- return {kind:'maze-lab-library-export',version:1,createdAt:typeof data.createdAt==='string'?data.createdAt:new Date().toISOString(),modelVersion:8,platform:typeof data.platform==='string'?data.platform:'import',mazes,walks};
+ return {kind:'maze-lab-library-export',version:1,createdAt:typeof data.createdAt==='string'?data.createdAt:new Date().toISOString(),modelVersion:Number.isInteger(data.modelVersion)&&data.modelVersion!>0?data.modelVersion!:8,platform:typeof data.platform==='string'?data.platform:'import',mazes,walks};
 }
 function pendingWalks():WalkData[]{
  const walks:WalkData[]=[];
@@ -33,7 +33,7 @@ export async function buildLibraryExport():Promise<LibraryExport>{
  const [mazes,records]=await Promise.all([Promise.all(a.mazes.map(row=>getLibraryMaze(row.id))),Promise.all(b.walks.map(row=>getLibraryWalk(row.id)))]);
  const merged=new Map(records.map(r=>[r.id,r.walk]));
  for(const walk of pendingWalks()){const old=merged.get(walk.id);merged.set(walk.id,preferWalk(old,walk));}
- return {kind:'maze-lab-library-export',version:1,createdAt:new Date().toISOString(),modelVersion:8,platform:isAndroidApp()?'android':'web',mazes:mazes.map(({id,title,maze})=>({id,title,maze})),walks:[...merged.values()]};
+ return {kind:'maze-lab-library-export',version:1,createdAt:new Date().toISOString(),modelVersion:9,platform:isAndroidApp()?'android':'web',mazes:mazes.map(({id,title,maze})=>({id,title,maze})),walks:[...merged.values()]};
 }
 export async function exportLibrary():Promise<{mazes:number;walks:number}>{
  const data=await buildLibraryExport(),text=JSON.stringify(data);if(new TextEncoder().encode(text).length>LIBRARY_EXPORT_LIMIT)throw new Error('Экспорт превышает 64 МБ.');

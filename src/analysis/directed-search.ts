@@ -1,3 +1,4 @@
+import { LearnedGraph, type LearnedRoute } from './learned-graph';
 import {visibleDeadEnd} from './visible-deadends';
 import { decisionModel, decisionScore, DECISION_WEIGHTS } from './decision-model';
 import { explorationMeter, type ExplorationForecast } from './exploration-meter';
@@ -23,7 +24,8 @@ export interface DirectedSearchResult {
 /**
  * Online goal-directed exploration. Only exits of visited cells enter the frontier.
  * A less promising continuation can lose to an earlier, still untried exit. Travel
- * between these exits uses the remembered exploration tree, never hidden passages.
+ * between these exits uses the observed graph, never hidden passages. Trees retain
+ * the LCA/path-difference fast path until an observed cross-connection is learned.
  */
 export function sampleDirectedSearch(maze: Maze, context: NavigationContext, profile: NavigationProfile, beta: number, requestedSamples: number, endpointLength: number, visibility: LandmarkVisibility, corridorPreference = 0, boundaryPreference = 0, diagonalVision = true, behavior: NavigationBehavior = DEFAULT_BEHAVIOR, decisionMode: 'local' | 'frontier' = 'local'): DirectedSearchResult {
   const size = maze.passages.length, samples = Math.min(requestedSamples, Math.max(16, Math.floor(2000000 / context.cells.length)));
@@ -50,7 +52,8 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
   }
   const scale = totalEdges ? totalEdgeLength / totalEdges : 1;
   const cognitive = behavior.internalOrientation > 0 || behavior.boundaryStrategy !== 'follow' || behavior.routeMemory < 1;
-  const rng = random(decisionMode === 'local' ? 'coldspots-visible-blind-branches-v8' : cognitive ? 'coldspots-internal-heading-beliefs-v6' : boundaryPreference > 0 || diagonalVision && corridorPreference > 0 ? 'coldspots-diagonals-perimeter-v5' : corridorPreference > 0 ? 'coldspots-visible-corridors-v4' : 'coldspots-landmarks-v3');
+  // v9: remembered returns use all observed connections, including cycle shortcuts.
+  const rng = random('coldspots-observed-graph-v9-' + decisionMode);
   const choices = decisionMode === 'local' ? decisionModel(maze, context, diagonalVision, boundaryPreference > 0) : null;
   const spatial = !choices && corridorPreference > 0 && diagonalVision ? spatialPerception(maze, context) : null;
   const perimeter = !choices && boundaryPreference > 0 ? perimeterPerception(maze, context) : null;
@@ -113,6 +116,7 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
     const root = maze.entrance.cell, visited = [root], heap: Frontier[] = [], pending: number[] = [];
     const belief = boundaryBelief(behavior.boundaryStrategy, cognitive ? rng() : 1, scale), recognizedLeaves: number[] = [];
     let recheckPending = false, runRechecks = 0;
+    const learned = new LearnedGraph(size, context.cells, (a, b) => edgeLength(context, a, b));
     visitedStamp[root] = run;
     discovered[root] = run;
     parent[root] = root;
@@ -156,7 +160,8 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
       return first.cell;
     };
     const observe = (cell: number) => {
-      const local = [...maze.passages[cell]!];
+      learned.observe(cell, maze.passages[cell]!);
+      const local = [...learned.neighbors(cell)];
       shuffle(local, rng);
       for (const next of local)
         if (discovered[next] !== run) {
@@ -191,7 +196,7 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
               hz = maze.entrance.side === 'north' ? 1 : maze.entrance.side === 'south' ? -1 : 0;
             }
             else {
-              const p = context.centers[parent[cell]!]!;
+              const p = context.centers[previousCell ?? parent[cell]!]!;
               hx = a.x - p.x;
               hz = a.z - p.z;
             }
@@ -207,7 +212,7 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
           priorities[next] = beta * perceivedGoal / scale + uncertainty - visual;
           visualPriorities[next] = uncertainty - visual;
           if (choices) {
-            const previous = cell === root ? undefined : context.centers[parent[cell]!]!;
+            const previous = cell === root ? undefined : context.centers[previousCell ?? parent[cell]!]!;
             const features = choices.features(cell, next, previous, profile);
             edgeAppeal[next] = boundaryPreference * features.boundary;
             const score = decisionScore(features, beta, corridorPreference, boundaryPreference, belief.sign);
@@ -219,6 +224,17 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
         }
     };
     let current = root, walkLength = endpointLength, confidence = 1;
+    let previousCell: number | undefined;
+    const replay = (route: LearnedRoute) => {
+      for (let i = 1; i < route.cells.length; i++) {
+        const from = route.cells[i - 1]!, to = route.cells[i]!;
+        confidence = Math.max(confidence * memoryDecay(edgeLength(context, from, to)), cues[to]!);
+        visits[to] = visits[to]! + 1;
+        // Transit/rechecks are physical visits, not a new exploration decision.
+        if (visitedStamp[to] !== run) meter?.enter(from, to);
+      }
+      walkLength += route.length;
+    };
     while (current !== maze.exit.cell) {
       observe(current);
       // A visually exhausted end is remembered at the last position actually reached,
@@ -231,19 +247,42 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
       if (!heap.length)
         throw new Error('Поиск не достиг выхода.');
       // Reconsider a known route only after a policy revision and imperfect recognition.
-      // The finite replay uses the observed exploration tree, never hidden graph paths.
+      // No unseen cell can serve as a shortcut between known branches.
+      const routes = learned.hasCycles ? learned.routesFrom(current) : null;
+      const routeTo = (target: number) => {
+        const route = routes!.routeTo(target);
+        if (!route) throw new Error('Frontier is unreachable in observed memory.');
+        return route;
+      };
+      const ownerAndTravel = (target: number) => {
+        if (routes) {
+          const owner = routes.predecessorOf(target);
+          if (owner === undefined) throw new Error('Frontier has no observed approach.');
+          return { owner, travel: routes.distanceTo(owner) };
+        }
+        const owner = parent[target]!, ancestor = lca(current, owner);
+        return { owner, travel: distance[current]! + distance[owner]! - 2 * distance[ancestor]! };
+      };
       if (recheckPending) {
         recheckPending = false;
         const leaf = recognizedLeaves.at(-1);
         if (leaf !== undefined && leaf !== current && runRechecks < 2 && rng() > behavior.routeMemory) {
-          const ancestor = lca(current, leaf), travel = distance[current]! + distance[leaf]! - 2 * distance[ancestor]!;
-          upward[current] = upward[current]! + 1;
-          upward[leaf] = upward[leaf]! + 1;
-          upward[ancestor] = upward[ancestor]! - 2;
-          downward[current] = downward[current]! + 1;
-          downward[leaf] = downward[leaf]! + 1;
-          downward[ancestor] = downward[ancestor]! - 2;
-          walkLength += 2 * travel;
+          const ancestor = lca(current, leaf), travel = routes ? routeTo(leaf).length : distance[current]! + distance[leaf]! - 2 * distance[ancestor]!;
+          if (routes) {
+            const outward = routeTo(leaf);
+            replay(outward);
+            replay({ cells: [...outward.cells].reverse(), length: outward.length });
+          } else {
+            confidence = rememberTravel(leaf, current, ancestor, rememberTravel(current, leaf, ancestor, confidence));
+            upward[current] = upward[current]! + 1;
+            upward[leaf] = upward[leaf]! + 1;
+            upward[ancestor] = upward[ancestor]! - 2;
+            downward[current] = downward[current]! + 1;
+            downward[leaf] = downward[leaf]! + 1;
+            downward[ancestor] = downward[ancestor]! - 2;
+            walkLength += 2 * travel;
+          }
+          confidence = Math.max(behavior.internalOrientation, confidence);
           recheckDistance += 2 * travel;
           rechecks++;
           runRechecks++;
@@ -251,7 +290,7 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
       }
       const guided = rng() < Math.max(behavior.internalOrientation, confidence);
       let target: number;
-      const local = maze.passages[current]!.filter(n => visitedStamp[n] !== run && discovered[n] === run && parent[n] === current);
+      const local = learned.neighbors(current).filter(n => visitedStamp[n] !== run && discovered[n] === run);
       if (guided) {
         target = heap[0]!.cell;
         if (choices) {
@@ -263,7 +302,7 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
               continue;
             const entry = { cell, priority: priorities[cell]! };
             shortlist.push(entry);
-            const owner = parent[cell]!, ancestor = lca(current, owner), travel = distance[current]! + distance[owner]! - 2 * distance[ancestor]!;
+            const { travel } = ownerAndTravel(cell);
             const score = entry.priority + .5 * travel / scale;
             if (score < bestScore) {
               bestScore = score;
@@ -275,8 +314,7 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
         }
         if (locality > 0 && local.length) {
           const bestLocal = local.reduce((a, b) => (choices ? localPriorities[a]! <= localPriorities[b]! : priorities[a]! <= priorities[b]!) ? a : b);
-          const owner = parent[target]!, ancestor = lca(current, owner);
-          const travel = distance[current]! + distance[owner]! - 2 * distance[ancestor]!;
+          const { owner, travel } = ownerAndTravel(target);
           if (choices && owner === current || priorities[bestLocal]! <= priorities[target]! + locality * travel / scale)
             target = bestLocal;
         }
@@ -287,21 +325,33 @@ export function sampleDirectedSearch(maze: Maze, context: NavigationContext, pro
         target = local.reduce((a, b) => visualPriorities[a]! <= visualPriorities[b]! ? a : b);
       else
         target = pending.pop()!;
-      const owner = parent[target]!, ancestor = lca(current, owner);
-      confidence = Math.max(behavior.internalOrientation, rememberTravel(current, target, ancestor, confidence));
+      let owner: number, travelled: number, retreated: boolean;
+      if (routes) {
+        const route = routeTo(target);
+        owner = route.cells[route.cells.length - 2]!;
+        travelled = route.length;
+        retreated = route.cells.length > 2;
+        replay(route);
+        confidence = Math.max(behavior.internalOrientation, confidence);
+      } else {
+        owner = parent[target]!;
+        const ancestor = lca(current, owner);
+        confidence = Math.max(behavior.internalOrientation, rememberTravel(current, target, ancestor, confidence));
+        upward[current] = upward[current]! + 1;
+        upward[ancestor] = upward[ancestor]! - 1;
+        downward[owner] = downward[owner]! + 1;
+        downward[ancestor] = downward[ancestor]! - 1;
+        travelled = distance[current]! + distance[owner]! - 2 * distance[ancestor]! + edgeLength(context, owner, target);
+        walkLength += travelled;
+        visits[target] = visits[target]! + 1;
+        meter?.enter(owner, target);
+        retreated = ancestor !== current;
+      }
       visitedStamp[target] = run;
-      upward[current] = upward[current]! + 1;
-      upward[ancestor] = upward[ancestor]! - 1;
-      downward[owner] = downward[owner]! + 1;
-      downward[ancestor] = downward[ancestor]! - 1;
-      walkLength += distance[current]! + distance[owner]! - 2 * distance[ancestor]! + edgeLength(context, owner, target);
-      visits[target] = visits[target]! + 1;
       visited.push(target);
-      meter?.enter(owner, target);
       if (maze.passages[target]!.length === 1)
         recognizedLeaves.push(target);
-      const travelled = distance[current]! + distance[owner]! - 2 * distance[ancestor]! + edgeLength(context, owner, target);
-      const retreated = ancestor !== current;
+      previousCell = owner;
       current = target;
       const oldSign = belief.sign;
       if (boundaryPreference > 0 && belief.observe(heuristic[current]!, travelled, retreated)) {

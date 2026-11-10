@@ -27,7 +27,9 @@ function longEdges(maze:Maze,limit:number):[number,number][]{
  * Trap count and portal pockets are retained. Once geometry fits, improve the worst-policy cold areas.
  */
 export function jointRepair(base:Maze,seed:string,steps=320,onProgress?:(state:{attempted:number;geometry:number;coldPenalty:number})=>void):Maze[]{
-  const limits=base.parameters.design;if(!limits)return [];
+  // Ordinary trap generation has the same default 12m/20m passage bounds,
+  // without additional design-only perspective or cold-area constraints.
+  const limits=base.parameters.design??{maxForcedStraight:12,maxForcedRun:20,maxVisibleStraight:Infinity,maxColdRatio:1,maxColdRegion:Infinity};
   const guard=guardedMaze(base,seed,true).constraints,rng=random(seed+'|joint-repair'),domain=domainOf(base);
   const requested=base.parameters.routeTrapCount??0,area=domain.area;
   const routeArea=(m:Maze)=>shortestPath(m).reduce((sum,n)=>{const s=cellSize(m,n);return sum+s.width*s.depth;},0)/area;

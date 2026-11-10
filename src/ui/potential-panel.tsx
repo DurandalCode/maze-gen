@@ -13,6 +13,9 @@ export function PotentialPanel({ value: p, onLimit }: {
     {!p.treeForecast&&<p className="field-note">{p.reason}</p>}
     <dl className="coldspot-metrics">
     <div><dt>Карманы, целиком видимые с развилки</dt><dd>{p.obviousDeadEnds.count} · {fmt(p.obviousDeadEnds.area)} м² · {fmt(p.obviousDeadEnds.ratio*100)}% площади</dd></div>
+    <div><dt>Маршрут без альтернативного обхода</dt><dd>{fmt(p.alternatives.unavoidableRatio*100)}% · {fmt(p.alternatives.unavoidableLength)} м</dd></div>
+    <div><dt>Участки маршрута с обходом</dt><dd>{p.alternatives.alternativeSections} · {fmt(p.alternatives.alternativeLength)} м</dd></div>
+    <div><dt>Длиннейший участок без обхода</dt><dd>{fmt(p.alternatives.longestUnavoidableRun)} м</dd></div>
     <div><dt>Независимые кольца</dt><dd>{p.cycles}</dd></div>
     {p.treeForecast&&<>
     <div><dt>Боковая площадь, прогноз разведки</dt><dd>{fmt(p.minOptionalCoverage * 100)}–{fmt(p.maxOptionalCoverage * 100)}%</dd></div>
@@ -22,10 +25,10 @@ export function PotentialPanel({ value: p, onLimit }: {
     <div><dt>Глубоких заходов ≥6 м, прогноз</dt><dd>{fmt(p.minDeepBranches)}–{fmt(p.maxDeepBranches)}</dd></div>
     <div><dt>Типичная глубина захода, прогноз</dt><dd>{fmt(p.minTypicalDepth)}–{fmt(p.maxTypicalDepth)} м</dd></div>
     </>}
-    <div><dt>Длиннейшая прямая без выбора</dt><dd>{fmt(p.corridors.longestForcedStraight)} м · предел {p.corridors.straightLimit} м</dd></div>
-    <div><dt>Проход без развилок, с поворотами</dt><dd>{fmt(p.corridors.longestForcedRun)} м · предел {p.forcedRunLimit} м</dd></div>
+    <div><dt>Длиннейшая прямая без содержательного выбора</dt><dd>{fmt(p.corridors.longestForcedStraight)} м · предел {p.corridors.straightLimit} м</dd></div>
+    <div><dt>Проход без содержательного выбора, с поворотами</dt><dd>{fmt(p.corridors.longestForcedRun)} м · предел {p.forcedRunLimit} м · по графу {fmt(p.corridors.graphLongestForcedRun)} м</dd></div>
     {p.treeForecast&&<>
-    <div><dt>Развилок на 100 м обязательного пути</dt><dd>{fmt(p.corridors.choicesPer100Metres)}</dd></div>
+    <div><dt>Содержательных развилок на 100 м пути</dt><dd>{fmt(p.corridors.choicesPer100Metres)}</dd></div>
     <div><dt>Доля пути в слишком длинных прямых</dt><dd>{fmt(p.corridors.longMandatoryStraightRatio * 100)}%</dd></div>
     </>}
     <div><dt>Видимая прямая перспектива, включая развилки</dt><dd>{fmt(p.corridors.longestVisibleStraight)} м</dd></div>

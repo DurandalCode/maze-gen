@@ -76,9 +76,12 @@ export function generateLoopTraps(base:Maze,onProgress?:(message:string)=>void):
   }
   for(const candidate of [...constructed,...beam]){
    if(metrics(candidate).cycles!==requested)continue;
-   const m={...candidate,parameters:{...base.parameters,extraConnections:requested}},repaired=repair(m,guard,seed,1200,onProgress);
+   // Route-alternative bounds apply to the final graph, after all requested links exist.
+   const design=base.parameters.design;
+   const m={...candidate,parameters:{...base.parameters,extraConnections:requested,...(design?{design:{...design,maxUnavoidableRouteRatio:1}}:{})}},repaired=repair(m,guard,seed,1200,onProgress);
    if(!repaired)continue;
-   const result=base.parameters.extraConnections>requested?addConstrainedConnections(repaired,base.parameters.extraConnections,base.parameters.seed,onProgress):repaired;
+   const restored={...repaired,parameters:{...base.parameters,extraConnections:requested}};
+   const result=base.parameters.extraConnections>requested?addConstrainedConnections(restored,base.parameters.extraConnections,base.parameters.seed,onProgress):restored;
    if(analyzePotential(result,{...DEFAULT_ANALYSIS,samples:2048,routeMemory:1},undefined,false).eligible)return result;
   }
  }

@@ -1,4 +1,5 @@
 import type { Maze,DesignLimits } from '../core/maze';
+import {routeAlternatives,type RouteAlternatives} from './route-alternatives';
 import {obviousForkDeadEnds,recognitionAdjustedColdspots} from './visible-deadends';
 import {loopTraps,type LoopTraps} from './loop-traps';
 import {routeTraps,type RouteTraps} from './route-traps';
@@ -25,6 +26,7 @@ export interface PotentialScenario {
 }
 export interface PotentialDifficulty {
   design?:DesignLimits;
+  alternatives:RouteAlternatives;
   obviousDeadEnds:{count:number;area:number;ratio:number};
   /** Effective quality bounds; raw heat remains in each scenario and these raw maxima. */
   worstColdRatio:number; worstColdRegion:number;
@@ -62,7 +64,7 @@ export function analyzePotential(maze: Maze, options: AnalysisOptions, primary?:
   validateAnalysisOptions(options);
   const m = metrics(maze), privacy = mazePortalPrivacy(maze, findWitness), corridors = corridorQuality(maze, maze.parameters.design?.maxForcedStraight ?? options.maxForcedStraight ?? 12);
   const blind=obviousForkDeadEnds(maze);
-  const result: PotentialDifficulty = { obviousDeadEnds:{count:blind.branches.length,area:blind.area,ratio:blind.ratio}, treeForecast:m.cycles===0,cycles:m.cycles,design:maze.parameters.design,worstColdRatio:0,worstColdRegion:0,rawWorstColdRatio:0,rawWorstColdRegion:0,traps:routeTraps(maze), loops:loopTraps(maze), requestedLoopTraps:maze.parameters.loopTrapCount??0, requestedRouteTraps:maze.parameters.routeTrapCount??0, supported: false, eligible: false, score: null, issues: [], privacy, corridors, forcedRunLimit: maze.parameters.design?.maxForcedRun ?? options.maxForcedRun ?? 20, mandatoryAreaRatio: 0, minMandatoryRatio: .35, maxMandatoryRatio: .55, scenarios: [], minOptionalCoverage: 0, maxOptionalCoverage: 0, minUniqueExplorationRatio: 0, maxUniqueExplorationRatio: 0, minFirstDetourRate: 0, maxFirstDetourRate: 0, minDeepBranches: 0, maxDeepBranches: 0, minTypicalDepth: 0, maxTypicalDepth: 0 };
+  const result: PotentialDifficulty = { alternatives:routeAlternatives(maze), obviousDeadEnds:{count:blind.branches.length,area:blind.area,ratio:blind.ratio}, treeForecast:m.cycles===0,cycles:m.cycles,design:maze.parameters.design,worstColdRatio:0,worstColdRegion:0,rawWorstColdRatio:0,rawWorstColdRegion:0,traps:routeTraps(maze), loops:loopTraps(maze), requestedLoopTraps:maze.parameters.loopTrapCount??0, requestedRouteTraps:maze.parameters.routeTrapCount??0, supported: false, eligible: false, score: null, issues: [], privacy, corridors, forcedRunLimit: maze.parameters.design?.maxForcedRun ?? options.maxForcedRun ?? 20, mandatoryAreaRatio: 0, minMandatoryRatio: .35, maxMandatoryRatio: .55, scenarios: [], minOptionalCoverage: 0, maxOptionalCoverage: 0, minUniqueExplorationRatio: 0, maxUniqueExplorationRatio: 0, minFirstDetourRate: 0, maxFirstDetourRate: 0, minDeepBranches: 0, maxDeepBranches: 0, minTypicalDepth: 0, maxTypicalDepth: 0 };
   if (m.components !== 1) {
     result.reason = 'Прогноз боковой разведки пока доступен для связного дерева проходов.';
     return result;
@@ -112,10 +114,12 @@ export function analyzePotential(maze: Maze, options: AnalysisOptions, primary?:
     if(result.worstColdRatio>result.design.maxColdRatio+1e-9)result.issues.push('Превышена допустимая холодная доля площади.');
     if(result.worstColdRegion>result.design.maxColdRegion+1e-9)result.issues.push('Слишком крупный связный колдспот.');
   }
+  if(result.design?.maxUnavoidableRouteRatio!==undefined&&maze.parameters.extraConnections>0&&result.alternatives.unavoidableRatio>result.design.maxUnavoidableRouteRatio+1e-9)result.issues.push('Слишком большая доля основного маршрута не имеет альтернативного обхода.');
   result.eligible = result.issues.length === 0;
   result.score = result.minUniqueExplorationRatio + .5 * result.minOptionalCoverage + .025 * Math.min(8, decisions?.credibleDecoys ?? 0) - .002 * Math.max(...result.scenarios.map(s => s.effectiveLargestColdArea));
   if(!result.treeForecast)result.score=1-result.worstColdRatio-.5*result.worstColdRegion/m.area;
   if(result.requestedRouteTraps>0 && result.traps.best?.qualifies)result.score! += .2 * result.traps.best.score;
   result.score! -= blind.ratio;
+  if(!result.treeForecast)result.score! += .35*result.alternatives.alternativeRatio;
   return result;
 }
