@@ -12,7 +12,8 @@
     "tauri": "tauri",
     "serve": "bun server/index.ts",
     "test:two-storey": "bun test tests/two-storey.test.ts",
-    "test:two-storey:browser": "bun scripts/two-storey-check.ts"
+    "test:two-storey:browser": "bun scripts/two-storey-check.ts",
+    "test:generation:browser": "bun scripts/generation-ux-check.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

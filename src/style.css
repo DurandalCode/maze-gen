@@ -168,9 +168,10 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 
 /* Separate daily play/analysis actions from generation and construction controls. */
 [hidden]{display:none!important}
-.workspace-tabs{display:flex;gap:6px;margin-bottom:18px;flex-shrink:0}
-.workspace-tabs button{min-height:44px;padding:10px 20px;border-radius:6px;background:#20261e;border:1px solid #3a4233;color:#aeb9a1;font-size:13px}
-.workspace-tabs button[aria-pressed=true]{background:#303b25;border-color:#8ba759;color:var(--lime)}
+.workspace-tabs,.floor-tabs{display:flex;gap:6px;margin-bottom:18px;flex-shrink:0}
+.workspace-tabs button,.floor-tabs button{min-height:44px;padding:10px 20px;border-radius:6px;background:#20261e;border:1px solid #3a4233;color:#aeb9a1;font-size:13px}
+.workspace-tabs button[aria-pressed=true],.floor-tabs button[aria-pressed=true]{background:#303b25;border-color:#8ba759;color:var(--lime)}
+.sidebar form>.floor-editor-control{grid-column:1/-1}
 .analyze-shortcut{min-height:44px;padding:10px 15px;border:1px solid #657c43;border-radius:5px;background:#303b25;color:var(--lime);font-size:12px}
 .analysis-options{margin:16px 0;border-top:1px solid var(--border)}
 .analysis-options summary{min-height:44px;padding:14px 0;cursor:pointer;font-size:12px;color:#b7c5a5}
