@@ -1,6 +1,6 @@
 import {storeyView} from './two-storey';
 import {freeRuntime,modulePolygon,size} from '../free/layout';
-import {edges,ends,lerp,segmentDistance} from '../free/geometry';
+import {edges,ends,segmentDistance} from '../free/geometry';
 import {corridorSupports} from './corridor-supports';
 import {footprint,metres,mergeWalls} from './corridor-geometry';
 import { domainOf } from './domain';
@@ -41,7 +41,21 @@ export function moduleFootprints(maze: Maze): ModuleFootprint[] {
 export function timberStructure(maze: Maze): TimberStructure {
   if(maze.shaftRects){const {shaftRects,...plain}=maze,base=timberStructure(plain);const inShaft=(x:number,z:number)=>shaftRects.some(r=>x>=r.x1-.1&&x<=r.x2+.1&&z>=r.z1-.1&&z<=r.z2+.1);return {...base,posts:base.posts.filter(p=>!inShaft(p.x,p.z)),frames:base.frames.filter(w=>!shaftRects.some(r=>Math.max(w.x1,w.x2)>=r.x1-.1&&Math.min(w.x1,w.x2)<=r.x2+.1&&Math.max(w.z1,w.z2)>=r.z1-.1&&Math.min(w.z1,w.z2)<=r.z2+.1))};}
   if(maze.storeys)return timberStructure(storeyView(maze,0));
-  if(maze.version===5){const r=freeRuntime(maze),frames=maze.free!.modules.flatMap(m=>edges(modulePolygon(m))),lowerFrames:LowerFrame[]=maze.free!.modules.filter(m=>m.type==='2x6').flatMap(m=>{const center={x:m.x,z:m.z};return r.panels.filter(w=>edges(modulePolygon(m)).some(e=>segmentDistance(ends(w)[0],e)<1e-7&&segmentDistance(ends(w)[1],e)<1e-7)).map(w=>{const mid=lerp(...ends(w),.5),d=Math.hypot(center.x-mid.x,center.z-mid.z);return {...w,inward:{x:(center.x-mid.x)/d,z:(center.z-mid.z)/d}};});});const headers=r.panels.filter(w=>!frames.some(e=>segmentDistance(ends(w)[0],e)<1e-7&&segmentDistance(ends(w)[1],e)<1e-7));return {posts:r.posts,frames:[...frames,...headers],bracedFrames:frames,lowerFrames,braceDrop:Math.min(.42,Math.max(0,maze.wallHeight-HEADER_DEPTH-1.88))};}
+  if(maze.version===5){
+    const r=freeRuntime(maze),frames=maze.free!.modules.flatMap(m=>edges(modulePolygon(m))),lowerFrames:LowerFrame[]=[];
+    for(const m of maze.free!.modules.filter(m=>m.type==='2x6')){
+      const perimeter=edges(modulePolygon(m));
+      for(const w of r.panels){
+        const edge=perimeter.find(e=>segmentDistance(ends(w)[0],e)<1e-7&&segmentDistance(ends(w)[1],e)<1e-7);
+        if(!edge)continue;
+        const dx=edge.x2-edge.x1,dz=edge.z2-edge.z1,length=Math.hypot(dx,dz);
+        // The offset must be perpendicular even when a doorway trims one end.
+        lowerFrames.push({...w,inward:{x:-dz/length,z:dx/length}});
+      }
+    }
+    const headers=r.panels.filter(w=>!frames.some(e=>segmentDistance(ends(w)[0],e)<1e-7&&segmentDistance(ends(w)[1],e)<1e-7));
+    return {posts:r.posts,frames:[...frames,...headers],bracedFrames:frames,lowerFrames,braceDrop:Math.min(.42,Math.max(0,maze.wallHeight-HEADER_DEPTH-1.88))};
+  }
   if(maze.navigation)return timberStructure(maze.navigation.source);
   if(maze.version===4){
     const posts:Point[]=corridorSupports(maze),frames:Wall[]=[],lowerFrames:LowerFrame[]=[];

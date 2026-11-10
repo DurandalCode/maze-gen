@@ -249,6 +249,8 @@ export function buildNavigation(l: FreeLayout) {
   return { ...phys, centers, passages, paths, edgePaths, portalPaths };
 }
 const runtimeCache = new WeakMap<FreeLayout, ReturnType<typeof buildNavigation>>();
+const domainCache = new WeakMap<FreeLayout,Domain>();
+const portalCache = new WeakMap<FreeLayout,Map<string,ReturnType<typeof anchorGeometry>>>();
 const referenceRoutes=new WeakMap<Maze,Map<string,{regions:number[];points:Point[]}>>();
 export function freeRuntime(maze: Maze) {
   const l = maze.free!;
@@ -260,8 +262,9 @@ export function freeRuntime(maze: Maze) {
   return r;
 }
 export function freeDomain(maze: Maze): Domain {
+  const cached=domainCache.get(maze.free!);if(cached)return cached;
   const r = freeRuntime(maze), cells = r.rooms.map((_, i) => i);
-  return {
+  const result:Domain={
     active: new Uint8Array(cells.length).fill(1), cells, modules: new Uint8Array(maze.free!.modules.length).fill(1), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: r.rooms.flatMap((s, i) => edges(s.polygon).map(w => ({ wall: w, portal: { cell: i, side: 'north' as const } }))), area: r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: r.contains, constrain(from, to) {
       if (segmentInside(from, to, r.contains, r.boundaries)) return { ...to };
       let lo = 0, hi = 1;
@@ -272,6 +275,7 @@ export function freeDomain(maze: Maze): Domain {
       return lerp(from, to, lo);
     }
   };
+  domainCache.set(maze.free!,result);return result;
 }
 export function freeRay(maze: Maze, start: Point, angle: number, limit = 24) {
   const r = freeRuntime(maze), end = { x: start.x + Math.cos(angle) * limit, z: start.z + Math.sin(angle) * limit };
@@ -286,9 +290,11 @@ export function freeRay(maze: Maze, start: Point, angle: number, limit = 24) {
   return best;
 }
 export function freePortal(maze: Maze, id: string) {
+  let cache=portalCache.get(maze.free!);if(!cache){cache=new Map();portalCache.set(maze.free!,cache);}
+  const cached=cache.get(id);if(cached)return cached;
   const o = maze.free!.openings.find(o => o.id === id);
   if (!o) throw Error('Проём не найден.');
-  return anchorGeometry(maze.free!, o, o.width);
+  const result=anchorGeometry(maze.free!, o, o.width);cache.set(id,result);return result;
 }
 export function freeRoute(maze: Maze, from = maze.entrance.cell, to = maze.exit.cell) {
   let routes=referenceRoutes.get(maze);if(!routes){routes=new Map();referenceRoutes.set(maze,routes);}const key=`${from}:${to}`,cached=routes.get(key);if(cached)return cached;

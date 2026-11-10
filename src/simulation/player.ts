@@ -14,7 +14,7 @@ export class Player {
   finished = false;
   private spatialWorld?:TwoStoreyWorld;
   constructor(private maze: Maze, private world: CollisionWorld, readonly mode:'walk'|'inspection'='walk') {
-    this.position = portalPoint(maze, maze.entrance);
+    this.position = {...portalPoint(maze, maze.entrance)};
     this.yaw = { west: -Math.PI/2, east: Math.PI/2, north: Math.PI, south: 0 }[maze.entrance.side];
     if(maze.version===5){const n=freePortal(maze,maze.free!.entrance).normal;this.yaw=Math.atan2(n.x,n.z);}
     if(mode==='inspection'){this.position={x:maze.width/2,z:maze.depth+6,y:0,floor:0};this.yaw=0;}
