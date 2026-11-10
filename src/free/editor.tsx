@@ -1,5 +1,5 @@
 import { EnvironmentControls } from '../ui/environment-controls';
-import { useEffect, useMemo, useReducer, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type PointerEvent } from 'react';
 import type { Maze, Parameters, Point } from '../core/maze';
 import { DEFAULT_CONSTRUCTION } from '../core/maze';
 import { emptyLayout, type Anchor, type FreeDraft, type FreeModule } from './model';
@@ -256,26 +256,23 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
       setInspection(false);setWalk({ ...m, roof: true });
     }
   };
-  const saveRun = (value: WalkResult, status: 'in-progress' | 'stopped' | 'finished') => {
+  const saveRun = useCallback((value: WalkResult, status: 'in-progress' | 'stopped' | 'finished') => {
     if (!walk || value.recorder.distance <= .01) return;
     void captureWalk(walk, value.recorder, value.id ?? crypto.randomUUID(), value.finished, status).then(() => setRevision(n => n + 1)).catch(e => setNotice(String(e)));
-  };
+  },[walk]);
+  const onWalkError=useCallback((error:string)=>{setNotice(error);setWalk(null);},[]);
+  const onWalkCheckpoint=useCallback((value:WalkResult)=>saveRun(value,'in-progress'),[saveRun]);
+  const onWalkEnd=useCallback((value:WalkResult)=>{
+    if(!inspection){saveRun(value,value.finished?'finished':'stopped');setResult(value);setShowRoute(true);}
+    setWalk(null);
+  },[inspection,saveRun]);
   const m = current.layout.modules.find(m => m.id === selected), c = current.layout.connections.find(c => c.id === selected), o = current.layout.openings.find(o => o.id === selected);
   const fit = () => setView({ x: -1, z: -1, width: d.parameters.columns + 2, height: d.parameters.rows + 2 });
   const numberField = (label: string, value: number, onChange: (v: number) => void, step = .1, min?: number, max?: number) => <label className="field"><span>{label}</span><input aria-label={label} type="number" step={step} value={Number.isFinite(value) ? value : ''} min={min} max={max} onChange={e => {
     if (Number.isFinite(e.target.valueAsNumber)) onChange(e.target.valueAsNumber);
   }} /></label>;
   const anchorOptions = (value: Anchor, onChange: (a: Anchor) => void) => <><label className="field">Пространство<select aria-label="Пространство" value={value.room} onChange={e => onChange({ ...value, room: e.target.value, edge: 0, offset: 0 })}>{rooms(l).map(r => <option key={r.id} value={r.id}>{r.id}</option>)}</select></label>{numberField('Сторона', value.edge, v => onChange({ ...value, edge: v }), 1, 0, (rooms(l).find(r => r.id === value.room)?.polygon.length ?? 4) - 1)}{numberField('Смещение проёма, м', value.offset, v => onChange({ ...value, offset: v }))}</>;
-  if (walk) return <main className="walk-main"><WalkCanvas maze={walk} inspection={inspection} onError={e => {
-    setNotice(e);
-    setWalk(null);
-  }} onCheckpoint={v => saveRun(v, 'in-progress')} onEnd={v => {
-    if(inspection){setWalk(null);return;}
-    saveRun(v, v.finished ? 'finished' : 'stopped');
-    setResult(v);
-    setWalk(null);
-    setShowRoute(true);
-  }} /></main>;
+  if (walk) return <main className="walk-main"><WalkCanvas maze={walk} inspection={inspection} onError={onWalkError} onCheckpoint={onWalkCheckpoint} onEnd={onWalkEnd}/></main>;
   return <div className="free-app"><header className="topbar"><div className="brand"><strong>MAZE <span>LAB</span></strong></div><label className="route-toggle"><input type="checkbox" role="switch" aria-label="Редактор свободного размещения" checked onChange={()=>onClose(d,ready,result)}/> Редактор свободного размещения</label><span>Черновик сохраняется на устройстве</span></header><aside className="free-sidebar"><h2>Свободное размещение</h2><label className="field">Тип лабиринта<select aria-label="Тип лабиринта" value={d.parameters.generationType ?? 'classical'} onChange={e => mutate(n => n.parameters.generationType = e.target.value as Parameters['generationType'])}><option value="classical">Классический</option><option value="living">Живой</option><option value="corridor">Коридорный</option></select></label><label className="field">Алгоритм<select value={d.parameters.algorithm} onChange={e => mutate(n => n.parameters.algorithm = e.target.value as Parameters['algorithm'])}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
     {numberField('Разброс углов, °', d.parameters.freeAngleSpread ?? 100, v => mutate(n => n.parameters.freeAngleSpread = v), 5, 0, 120)}
     <label className="field">Центральный перекрёсток<select aria-label="Центральный перекрёсток" value={d.parameters.freeJunctionDegree ?? 'auto'} onChange={e => mutate(n => {

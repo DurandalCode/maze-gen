@@ -67,6 +67,7 @@ function App() {
     setShapeEditing(false);setShapeSelected(null);
   };
   const [mode, setMode] = useState<'map' | 'walk' | 'inspect'>('map');
+  const modeRef=useRef(mode);modeRef.current=mode;
   const [heatDisplay,setHeatDisplay] = useState<HeatDisplay|null>(null);
   const [showRoute, setShowRoute] = useState(false);
   const [result, setResult] = useState<WalkResult | null>(null);
@@ -82,7 +83,7 @@ function App() {
   const moduleCount=useMemo(()=>domainOf(maze).modules.reduce((sum,active)=>sum+active,0),[maze]);
   const walkAssessment=useMemo(()=>result?assessWalk(maze,result.recorder.samples,result.recorder.distance,result.finished):null,[maze,result]);
   useEffect(()=> {
-    void flushPendingWalks();const retry=()=>void flushPendingWalks();
+    const retry=()=>void flushPendingWalks(()=>modeRef.current==='map'&&!document.querySelector('.walk-view'));retry();
     window.addEventListener('online',retry);const timer=window.setInterval(retry,30_000);
     return ()=>{window.removeEventListener('online',retry);window.clearInterval(timer);};
   },[]);
