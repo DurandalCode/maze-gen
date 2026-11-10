@@ -8,8 +8,9 @@ import {makeWalkData} from '../src/persistence/walk-json';
 import * as mazeJson from '../src/persistence/maze-json';
 import {saveLibraryWalk,flushPendingWalks} from '../src/persistence/library';
 const beforeStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage'),beforeLocation=Object.getOwnPropertyDescriptor(globalThis,'location'),beforeFetch=globalThis.fetch;
+const mockFetch=(handler:()=>Promise<Response>)=>{globalThis.fetch=Object.assign(handler,{preconnect:beforeFetch.preconnect});};
 class Storage{getItem(k:string){return Object.hasOwn(this,k)?(this as any)[k]:null;}setItem(k:string,v:string){Object.defineProperty(this,k,{value:v,enumerable:true,configurable:true,writable:true});}removeItem(k:string){delete (this as any)[k];}}
-Object.defineProperty(globalThis,'localStorage',{configurable:true,value:new Storage()});Object.defineProperty(globalThis,'location',{configurable:true,value:{search:''}});globalThis.fetch=async()=>new Response('{}',{status:503});
+Object.defineProperty(globalThis,'localStorage',{configurable:true,value:new Storage()});Object.defineProperty(globalThis,'location',{configurable:true,value:{search:''}});mockFetch(async()=>new Response('{}',{status:503}));
 afterAll(()=>{globalThis.fetch=beforeFetch;for(const [key,value]of [['localStorage',beforeStorage],['location',beforeLocation]] as const){if(value)Object.defineProperty(globalThis,key,value);else delete (globalThis as any)[key];}});
 function fixture(id:string){
  const layout=emptyLayout();layout.modules=[{id:'a',type:'2x2',x:10,z:10,angle:0},{id:'b',type:'2x2',x:14,z:10,angle:0}];layout.connections=[{id:'ab',a:{room:'a',edge:1,offset:0},b:{room:'b',edge:3,offset:0},width:1.4}];layout.openings=[{id:'in',room:'a',edge:3,offset:0,width:1.4},{id:'out',room:'b',edge:1,offset:0,width:1.4}];layout.entrance='in';layout.exit='out';
@@ -31,7 +32,7 @@ test('unknown disk snapshots are validated once, retries accept compact v5 recor
  }finally{decode.mockRestore();localStorage.removeItem(key);}
 });
 test('paused retry leaves backups intact and cannot delete a newer queued checkpoint after an older response',async()=>{
- const first=fixture(crypto.randomUUID()),key='maze-lab:pending-walk:'+first.id;await saveLibraryWalk(first);let resolve!:(r:Response)=>void;globalThis.fetch=()=>new Promise(r=>{resolve=r;});
+ const first=fixture(crypto.randomUUID()),key='maze-lab:pending-walk:'+first.id;await saveLibraryWalk(first);let resolve!:(r:Response)=>void;mockFetch(()=>new Promise(r=>{resolve=r;}));
  const old=saveLibraryWalk(first);const backup=localStorage.getItem(key);await flushPendingWalks(()=>false);expect(localStorage.getItem(key)).toBe(backup);
- globalThis.fetch=async()=>new Response('{}',{status:503});await saveLibraryWalk({...first,finished:true,status:'finished'});resolve(new Response('{}'));await old;expect(JSON.parse(localStorage.getItem(key)!).finished).toBe(true);localStorage.removeItem(key);
+ mockFetch(async()=>new Response('{}',{status:503}));await saveLibraryWalk({...first,finished:true,status:'finished'});resolve(new Response('{}'));await old;expect(JSON.parse(localStorage.getItem(key)!).finished).toBe(true);localStorage.removeItem(key);
 });

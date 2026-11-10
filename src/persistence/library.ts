@@ -27,6 +27,20 @@ function queuedWalk(key:string,text:string):WalkData {
   const cached=queuedSnapshots.get(key);if(cached?.text===text)return cached.walk;
   const walk=validateWalk(JSON.parse(text));queuedSnapshots.set(key,{text,walk});return walk;
 }
+const queuedChecks=new Map<string,{text:string;promise:Promise<WalkData>}>();
+function queuedWalkInBackground(key:string,text:string):Promise<WalkData>{
+  const cached=queuedSnapshots.get(key);if(cached?.text===text)return Promise.resolve(cached.walk);
+  if(typeof document==='undefined'||typeof Worker==='undefined')return Promise.resolve().then(()=>queuedWalk(key,text));
+  const existing=queuedChecks.get(key);if(existing?.text===text)return existing.promise;
+  const promise=new Promise<WalkData>((resolve,reject)=>{
+    const worker=new Worker(new URL('./queued-walk-worker.ts',import.meta.url),{type:'module'});
+    worker.onmessage=e=>{worker.terminate();if(e.data.error){reject(new Error(e.data.error));return;}const walk=e.data.walk as WalkData;
+      try{if(localStorage.getItem(key)===text)queuedSnapshots.set(key,{text,walk});}catch{/* The validated result can still be uploaded. */}resolve(walk);};
+    worker.onerror=()=>{worker.terminate();reject(new Error('Не удалось проверить отложенную запись.'));};
+    worker.postMessage(text);
+  }).finally(()=>{if(queuedChecks.get(key)?.promise===promise)queuedChecks.delete(key);});
+  queuedChecks.set(key,{text,promise});return promise;
+}
 export async function saveLibraryWalk(data:WalkData):Promise<{saved:boolean;queued:boolean}> {
   const key=prefix+data.id;let attempt=data,queued=false;
   let pending:WalkData|undefined;
@@ -51,6 +65,6 @@ export async function flushPendingWalks(shouldContinue:()=>boolean=()=>true):Pro
     if(!shouldContinue())break;
     let text:string|null;try{text=localStorage.getItem(key);}catch{return;}
     if(!text)continue;
-    try{await saveLibraryWalk(queuedWalk(key,text));}catch{/* Leave a failed record available for a later retry. */}
+    try{const walk=await queuedWalkInBackground(key,text);if(!shouldContinue())break;await saveLibraryWalk(walk);}catch{/* Leave a failed record available for a later retry. */}
   }
 }
