@@ -10,7 +10,9 @@
     "preview": "bun --bun vite preview --host 127.0.0.1",
     "test": "bun test",
     "tauri": "tauri",
-    "serve": "bun server/index.ts"
+    "serve": "bun server/index.ts",
+    "test:two-storey": "bun test tests/two-storey.test.ts",
+    "test:two-storey:browser": "bun scripts/two-storey-check.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

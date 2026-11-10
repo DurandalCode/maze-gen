@@ -66,3 +66,10 @@ test('ordinary generation creates a new reproducible return-loop maze while resp
  for(let c=0;c<m.passages.length;c++)for(const n of m.passages[c]!)if(n>c){const a=cellCenter(m,c),b=cellCenter(m,n),r=world.move(a,{x:b.x-a.x,z:b.z-a.z});expect(Math.hypot(r.x-b.x,r.z-b.z)).toBeLessThan(1e-5);}
  expect(deserialize(serialize(m))).toEqual(m);expect(prior).toEqual(snapshot);expect(generate(parameters,prior)).toEqual(m);
 },60000);
+
+test('legacy loop qualification does not mistake geometrical return for directional credibility',()=>{
+ const t=loopTraps(fixture()).candidates[0]!;
+ expect(t.geometryQualifies).toBe(true);expect(t.qualifies).toBe(true);
+ expect(t.credibility.strongEntry).toBe(false);expect(t.credibility.credible).toBe(false);
+ expect(t.credibility.probes).toHaveLength(4);
+});

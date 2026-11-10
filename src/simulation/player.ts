@@ -1,3 +1,6 @@
+import {TwoStoreyWorld} from './two-storey-world';
+import {freePortal} from '../free/layout';
+import {segmentDistance} from '../free/geometry';
 import { domainOf } from '../core/domain';
 import { cellSize, portalPoint, type Maze, type Point } from '../core/maze';
 import { CollisionWorld } from './collisions';
@@ -9,10 +12,13 @@ export class Player {
   pitch = 0;
   readonly recorder: Recorder;
   finished = false;
+  private spatialWorld?:TwoStoreyWorld;
   constructor(private maze: Maze, private world: CollisionWorld) {
     this.position = portalPoint(maze, maze.entrance);
     this.yaw = { west: -Math.PI/2, east: Math.PI/2, north: Math.PI, south: 0 }[maze.entrance.side];
+    if(maze.version===5){const n=freePortal(maze,maze.free!.entrance).normal;this.yaw=Math.atan2(n.x,n.z);}
     this.recorder = new Recorder(this.position);
+    if(maze.storeys)this.spatialWorld=new TwoStoreyWorld(maze);
   }
 
   update(dt: number, keys: ReadonlySet<string>): void {
@@ -35,6 +41,11 @@ export class Player {
       x: (-Math.sin(this.yaw)*forward + Math.cos(this.yaw)*right)*distance,
       z: (-Math.cos(this.yaw)*forward - Math.sin(this.yaw)*right)*distance,
     };
+    if(this.spatialWorld){
+      const elapsed=this.recorder.elapsed,count=Math.max(1,Math.ceil(Math.hypot(delta.x,delta.z)/.0625));let step=0;
+      this.position=this.spatialWorld.move(this.position,delta,p=>{step++;if(this.finished)return;this.recorder.record(p,elapsed+dt*step/count);if(this.atExit(p)){this.finished=true;this.recorder.record(p,this.recorder.elapsed,true);}});
+      if(this.finished)this.position={...this.recorder.samples.at(-1)!};return;
+    }
     const previousTime = this.recorder.elapsed;
     let step = 0;
     const totalSteps = Math.max(1, Math.ceil(Math.hypot(delta.x, delta.z) / 0.0625));
@@ -58,10 +69,12 @@ export class Player {
   }
 
   private atExit(point: Point): boolean {
+    if(this.maze.storeys&&((point.floor??0)!==0||point.stair!==undefined||(point.y??0)>.01))return false;
+    if(this.maze.version===5){const g=freePortal(this.maze,this.maze.free!.exit);return segmentDistance(point,g.wall)<.03&&Math.hypot(point.x-g.mid.x,point.z-g.mid.z)<=this.maze.exit.width!/2-.25;}
     const exit = portalPoint(this.maze, this.maze.exit);
     const side = this.maze.exit.side;
     const size = cellSize(this.maze, this.maze.exit.cell);
-    const half = (side === 'east' || side === 'west' ? size.depth : size.width)/2 - 0.25;
+    const half = (this.maze.exit.width??(side === 'east' || side === 'west' ? size.depth : size.width))/2 - 0.25;
     return side === 'east' || side === 'west'
       ? Math.abs(point.x-exit.x) < 1e-6 && Math.abs(point.z-exit.z) <= half
       : Math.abs(point.z-exit.z) < 1e-6 && Math.abs(point.x-exit.x) <= half;

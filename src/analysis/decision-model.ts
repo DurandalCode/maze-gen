@@ -37,7 +37,7 @@ export function decisionModel(maze: Maze, context: NavigationContext, diagonal =
       exitView = sight.trace(from, Math.atan2(exit.z - a.z, exit.x - a.x), Math.min(24, distance + 1e-5));
       exitViews.set(from, exitView);
     }
-    const exitVisible = exitView.firstCell === to && exitView.length >= distance - 1e-7 ? 1 : 0;
+    const exitVisible = (!maze.storeys||Math.abs((a.y??0)-(exit.y??0))<1e-7)&&exitView.firstCell === to && exitView.length >= distance - 1e-7 ? 1 : 0;
     let hx: number, hz: number;
     if (previous) {
       hx = a.x - previous.x;

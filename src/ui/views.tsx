@@ -1,3 +1,4 @@
+import {floorOf} from '../core/two-storey';
 import type { HeatDisplay } from './coldspot-controls';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {trapOverlay} from './trap-overlay';
@@ -15,8 +16,8 @@ import { MapView } from './map-view';
 import { TouchControls } from './touch-controls';
 import { applyTouchLook, applyTouchMovement, neutralStick, touchControlsAvailable, type StickVector } from './touch-input';
 
-export function MapCanvas({ maze, heat, showRoute, recorder, onPlacePortal, onEnvironmentChange }: {
-  maze: Maze; heat?: HeatDisplay|null; showRoute: boolean; recorder: Recorder | null; onPlacePortal?: (portal: Portal | null) => void;
+export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePortal, onEnvironmentChange }: {
+  floor?:number;maze: Maze; heat?: HeatDisplay|null; showRoute: boolean; recorder: Recorder | null; onPlacePortal?: (portal: Portal | null) => void;
   onEnvironmentChange?: (environment: Environment) => void;
 }) {
   const [hover,setHover]=useState<{x:number;y:number;text:string}|null>(null);
@@ -34,6 +35,7 @@ export function MapCanvas({ maze, heat, showRoute, recorder, onPlacePortal, onEn
     const map = new MapView(canvas.current, maze); view.current = map;
     return () => { map.dispose(); view.current = null; };
   }, [maze]);
+  useEffect(()=>{if(view.current){view.current.floor=floor;view.current.draw();}},[maze,floor]);
   useEffect(() => {
     if (view.current) view.current.onPlacePortal = onPlacePortal ?? null;
   }, [maze, onPlacePortal]);
@@ -48,9 +50,9 @@ export function MapCanvas({ maze, heat, showRoute, recorder, onPlacePortal, onEn
     if(view.current) {view.current.heat=heat??null;view.current.draw();}setHover(null);
   },[maze,heat]);
   useEffect(()=>{
-    if(view.current){view.current.traps=visibleTraps;view.current.draw();}setHover(null);
-  },[maze,visibleTraps]);
-  useEffect(()=>{if(view.current){view.current.criticalWalls=protectedWalls;view.current.draw();}setHover(null);},[maze,protectedWalls]);
+    if(view.current){view.current.traps=visibleTraps.filter(t=>!maze.storeys||floorOf(maze,t.fork)===floor);view.current.draw();}setHover(null);
+  },[maze,visibleTraps,floor]);
+  useEffect(()=>{if(view.current){view.current.criticalWalls=protectedWalls.filter(w=>!maze.storeys||w.wall.floor===floor);view.current.draw();}setHover(null);},[maze,protectedWalls,floor]);
   return <>
     <canvas ref={canvas} onPointerLeave={()=>setHover(null)} onPointerMove={event=>{
       if(event.buttons || (!heat&&!showTraps&&!showCritical)) {setHover(null);return;}

@@ -1,3 +1,6 @@
+import {storeyDomain} from './two-storey';
+import {freeDomain} from '../free/layout';
+import {walkableContains,mm} from './corridor-geometry';
 import { axisBounds, routingSize, type Maze, type Parameters, type Point, type Portal, type Wall } from './maze';
 export interface ShapeRectangle {
   x: number;
@@ -72,24 +75,30 @@ export function validateShape(p: Parameters): void {
     throw new Error('Форма должна быть связной по сторонам. Отдельные острова и касание углами недопустимы.');
 }
 const cache = new WeakMap<Parameters, Map<number, Domain>>();
+const corridorCache=new WeakMap<object,Domain>();
 /** Grid placement adapter. Consumers use world geometry rather than editor rectangles. */
 export function domainOf(maze: Maze): Domain {
+  if(maze.version===5)return freeDomain(maze);
+  if(maze.storeys)return storeyDomain(maze);
+  if(maze.navigation)return maze.navigation.domain;
+  if(maze.version===4&&corridorCache.has(maze.layout!))return corridorCache.get(maze.layout!)!;
   let versions = cache.get(maze.parameters);
   if (!versions) {
     versions = new Map();
     cache.set(maze.parameters, versions);
   }
   const found = versions.get(maze.version);
-  if (found)
+  if (found&&maze.version!==4)
     return found;
-  const p = maze.parameters, modules = shapeMask(p), { columns: w, rows: h } = routingSize(maze);
+  const p = maze.parameters, modules = maze.version===4?new Uint8Array(maze.layout!.modules.length).fill(1):shapeMask(p), { columns: w, rows: h } = routingSize(maze);
   const active = new Uint8Array(w * h), cells: number[] = [], rectangles: Domain['rectangles'] = [];
   const xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z');
   const included = (x: number, z: number) => x >= 0 && z >= 0 && x < p.columns && z < p.rows && !!modules[z * p.columns + x];
   for (let z = 0; z < h; z++)
     for (let x = 0; x < w; x++) {
       let on = true;
-      if (p.shape) {
+      if(maze.version===4)on=walkableContains(maze,mm((xs[x]!+xs[x+1]!)/2),mm((zs[z]!+zs[z+1]!)/2));
+      else if (p.shape) {
         if (p.moduleSize === undefined)
           on = included(x, z);
         else {
@@ -173,6 +182,7 @@ export function domainOf(maze: Maze): Domain {
       const result = { x: from.x + (to.x - from.x) * t, z: from.z + (to.z - from.z) * t };
       return contains(result) ? result : { ...from };
     } };
-  versions.set(maze.version, domain);
+  if(maze.version===4)corridorCache.set(maze.layout!,domain);
+  else versions.set(maze.version, domain);
   return domain;
 }

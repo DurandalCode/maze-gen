@@ -1,3 +1,6 @@
+import {freeRuntime} from '../free/layout';
+import {area} from '../free/geometry';
+import {corridorNavigation} from '../core/corridor-navigation';
 import { assessExploration, type WalkExploration } from './walk-exploration';
 import type { Maze, Point } from '../core/maze';
 import { domainOf } from '../core/domain';
@@ -18,8 +21,10 @@ export interface WalkAssessment {
   interpretation: 'movement-only';
 }
 export function assessWalk(maze: Maze, samples: readonly Sample[], distance: number, finished = false): WalkAssessment {
+  if(maze.version===4&&!maze.navigation)return assessWalk(corridorNavigation(maze),samples,distance,finished);
+  if(maze.version===5){const r=freeRuntime(maze),sequence:number[]=[];for(const sample of samples){const c=cellAtPoint(maze,sample);if(c!==null&&sequence.at(-1)!==c)sequence.push(c);}const seen=new Set(sequence),covered=[...seen].reduce((n,c)=>n+area(r.rooms[c]!.polygon)-r.rooms[c]!.holes.reduce((n,h)=>n+area(h),0),0),optimalLength=pathLength(routePoints(maze));return {exploration:null,distance,optimalLength,ratio:optimalLength?distance/optimalLength:null,coveredAreaRatio:covered/domainOf(maze).area,decisionCount:sequence.filter(c=>maze.passages[c]!.length>=3).length,comparableCorridorChoices:0,longestCorridorChoices:0,continuedStraight:0,interpretation:'movement-only'};}
   const context = prepareNavigation(maze), domain = domainOf(maze), sequence: number[] = [];
-  const locate = (p: Point) => cellAtPoint(maze, { x: Math.max(1e-7, Math.min(maze.width - 1e-7, p.x)), z: Math.max(1e-7, Math.min(maze.depth - 1e-7, p.z)) });
+  const locate = (p: Point) => cellAtPoint(maze, { ...p,x: Math.max(1e-7, Math.min(maze.width - 1e-7, p.x)), z: Math.max(1e-7, Math.min(maze.depth - 1e-7, p.z)) });
   for (const sample of samples) {
     const cell = locate(sample);
     if (cell !== null && cell !== sequence[sequence.length - 1])

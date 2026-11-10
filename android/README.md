@@ -40,3 +40,9 @@
 Проверки сборки: Java компиляция, Gradle assembleDebug, apksigner, aapt и содержимое ZIP. Запуск на физическом Android-устройстве не входит в эти проверки; эмулятор не устанавливался.
 
 Официальные основания: [совместимость AGP 8.9](https://developer.android.com/build/releases/agp-8-9-0-release-notes), [WebViewAssetLoader](https://developer.android.com/develop/ui/views/layout/webapps/load-local-content), [безопасная передача файлов](https://developer.android.com/training/secure-file-sharing/share-file).
+
+## Двухэтажные карты
+
+Перед упаковкой `scripts/android-build.sh` запускает `tests/two-storey.test.ts`: обязательные переходы, физические лестницы, столкновения, запись v2 и совместимость JSON v6. Клавиатура и джойстики используют общий контроллер движения. Дополнительная браузерная проверка с Android bridge и IndexedDB: `MAZE_TEST_URL=http://127.0.0.1:1420 bun run test:two-storey:browser`; при необходимости задайте `MAZE_BROWSER`.
+
+На устройстве проверить подъём, остановку и разворот на лестнице двумя джойстиками; уход в фон на середине марша; экспорт и повторный импорт записи. Сборка и браузерный тест не заменяют проверку на физическом устройстве.

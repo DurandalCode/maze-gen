@@ -1,3 +1,6 @@
+import {spatialDistance} from '../core/two-storey';
+import {corridorSight} from './corridor-sight';
+import {corridorNavigation} from '../core/corridor-navigation';
 import { domainOf } from '../core/domain';
 import { cellCenter, portalPoint, type Maze, type Point } from '../core/maze';
 import { shortestPath, pathLength } from '../core/pathfinding';
@@ -20,16 +23,18 @@ export interface CorridorQuality {
   routeForks: number;
   choicesPer100Metres: number;
   straightLimit: number;
+  /** Dense physical-ray estimate includes diagonal corner peeks. */
+  diagonalSight?:number;
 }
 const edgeKey = (a: number, b: number) => a < b ? `${a}:${b}` : `${b}:${a}`;
 function straightSegments(points: readonly Point[]) {
   const lengths: number[] = [];
   let previous = '', length = 0;
   for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1]!, b = points[i]!, distance = Math.hypot(b.x - a.x, b.z - a.z);
+    const a = points[i - 1]!, b = points[i]!, distance = spatialDistance(a,b);
     if (!distance)
       continue;
-    const direction = `${Math.sign(b.x - a.x)}:${Math.sign(b.z - a.z)}`;
+    const direction = `${Math.sign(b.x - a.x)}:${Math.sign(b.z - a.z)}:${Math.sign((b.y??0)-(a.y??0))}`;
     if (direction !== previous && length) {
       lengths.push(length);
       length = 0;
@@ -83,6 +88,8 @@ function measureChains(maze: Maze, cells: readonly number[], adjacent: readonly 
 }
 /** Long forced travel is separate from a useful long perspective containing real choices. */
 export function corridorQuality(maze: Maze, straightLimit = 12): CorridorQuality {
+ if(maze.version===4&&!maze.navigation)return corridorQuality(corridorNavigation(maze),straightLimit);
+
   if (!Number.isFinite(straightLimit) || straightLimit < 2 || straightLimit > 40)
     throw new Error('Предел прямого участка должен быть от 2 до 40 м.');
   const domain = domainOf(maze), route = shortestPath(maze);
@@ -92,6 +99,8 @@ export function corridorQuality(maze: Maze, straightLimit = 12): CorridorQuality
   // Proofs are local to this evaluation: callers may edit passages on the same Maze.
   // No ray is extended around a bend, through a junction, beyond sight range or past a portal.
   const proofMaze = { ...maze }, omitted = new Set<number>();
+  // The semantic adapter is non-enumerable; keep it when isolating proof caches.
+  if(maze.navigation)Object.defineProperty(proofMaze,'navigation',{value:maze.navigation,enumerable:false});
   for (const from of domain.cells) {
     if (maze.passages[from]!.length < 3 && from !== maze.entrance.cell) continue;
     for (const to of maze.passages[from]!) {
@@ -122,6 +131,8 @@ export function corridorQuality(maze: Maze, straightLimit = 12): CorridorQuality
     const rectangle = domain.rectangles[domain.cells[0]!]!;
     longestVisibleStraight = Math.max(rectangle.x2 - rectangle.x1, rectangle.z2 - rectangle.z1);
   }
+  const source=maze.navigation?.source??maze,diagonalSight=source.layout?.networkVersion===4&&Math.max(source.width,source.depth)>=40?corridorSight(source,24,1).maximum:undefined;
+  if(diagonalSight!==undefined)longestVisibleStraight=Math.max(longestVisibleStraight,diagonalSight);
   const graphRouteForks = route.slice(0, -1).filter((c, i) => maze.passages[c]!.filter(n => n !== route[i - 1]).length > 1).length;
   const routeForks = route.slice(0, -1).filter((c, i) => meaningfulAdjacent[c]!.filter(n => n !== route[i - 1]).length > 1).length;
   return {
@@ -133,7 +144,7 @@ export function corridorQuality(maze: Maze, straightLimit = 12): CorridorQuality
     longMandatoryStraightRatio: optimal ? meaningful.longStraight / optimal : 0,
     graphLongestForcedRun: graph.longestRun, graphLongestForcedStraight: graph.longestStraight,
     graphLongestMandatoryForcedRun: graph.mandatoryRun, graphLongestMandatoryForcedStraight: graph.mandatoryStraight,
-    graphRouteForks, longestVisibleStraight, routeForks,
+    graphRouteForks, longestVisibleStraight, routeForks,...(diagonalSight!==undefined?{diagonalSight}:{}),
     choicesPer100Metres: optimal ? 100 * routeForks / optimal : 0, straightLimit,
   };
 }

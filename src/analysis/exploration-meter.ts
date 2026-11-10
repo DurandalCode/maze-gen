@@ -1,3 +1,4 @@
+import {spatialEdgeLength} from '../core/two-storey';
 import type { Maze } from '../core/maze';
 import { cellCenter } from '../core/maze';
 import { metrics } from '../core/metrics';
@@ -16,7 +17,7 @@ export function explorationMeter(maze: Maze) {
   if (m.components !== 1 || m.cycles !== 0)
     return null;
   const route = shortestPath(maze), onRoute = new Set(route), branchOf = new Int32Array(maze.passages.length).fill(-1), depth = new Float64Array(maze.passages.length), forkNext = new Int32Array(maze.passages.length).fill(-1);
-  const edge = (a: number, b: number) => { const p = cellCenter(maze, a), q = cellCenter(maze, b); return Math.hypot(p.x - q.x, p.z - q.z); };
+  const edge = (a: number, b: number) => { const p = cellCenter(maze, a), q = cellCenter(maze, b); return maze.storeys?spatialEdgeLength(maze,a,b):Math.hypot(p.x - q.x, p.z - q.z); };
   const seen = new Set(route);
   let count = 0;
   for (let i = 0; i < route.length; i++) {
@@ -92,7 +93,7 @@ export function unguidedExplorationForecast(maze: Maze, probability: ArrayLike<n
     weight: number;
   }[] = [];
   let expectedEnteredBranches = 0, expectedDeepBranches = 0, depthSum = 0, forks = 0, wrong = 0;
-  const length = (a: number, b: number) => { const p = cellCenter(maze, a), q = cellCenter(maze, b); return Math.hypot(p.x - q.x, p.z - q.z); };
+  const length = (a: number, b: number) => { const p = cellCenter(maze, a), q = cellCenter(maze, b); return maze.storeys?spatialEdgeLength(maze,a,b):Math.hypot(p.x - q.x, p.z - q.z); };
   for (let i = 0; i < route.length; i++) {
     const anchor = route[i]!, next = route[i + 1], choices = maze.passages[anchor]!.filter(n => n !== route[i - 1]);
     if (next !== undefined && choices.length > 1) {

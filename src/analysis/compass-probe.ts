@@ -1,3 +1,4 @@
+import {spatialEdgeLength} from '../core/two-storey';
 import {domainOf} from '../core/domain';
 import {cellCenter,portalPoint,type Maze} from '../core/maze';
 import {pathLength,routePoints} from '../core/pathfinding';
@@ -12,11 +13,11 @@ const cache=new WeakMap<Maze,{signature:string;value:CompassProbe}>();
  * previously entered cells are used for return travel; the exit position is known. */
 export function compassProbe(maze:Maze):CompassProbe{
  const original=maze,signature=JSON.stringify([maze.version,maze.parameters,maze.entrance,maze.exit,maze.portals,maze.passages]);const cached=cache.get(original);if(cached?.signature===signature)return cached.value;
- maze={...maze};
+ maze={...maze,...(maze.navigation?{navigation:maze.navigation}:{})};
  const d=domainOf(maze),optimal=pathLength(routePoints(maze));
  if(d.cells.length>1200||!optimal)return {supported:false,bestRatio:null,meanRatio:null,runs:[]};
  const context=prepareNavigation(maze),goal=portalPoint(maze,maze.exit),start=portalPoint(maze,maze.entrance),end=cellCenter(maze,maze.exit.cell),root=cellCenter(maze,maze.entrance.cell);
- const edge=(a:number,b:number)=>{const p=context.centers[a]!,q=context.centers[b]!;return Math.hypot(q.x-p.x,q.z-p.z);};
+ const edge=(a:number,b:number)=>{const p=context.centers[a]!,q=context.centers[b]!;return maze.storeys?spatialEdgeLength(maze,a,b):Math.hypot(q.x-p.x,q.z-p.z);};
  const runs:CompassRun[]=[];
  for(const policy of ['direction','direction-straight','vertical-first','horizontal-first','visible-progress','nearest-goal'] as const){
   const learned=new LearnedGraph(maze.passages.length,d.cells,edge),visited=new Set<number>(),frontier=new Set<number>();let at=maze.entrance.cell,previous:number|undefined,length=Math.hypot(start.x-root.x,start.z-root.z),revisits=0;

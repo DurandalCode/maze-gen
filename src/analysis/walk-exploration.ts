@@ -1,3 +1,4 @@
+import {spatialEdgeLength} from '../core/two-storey';
 import type { Maze } from '../core/maze';
 import { cellCenter, portalPoint } from '../core/maze';
 import { domainOf } from '../core/domain';
@@ -32,7 +33,7 @@ export function assessExploration(maze: Maze, sequence: readonly number[], finis
     return null;
   if (sequence.some(c => !domain.active[c]) || sequence.slice(1).some((c, i) => !maze.passages[sequence[i]!]!.includes(c)))
     return null;
-  const centers = new Map(domain.cells.map(c => [c, cellCenter(maze, c)])), edge = (a: number, b: number) => { const p = centers.get(a)!, q = centers.get(b)!; return Math.hypot(p.x - q.x, p.z - q.z); };
+  const centers = new Map(domain.cells.map(c => [c, cellCenter(maze, c)])), edge = (a: number, b: number) => { const p = centers.get(a)!, q = centers.get(b)!; return maze.storeys?spatialEdgeLength(maze,a,b):Math.hypot(p.x - q.x, p.z - q.z); };
   const area = (c: number) => { const r = domain.rectangles[c]!; return (r.x2 - r.x1) * (r.z2 - r.z1); };
   const path = shortestPath(maze), route = new Set(path), visited = new Set(sequence), optimalLength = pathLength(routePoints(maze));
   const shortestInternal = path.slice(1).reduce((s, c, i) => s + edge(path[i]!, c), 0);

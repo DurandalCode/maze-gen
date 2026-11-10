@@ -1,3 +1,4 @@
+import {sideDistricts} from './side-districts';
 import {analyzePotential} from './potential-difficulty';
 import { expectedExploration } from './expected-exploration';
 import { decisionDifficulty } from './decision-difficulty';
@@ -23,10 +24,11 @@ self.onmessage = (event: MessageEvent<Request>) => {
     if (request.kind === 'analyze') {
       const result = analyzeColdspots(request.maze, request.options);
       result.potential=analyzePotential(request.maze,request.maze.parameters.design?{...request.options,samples:2048}:request.options,result);
+      result.sideDistricts=sideDistricts(request.maze,result.probability,result.options.threshold);
       result.privacy = result.potential.privacy;
-      if (metrics(request.maze).cycles === 0)
+      if (request.maze.version!==4&&metrics(request.maze).cycles === 0)
         result.sideExploration = expectedExploration(request.maze, result.probability);
-      if (request.options.profile === 'outline' && metrics(request.maze).cycles === 0)
+      if (request.maze.version!==4&&request.options.profile === 'outline' && metrics(request.maze).cycles === 0)
         result.decisions = decisionDifficulty(request.maze);
       result.explorerExpectedLength = request.options.profile === 'explorer' ? result.expectedLength :
         analyzeColdspots(request.maze, { ...request.options, profile: 'explorer' }).expectedLength;

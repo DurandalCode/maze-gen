@@ -1,3 +1,4 @@
+import {validFloorChanges} from '../core/two-storey';
 import type {Maze,Wall,Point} from '../core/maze';
 import {neighbors} from '../core/maze';
 import {domainOf} from '../core/domain';
@@ -5,7 +6,7 @@ import {shortestPath} from '../core/pathfinding';
 import {loopTraps} from './loop-traps';
 import {routeTraps} from './route-traps';
 import {mazePortalPrivacy} from './portal-privacy';
-export interface WallProtection {kind:'portal'|'trap'|'loop';element:string;reason:string}
+export interface WallProtection {kind:'portal'|'trap'|'loop'|'floor';element:string;reason:string}
 export interface CriticalWall {a:number;b:number;wall:Wall;protections:WallProtection[]}
 export const detailedCriticalWallsAvailable=(maze:Maze)=>domainOf(maze).cells.length<=1200;
 function overlaps(a:Wall,b:Wall){
@@ -24,7 +25,9 @@ export function criticalWalls(maze:Maze):CriticalWall[]{
  for(const a of domain.cells)for(const b of neighbors(maze,a))if(b>a&&!maze.passages[a]!.includes(b)){
    const r=domain.rectangles[a]!,q=domain.rectangles[b]!,horizontal=Math.abs(r.z1-q.z1)<1e-8;
    const wall:Wall=horizontal?{x1:r.x2,z1:Math.max(r.z1,q.z1),x2:r.x2,z2:Math.min(r.z2,q.z2)}:{x1:Math.max(r.x1,q.x1),z1:r.z2,x2:Math.min(r.x2,q.x2),z2:r.z2};
+   if(maze.storeys)wall.floor=maze.storeys.nodes[a]!.floor;
    const protections:WallProtection[]=[];
+   if(maze.storeys){const passages=maze.passages.map(v=>[...v]);passages[a]!.push(b);passages[b]!.push(a);if(!validFloorChanges({...maze,passages}))protections.push({kind:'floor',element:'floor-changes',reason:'Обязательные смены этажей'});}
    for(const [name,p] of [['входа',privacy.entrance],['выхода',privacy.exit]] as const)if(p.certified&&p.blockers.some(blocker=>overlaps(wall,blocker)))protections.push({kind:'portal',element:name,reason:`Экранирование ${name}`});
    if(forks.length||loops.length){
      const passages=[...maze.passages];passages[a]=[...passages[a]!,b].sort((x,y)=>x-y);passages[b]=[...passages[b]!,a].sort((x,y)=>x-y);

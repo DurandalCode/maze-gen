@@ -1,3 +1,5 @@
+import {spatialLineVisible} from '../core/spatial-visibility';
+import {rayDistance} from '../core/corridor-navigation';
 import type {Maze} from '../core/maze';
 import {mazePortals} from '../core/portals';
 import {domainOf} from '../core/domain';
@@ -10,15 +12,16 @@ const cache=new WeakMap<Maze,{openings:Map<string,VisibleDeadEnd|null>;summary?:
  * portal or unseen continuation before its terminal wall. Nothing behind a corner is inferred.
  */
 export function visibleDeadEnd(maze:Maze,from:number,to:number,context:NavigationContext=prepareNavigation(maze)):VisibleDeadEnd|null {
+ if(maze.navigation){if(maze.passages[to]!.length!==1||mazePortals(maze).some(p=>p.cell===to))return null;const a=context.centers[from]!,r=domainOf(maze).rectangles[to]!,targets=[{x:r.x1+.1,z:r.z1+.1},{x:r.x2-.1,z:r.z1+.1},{x:r.x2-.1,z:r.z2-.1},{x:r.x1+.1,z:r.z2-.1}];if(!targets.every(p=>{const d=Math.hypot(p.x-a.x,p.z-a.z);return d<=24&&rayDistance(maze.navigation!.source,a,Math.atan2(p.z-a.z,p.x-a.x),d)>=d-1e-7;}))return null;return {from,to,end:to,cells:[to],length:Math.hypot(context.centers[to]!.x-a.x,context.centers[to]!.z-a.z),area:(r.x2-r.x1)*(r.z2-r.z1)};}
  let data=cache.get(maze);if(!data){data={openings:new Map()};cache.set(maze,data);}
  const key=from+':'+to;if(data.openings.has(key))return data.openings.get(key)!;
  const view=viewCorridor(maze,context,from,to);
  let result:VisibleDeadEnd|null=null;
- if(view.end==='dead-end'&&view.junctions===0){
+ if(view.end==='dead-end'&&view.junctions===0&&(!maze.storeys||spatialLineVisible(maze,{...context.centers[from]!,y:(context.centers[from]!.y??0)+1.7},{...context.centers[view.endCell]!,y:(context.centers[view.endCell]!.y??0)+1.7}))){
   const cells:number[]=[];let previous=from,cell=to;
   while(true){cells.push(cell);if(cell===view.endCell)break;const next=maze.passages[cell]!.find(n=>n!==previous);if(next===undefined)break;previous=cell;cell=next;}
   const portals=new Set(mazePortals(maze).map(p=>p.cell));
-  if(cells.at(-1)===view.endCell&&!cells.some(c=>portals.has(c))){
+  if(cells.at(-1)===view.endCell&&(!maze.storeys||cells.every(c=>maze.storeys!.nodes[c]!.stair===undefined&&maze.storeys!.nodes[c]!.floor===maze.storeys!.nodes[from]!.floor))&&!cells.some(c=>portals.has(c))){
    const domain=domainOf(maze),area=cells.reduce((sum,c)=>{const r=domain.rectangles[c]!;return sum+(r.x2-r.x1)*(r.z2-r.z1);},0);
    result={from,to,end:view.endCell,cells,length:view.length,area};
   }

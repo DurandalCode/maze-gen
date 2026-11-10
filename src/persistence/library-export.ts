@@ -1,3 +1,4 @@
+import {recordJson} from './record-codec';
 import {preferWalk} from './walk-order';
 import type {Maze} from '../core/maze';
 import {deserialize} from './maze-json';
@@ -33,10 +34,10 @@ export async function buildLibraryExport():Promise<LibraryExport>{
  const [mazes,records]=await Promise.all([Promise.all(a.mazes.map(row=>getLibraryMaze(row.id))),Promise.all(b.walks.map(row=>getLibraryWalk(row.id)))]);
  const merged=new Map(records.map(r=>[r.id,r.walk]));
  for(const walk of pendingWalks()){const old=merged.get(walk.id);merged.set(walk.id,preferWalk(old,walk));}
- return {kind:'maze-lab-library-export',version:1,createdAt:new Date().toISOString(),modelVersion:9,platform:isAndroidApp()?'android':'web',mazes:mazes.map(({id,title,maze})=>({id,title,maze})),walks:[...merged.values()]};
+ return {kind:'maze-lab-library-export',version:1,createdAt:new Date().toISOString(),modelVersion:mazes.some(row=>row.maze.storeys)||[...merged.values()].some(w=>w.maze.storeys)?11:10,platform:isAndroidApp()?'android':'web',mazes:mazes.map(({id,title,maze})=>({id,title,maze})),walks:[...merged.values()]};
 }
 export async function exportLibrary():Promise<{mazes:number;walks:number}>{
- const data=await buildLibraryExport(),text=JSON.stringify(data);if(new TextEncoder().encode(text).length>LIBRARY_EXPORT_LIMIT)throw new Error('Экспорт превышает 64 МБ.');
+ const data=await buildLibraryExport(),text=recordJson(data);if(new TextEncoder().encode(text).length>LIBRARY_EXPORT_LIMIT)throw new Error('Экспорт превышает 64 МБ.');
  downloadJson('maze-lab-recordings-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json',text);
  return {mazes:data.mazes.length,walks:data.walks.length};
 }

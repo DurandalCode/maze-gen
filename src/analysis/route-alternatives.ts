@@ -1,3 +1,5 @@
+import {spatialEdgeLength} from '../core/two-storey';
+import {corridorNavigation} from '../core/corridor-navigation';
 import type {Maze} from '../core/maze';
 import {domainOf} from '../core/domain';
 import {cellCenter} from '../core/maze';
@@ -38,7 +40,7 @@ function structure(maze:Maze):Structure {
   }
  }
  const route=shortestPath(maze),centers=domain.cells.reduce((m,c)=>m.set(c,cellCenter(maze,c)),new Map<number,ReturnType<typeof cellCenter>>());
- const edgeLength=(a:number,b:number)=>{const p=centers.get(a)!,q=centers.get(b)!;return Math.hypot(p.x-q.x,p.z-q.z);};
+ const edgeLength=(a:number,b:number)=>{const p=centers.get(a)!,q=centers.get(b)!;return maze.storeys?spatialEdgeLength(maze,a,b):Math.hypot(p.x-q.x,p.z-q.z);};
  let routeLength=0,unavoidableLength=0,longestUnavoidableRun=0,run=0,alternativeSections=0,wasAlternative=false;
  const routeBridges=new Set<string>();
  for(let i=1;i<route.length;i++){
@@ -51,7 +53,7 @@ function structure(maze:Maze):Structure {
  const value={routeLength,unavoidableLength,unavoidableRatio,alternativeLength,alternativeRatio:routeLength?alternativeLength/routeLength:0,alternativeSections,longestUnavoidableRun};
  const result={signature,value,routeBridges,edgeLength};cache.set(maze,result);return result;
 }
-export const routeAlternatives=(maze:Maze):RouteAlternatives=>structure(maze).value;
+export const routeAlternatives=(maze:Maze):RouteAlternatives=>structure(maze.version===4&&!maze.navigation?corridorNavigation(maze):maze).value;
 /** Route metres whose unique connection would gain an alternative after this wall opens.
  * This is a design metric, never information supplied to the simulated player.
  */

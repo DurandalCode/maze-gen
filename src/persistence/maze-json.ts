@@ -1,3 +1,6 @@
+import {decodeStorey,storeyWire} from './two-storey-json';
+import {decodeFree,freeWire} from '../free/json';
+import {decodeCorridor,corridorWire} from './corridor-json';
 import { domainOf } from '../core/domain';
 import { componentCount } from '../core/graph';
 import { DEFAULT_CONSTRUCTION, emptyMaze, neighbors, validateConstruction, validateParameters, type Construction, type Maze, type Parameters, type Portal } from '../core/maze';
@@ -13,6 +16,9 @@ const object = (value: unknown): Record<string, unknown> => {
 export function deserialize(json: string): Maze {
   if (json.length > 5_000_000) throw new Error('Файл слишком большой (максимум 5 МБ).');
   const data = object(JSON.parse(json) as unknown);
+  if(data.version===6)return decodeStorey(data);
+  if(data.version===5)return decodeFree(data);
+  if(data.version===4)return decodeCorridor(data);
   if (data.version !== 1 && data.version !== 2 && data.version !== 3) throw new Error('Неподдерживаемая версия формата.');
   const raw = object(data.parameters);
   const p = {
@@ -26,6 +32,7 @@ export function deserialize(json: string): Maze {
     ...(raw.moduleSize === undefined ? {} : { moduleSize: raw.moduleSize }),
   } as Parameters;
   validateParameters(p);
+  if(p.generationType==='two-storey')fail();
   if (data.version === 2 && p.moduleSize === undefined) fail();
   if ((data.version === 3) !== (p.shape !== undefined)) fail();
   const maze = emptyMaze(p, data.version);
@@ -81,5 +88,5 @@ export function deserialize(json: string): Maze {
 }
 
 export function serialize(maze: Maze): string {
-  return JSON.stringify(maze, null, 2);
+  return JSON.stringify(maze.storeys?storeyWire(maze):maze.version===5?freeWire(maze):maze.version===4?corridorWire(maze):maze, null, 2);
 }

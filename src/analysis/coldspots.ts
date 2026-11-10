@@ -1,3 +1,5 @@
+import type {SideDistricts} from './side-districts';
+import {corridorSearch} from './corridor-search';
 import type { PotentialDifficulty } from './potential-difficulty';
 import { unguidedExplorationForecast, type ExplorationForecast } from './exploration-meter';
 import type { PortalPrivacy } from './portal-privacy';
@@ -30,6 +32,8 @@ export interface ColdRegion {
   area: number;
 }
 export interface ColdspotAnalysis {
+  modelVersion?:number;
+  sideDistricts?:SideDistricts;
   options: AnalysisOptions;
   behavior?: BehaviorSummary;
   decisions?: DecisionDifficulty;
@@ -80,6 +84,7 @@ export function validateAnalysisOptions(options: AnalysisOptions): void {
 /** Explorers use DFS; oriented navigators reconsider all observed, still untried exits after every discovery. */
 export function analyzeColdspots(maze: Maze, options: AnalysisOptions = DEFAULT_ANALYSIS, prepared?: NavigationContext, forceSampling = false): ColdspotAnalysis {
   validateAnalysisOptions(options);
+  if(maze.version===4)return corridorSearch(maze,options);
   const context = prepared ?? prepareNavigation(maze), domain = domainOf(maze);
   const route = shortestPath(maze);
   if (!route.length)
@@ -206,6 +211,6 @@ export function analyzeColdspots(maze: Maze, options: AnalysisOptions = DEFAULT_
   }
   regions.sort((a, b) => b.area - a.area || a.cells[0]! - b.cells[0]!);
   explorationForecast ??= unguidedExplorationForecast(maze, probability);
-  return { explorationForecast, options: { ...options }, landmarks, probability, visits, regions, coldArea, coldAreaRatio: coldArea / domain.area, largestColdArea: regions[0]?.area ?? 0,
+  return { modelVersion:maze.storeys?11:9,explorationForecast, options: { ...options }, landmarks, probability, visits, regions, coldArea, coldAreaRatio: coldArea / domain.area, largestColdArea: regions[0]?.area ?? 0,
     ...(behavior ? { behavior } : {}), expectedLength, optimalLength, searchRatio: optimalLength ? expectedLength / optimalLength : 1, method: exact ? 'exact-tree' : 'sampled', samples: exact ? 0 : samples };
 }

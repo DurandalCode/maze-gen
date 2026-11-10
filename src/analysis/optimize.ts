@@ -1,3 +1,5 @@
+import {optimizeTwoStorey} from './two-storey-optimize';
+import {optimizeCorridor} from './corridor-optimize';
 import {optimizeLiving} from '../generators/living';
 import { optimizePotential } from './potential-optimize';
 import type { PotentialDifficulty } from './potential-difficulty';
@@ -48,6 +50,8 @@ export function optimizeColdspots(base: Maze, options: AnalysisOptions, method: 
     throw new Error('Некорректные параметры оптимизации.');
   if (!['coldspots', 'exploration'].includes(objective))
     throw new Error('Неизвестная цель подбора.');
+  if(base.storeys)return optimizeTwoStorey(base,options,method,attempts,progress,objective);
+  if(base.parameters.generationType==='corridor')return optimizeCorridor(base,options,attempts,progress,objective);
   if(base.parameters.generationType==='living')return optimizeLiving(base,options,method,attempts,progress,objective);
   if (objective === 'exploration')
     return optimizePotential(base, options, method, attempts, progress);

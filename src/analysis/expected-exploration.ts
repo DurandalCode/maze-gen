@@ -1,3 +1,4 @@
+import {spatialEdgeLength} from '../core/two-storey';
 import type { Maze } from '../core/maze';
 import { cellCenter } from '../core/maze';
 import { domainOf } from '../core/domain';
@@ -31,7 +32,7 @@ export function expectedExploration(maze: Maze, probability: ArrayLike<number>) 
         const area = (r.x2 - r.x1) * (r.z2 - r.z1);
         optionalArea += area;
         visitedArea += p * area;
-        uniqueLength += 2 * p * Math.hypot(a.x - b.x, a.z - b.z);
+        uniqueLength += 2 * p * (maze.storeys?spatialEdgeLength(maze,c,n):Math.hypot(a.x - b.x, a.z - b.z));
       }
     }
   }

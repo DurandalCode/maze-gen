@@ -1,4 +1,7 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import {makeFloors} from '../core/two-storey';
+import {domainOf} from '../core/domain';
+import {footprintSummary} from '../core/corridor-geometry';
+import { useId,useRef, useState, type PointerEvent } from 'react';
 import { emptyMaze, validateParameters, type Parameters } from '../core/maze';
 import { shapeMask, type ShapeRectangle } from '../core/domain';
 export type ShapeTool = 'select' | 'add' | 'subtract';
@@ -9,16 +12,20 @@ interface ControlsProps {
   onEditing: (editing: boolean) => void;
   selected: number | null;
   onSelect: (index: number | null) => void;
+  allowDisconnected?:boolean;
+  underlay?:Parameters;
   tool: ShapeTool;
   onTool: (tool: ShapeTool) => void;
 }
-export function shapeStatus(p: Parameters): {
+export function shapeStatus(p: Parameters,allowDisconnected=false): {
   error: string;
   area: number;
   count: number;
 } {
   let area = 0, count = 0;
   try {
+    if((p.generationType==='corridor'||p.placementMode==='free')){validateParameters(p);const summary=footprintSummary(p);return {area:summary.area,count:0,error:summary.connected?'':'Форма должна быть связной по сторонам.'};}
+    if(p.generationType==='two-storey'){validateParameters(p);const floors=makeFloors(p);return {error:'',area:floors.reduce((a,m)=>a+domainOf(m).area,0),count:floors.reduce((a,m)=>a+domainOf(m).modules.reduce((n,on)=>n+on,0),0)};}
     validateParameters({ ...p, shape: undefined });
     const mask = shapeMask(p);
     count = mask.reduce((sum, n) => sum + n, 0);
@@ -39,15 +46,15 @@ export function shapeStatus(p: Parameters): {
               area += g * g;
           }
     }
-    emptyMaze(p);
+    if(!allowDisconnected)emptyMaze(p);
     return { error: '', area, count };
   }
   catch (e) {
     return { error: e instanceof Error ? e.message : String(e), area, count };
   }
 }
-export function ShapeControls({ value: p, onChange, editing, onEditing, selected, onSelect, tool, onTool }: ControlsProps) {
-  const shape = p.shape, r = selected === null ? undefined : shape?.rectangles[selected], status = shapeStatus(p);
+export function ShapeControls({ value: p, onChange, editing, onEditing, selected, onSelect, tool, onTool,allowDisconnected=false }: ControlsProps) {
+  const shape = p.shape, r = selected === null ? undefined : shape?.rectangles[selected], status = shapeStatus(p,allowDisconnected);
   const patch = (changes: Partial<ShapeRectangle>) => {
     if (!shape || selected === null)
       return;
@@ -77,17 +84,18 @@ export function ShapeControls({ value: p, onChange, editing, onEditing, selected
       <option value="">Выберите прямоугольник</option>{shape.rectangles.map((v, i) => <option key={i} value={i}>{i + 1}. {v.operation === 'add' ? 'Добавить' : 'Вырезать'} · {v.width} × {v.height}</option>)}
     </select></label>
     {r && <div className="rectangle-fields">
-      <div className="field-pair">{(['x', 'z', 'width', 'height'] as const).map(key => <label className="field" key={key}><span>{{ x: 'X', z: 'Z', width: 'Ширина', height: 'Высота' }[key]}</span><input aria-label={`Прямоугольник: ${key}`} type="number" step="1" min={key === 'x' || key === 'z' ? 0 : 1} value={Number.isNaN(r[key]) ? '' : r[key]} onChange={e => patch({ [key]: e.target.valueAsNumber })}/></label>)}</div>
+      <div className="field-pair">{(['x', 'z', 'width', 'height'] as const).map(key => <label className="field" key={key}><span>{{ x: 'X', z: 'Z', width: 'Ширина', height: 'Высота' }[key]}</span><input aria-label={`Прямоугольник: ${key}`} type="number" step={(p.generationType==='corridor'||p.placementMode==='free')?0.1:1} min={key === 'x' || key === 'z' ? 0 : (p.generationType==='corridor'||p.placementMode==='free')?0.1:1} value={Number.isNaN(r[key]) ? '' : r[key]} onChange={e => patch({ [key]: e.target.valueAsNumber })}/></label>)}</div>
       <label className="field"><span>Операция</span><select aria-label="Операция прямоугольника" value={r.operation} onChange={e => patch({ operation: e.target.value as ShapeRectangle['operation'] })}><option value="add">Добавить область</option><option value="subtract">Вырезать область</option></select></label>
       <button type="button" onClick={() => { onChange({ ...p, shape: { ...shape, rectangles: shape.rectangles.filter((_, i) => i !== selected) } }); onSelect(null); }}>Удалить прямоугольник</button>
     </div>}
     </>}
-    <p className="field-note" role="status">{status.count} {p.moduleSize === undefined ? 'клеток' : 'модулей'} · {status.area.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} м²</p>
+    <p className="field-note" role="status">{(p.generationType==='corridor'||p.placementMode==='free')?'Площадка':`${status.count} ${p.moduleSize === undefined ? 'клеток' : 'модулей'}`} · {status.area.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} м²</p>
     {status.error && <p className="shape-error" role="alert">{status.error}</p>}
   </>}
   </section>;
 }
 interface EditorProps {
+  underlay?:Parameters;
   value: Parameters;
   onChange: (value: Parameters) => void;
   selected: number | null;
@@ -115,10 +123,11 @@ interface Gesture {
     z: number;
   };
 }
-export function ShapeEditor({ value: p, onChange, selected, onSelect, tool }: EditorProps) {
+export function ShapeEditor({ value: p, onChange, selected, onSelect, tool,underlay }: EditorProps) {
+  const maskId=useId(),metric=(p.generationType==='corridor'||p.placementMode==='free'),step=metric?.1:1,snap=(v:number)=>Math.round(v*(metric?10:1))/(metric?10:1);
   const svg = useRef<SVGSVGElement>(null), [gesture, setGesture] = useState<Gesture | null>(null);
   const [zoom, setZoom] = useState(1), [pan, setPan] = useState({ x: 0, z: 0 });
-  if (![p.columns, p.rows].every(n => Number.isInteger(n) && n >= 1 && n <= 100))
+  if (![p.columns, p.rows].every(n => Number.isFinite(n) && (metric||Number.isInteger(n)) && n >= 1 && n <= 100))
     return <div className="shape-editor shape-error" role="alert">Задайте размеры рабочей сетки от 1 до 100.</div>;
   const shape = p.shape!, padding = Math.max(p.columns, p.rows) * 0.08 + 0.5;
   const baseW = p.columns + 2 * padding, baseH = p.rows + 2 * padding;
@@ -128,20 +137,20 @@ export function ShapeEditor({ value: p, onChange, selected, onSelect, tool }: Ed
     const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix.inverse());
     return { x: pt.x, z: pt.y };
   };
-  const bound = (v: number, max: number) => Math.max(0, Math.min(max, v));
+  const bound = (v: number, max: number) => snap(Math.max(0, Math.min(max, v)));
   const candidate = (g: Gesture): ShapeRectangle | null => {
     if (g.type === 'pan' || g.type === 'select')
       return null;
-    const dx = Math.round(g.current.x - g.start.x), dz = Math.round(g.current.z - g.start.z);
+    const dx = snap(g.current.x - g.start.x), dz = snap(g.current.z - g.start.z);
     if (g.original) {
       const r = g.original;
       if (g.type === 'move')
         return { ...r, x: bound(r.x + dx, p.columns - r.width), z: bound(r.z + dz, p.rows - r.height) };
-      return { ...r, width: Math.max(1, Math.min(p.columns - r.x, r.width + dx)), height: Math.max(1, Math.min(p.rows - r.z, r.height + dz)) };
+      return { ...r, width: snap(Math.max(step, Math.min(p.columns - r.x, r.width + dx))), height: snap(Math.max(step, Math.min(p.rows - r.z, r.height + dz))) };
     }
-    const ax = bound(Math.floor(g.start.x), p.columns - 1), az = bound(Math.floor(g.start.z), p.rows - 1);
-    const bx = bound(Math.floor(g.current.x), p.columns - 1), bz = bound(Math.floor(g.current.z), p.rows - 1);
-    return { x: Math.min(ax, bx), z: Math.min(az, bz), width: Math.abs(bx - ax) + 1, height: Math.abs(bz - az) + 1, operation: g.type === 'subtract' ? 'subtract' : 'add' };
+    const ax = bound(Math.floor(g.start.x/step)*step, p.columns - step), az = bound(Math.floor(g.start.z/step)*step, p.rows - step);
+    const bx = bound(Math.floor(g.current.x/step)*step, p.columns - step), bz = bound(Math.floor(g.current.z/step)*step, p.rows - step);
+    return { x: Math.min(ax, bx), z: Math.min(az, bz), width: snap(Math.abs(bx - ax) + step), height: snap(Math.abs(bz - az) + step), operation: g.type === 'subtract' ? 'subtract' : 'add' };
   };
   const preview = gesture ? candidate(gesture) : null;
   const rectangles = shape.rectangles.map((r, i) => preview && gesture?.index === i ? preview : r);
@@ -149,7 +158,7 @@ export function ShapeEditor({ value: p, onChange, selected, onSelect, tool }: Ed
     rectangles.push(preview);
   let mask: Uint8Array = new Uint8Array(p.columns * p.rows);
   try {
-    mask = shapeMask({ ...p, shape: { ...shape, rectangles } });
+    if(!metric)mask = shapeMask({ ...p, shape: { ...shape, rectangles } });
   }
   catch { /* Invalid numeric draft is explained in controls. */ }
   const down = (e: PointerEvent<SVGSVGElement>) => {
@@ -209,12 +218,14 @@ export function ShapeEditor({ value: p, onChange, selected, onSelect, tool }: Ed
   <div className="shape-editor-heading"><strong>Черновик формы</strong><span>Изменения применятся при генерации</span></div>
   <svg ref={svg} role="img" aria-label="Редактор формы лабиринта" viewBox={`${view.x} ${view.z} ${view.w} ${view.h}`} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => setGesture(null)} onWheel={e => { setZoom(z => Math.max(0.5, Math.min(8, z * Math.exp(-e.deltaY * 0.001)))); }} onAuxClick={e => e.preventDefault()}>
     <rect x="0" y="0" width={p.columns} height={p.rows} fill="#151c17"/>
-    {Array.from(mask, (active, i) => active ? <rect key={i} x={i % p.columns} y={Math.floor(i / p.columns)} width="1" height="1" fill="#78945d"/> : null)}
+    {metric&&<><defs><mask id={maskId}><rect width={p.columns} height={p.rows} fill="black"/>{rectangles.filter(r=>r.operation==='add').map((r,i)=><rect key={i} x={r.x} y={r.z} width={r.width} height={r.height} fill="white"/>)}{rectangles.filter(r=>r.operation==='subtract').map((r,i)=><rect key={i} x={r.x} y={r.z} width={r.width} height={r.height} fill="black"/>)}</mask></defs><rect width={p.columns} height={p.rows} fill="#78945d" mask={`url(#${maskId})`}/></>}
+    {underlay&&Array.from(shapeMask(underlay),(on,i)=>on?<rect key={`under${i}`} x={i%p.columns} y={Math.floor(i/p.columns)} width="1" height="1" fill="#567c9a" fillOpacity=".4"/>:null)}
+    {!metric&&Array.from(mask, (active, i) => active ? <rect key={i} x={i % p.columns} y={Math.floor(i / p.columns)} width="1" height="1" fill="#78945d"/> : null)}
     <g stroke="#56654d" strokeWidth="0.015" pointerEvents="none">{Array.from({ length: p.columns + 1 }, (_, i) => <path key={`x${i}`} d={`M${i} 0V${p.rows}`}/>)}{Array.from({ length: p.rows + 1 }, (_, i) => <path key={`z${i}`} d={`M0 ${i}H${p.columns}`}/>)}</g>
     {rectangles.map((r, i) => [r.x, r.z, r.width, r.height].every(Number.isFinite) ? <rect key={i} data-index={i} x={r.x} y={r.z} width={r.width} height={r.height} fill="transparent" stroke={r.operation === 'subtract' ? '#eea181' : '#d1ee86'} strokeWidth={selected === i ? '0.065' : '0.025'} strokeDasharray={r.operation === 'subtract' ? '0.16 0.08' : undefined} style={{ pointerEvents: tool === 'select' ? 'all' : 'none', cursor: 'move' }}/> : null)}
     {selected !== null && rectangles[selected] && (() => { const r = rectangles[selected]!; return [r.x, r.z, r.width, r.height].every(Number.isFinite) ? <rect data-index={selected} data-handle="resize" x={r.x + r.width - handle} y={r.z + r.height - handle} width={handle * 2} height={handle * 2} fill="#d1ee86" style={{ cursor: 'nwse-resize', pointerEvents: tool === 'select' ? 'all' : 'none' }}/> : null; })()}
   </svg>
-  <div className="shape-editor-footer"><span>{p.columns} × {p.rows} · {p.moduleSize === undefined ? 'клетки' : 'модули'} · X → Z ↓</span><button type="button" onClick={() => { setZoom(1); setPan({ x: 0, z: 0 }); }}>Вписать форму</button></div>
+  <div className="shape-editor-footer"><span>{p.columns} × {p.rows} · {metric?'метры':p.moduleSize === undefined ? 'клетки' : 'модули'} · X → Z ↓</span><button type="button" onClick={() => { setZoom(1); setPan({ x: 0, z: 0 }); }}>Вписать форму</button></div>
   <p className="field-note">Колесо — масштаб · средняя кнопка — перемещение · зелёное — итоговая область</p>
   </div>;
 }

@@ -1,18 +1,19 @@
 import * as THREE from 'three';
-import type { Maze } from '../core/maze';
+import { WALL_THICKNESS,type Maze } from '../core/maze';
 import { BOARD_THICKNESS, BOARD_WIDTH, HEADER_DEPTH, timberStructure } from '../core/structure';
 import { random } from '../core/random';
 import { woodMaterial } from './wood';
 
 export function timberMesh(maze: Maze): THREE.Group {
   const group = new THREE.Group(); group.name = 'timber-structure';
-  const { posts, frames, braceDrop } = timberStructure(maze);
+  const { posts, frames, braceDrop,lowerFrames=[],bracedFrames } = timberStructure(maze);
   const hasBraces = braceDrop > 0.06;
-  const count = posts.length * 2 + frames.length * (hasBraces ? 3 : 1);
+  const braceSides=hasBraces?new Set(bracedFrames??frames):new Set();
+  const count = posts.length * 2 + frames.length + braceSides.size*2+lowerFrames.length;
   const boards = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), woodMaterial(), count);
   boards.name = 'timber-boards'; boards.castShadow = true; boards.receiveShadow = true;
   const bolts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.009, 0.009, 0.007, 6),
-    new THREE.MeshStandardMaterial({ color: '#554f46', roughness: 0.65, metalness: 0.75 }), frames.length * (hasBraces ? 6 : 2));
+    new THREE.MeshStandardMaterial({ color: '#554f46', roughness: 0.65, metalness: 0.75 }), frames.length * 2 + braceSides.size * 4);
   bolts.name = 'frame-fasteners';
   const dummy = new THREE.Object3D(), up = new THREE.Vector3(0, 1, 0), direction = new THREE.Vector3();
   const rng = random('maze-lab-board-shades');
@@ -54,7 +55,7 @@ export function timberMesh(maze: Maze): THREE.Group {
     const offset = normal.clone().multiplyScalar(0.052);
     board(a.clone().add(offset), b.clone().add(offset), headerDepth, BOARD_THICKNESS, normal);
     for (const end of [a, b]) bolt(end.clone().addScaledVector(normal, 0.076), normal);
-    if (!hasBraces) continue;
+    if (!braceSides.has(frame)) continue;
     const span = Math.min(braceDrop * 1.15, maze.parameters.corridorWidth * 0.32);
     for (const [end, sign] of [[a, 1], [b, -1]] as const) {
       const low = end.clone().add(offset); low.y -= braceDrop;
@@ -63,6 +64,11 @@ export function timberMesh(maze: Maze): THREE.Group {
       bolt(low.clone().addScaledVector(normal, 0.024), normal);
       bolt(high.clone().addScaledVector(normal, 0.024), normal);
     }
+  }
+  // Lower rails sit wholly on the module interior side of the fabric.
+  for(const f of lowerFrames){
+    const normal=new THREE.Vector3(f.inward.x,0,f.inward.z),offset=normal.clone().multiplyScalar(WALL_THICKNESS/2+BOARD_THICKNESS/2+.002);
+    board(new THREE.Vector3(f.x1,BOARD_WIDTH/2,f.z1).add(offset),new THREE.Vector3(f.x2,BOARD_WIDTH/2,f.z2).add(offset),BOARD_WIDTH,BOARD_THICKNESS,normal);
   }
   boards.instanceMatrix.needsUpdate = true; boards.computeBoundingSphere();
   bolts.instanceMatrix.needsUpdate = true; bolts.computeBoundingSphere();

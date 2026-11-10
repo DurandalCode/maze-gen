@@ -1,3 +1,4 @@
+import {recordJson} from '../src/persistence/record-codec';
 import 'fake-indexeddb/auto';
 import { afterAll, expect, spyOn, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -24,7 +25,9 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string) { Object.defineProperty(this, key, { value: String(value), configurable: true, enumerable: true, writable: true }); }
   removeItem(key: string) { delete (this as unknown as Record<string, string>)[key]; }
 }
-Object.defineProperty(globalThis, 'location', { configurable: true, value: { search: '?offline=1&test=1' } });
+// Other suites may already have opened the shared in-memory default DB. Keep
+// the same name so a fresh module really reopens the connection being tested.
+Object.defineProperty(globalThis, 'location', { configurable: true, value: { search: '?offline=1' } });
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: new MemoryStorage() });
 const roots: string[] = [];
 afterAll(async () => {
@@ -100,9 +103,9 @@ test('fresh module connection lists persisted maze and raw recordings; full expo
   const list = await restarted.offlineRequest('/api/walks') as { walks: { id: string; finished: boolean }[] };
   expect(list.walks.some(row => row.id === finished.id && row.finished)).toBe(true);
   const exported = await buildLibraryExport();
-  expect(exported.modelVersion).toBe(9);
+  expect(exported.modelVersion).toBe(10);
   const decoded = validateLibraryExport(JSON.parse(JSON.stringify(exported)));
-  expect(decoded.modelVersion).toBe(9);
+  expect(decoded.modelVersion).toBe(10);
   expect(decoded.walks.find(row => row.id === finished.id)).toEqual(finished);
   expect(decoded.mazes.find(row => row.title === 'Тест перезапуска')?.maze).toEqual(maze);
   // Reimporting snapshots keeps the exact same route and content identity.
@@ -185,4 +188,12 @@ test('transient database open failure is recoverable without reloading the modul
   finally { open.mockRestore(); }
   const saved = await fresh.saveOfflineMaze(maze, 'Retry');
   expect(saved.id).toBe(await contentId(maze));
+});
+
+
+test('offline corridor v4 restores explicit supports and exports without navigation subdivisions',async()=>{
+ const maze=generate({generationType:'corridor',columns:18,rows:18,moduleSize:2,corridorWidth:2,algorithm:'backtracker',seed:'OFFLINE-CORRIDOR',extraConnections:1}),saved=await saveOfflineMaze(maze,'Corridor offline QA');
+ const loaded=await offlineRequest('/api/mazes/'+saved.id) as SavedMaze;expect(loaded.maze).toEqual(maze);
+ const exported=await buildLibraryExport(),wire=JSON.parse(recordJson(exported)),entry=wire.mazes.find((r:any)=>r.title==='Corridor offline QA');expect(entry.maze.version).toBe(4);expect(entry.maze.passages).toBeUndefined();expect(entry.maze.supports.length).toBeGreaterThan(0);
+ const restored=validateLibraryExport(wire).mazes.find(r=>r.title==='Corridor offline QA')!;expect(restored.maze.passages).toEqual(maze.passages);expect(await browserTopologyId(restored.maze)).toBe(topologyId(maze));
 });

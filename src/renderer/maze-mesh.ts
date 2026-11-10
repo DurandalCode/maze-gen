@@ -1,3 +1,5 @@
+import {twoStoreyMesh} from './two-storey-mesh';
+import {freeMesh} from '../free/mesh';
 import { domainOf } from '../core/domain';
 import * as THREE from 'three';
 import { WALL_THICKNESS, walls, type Maze } from '../core/maze';
@@ -6,8 +8,13 @@ import { groundMaterial } from './ground';
 import { fabricMaterial } from './fabric-material';
 
 export function mazeMesh(maze: Maze): THREE.Group {
+  if(maze.storeys)return twoStoreyMesh(maze);
+  if(maze.version===5)return freeMesh(maze);
   const group = new THREE.Group();
   const segments = walls(maze);
+  // Fabric is thinner than the timber: a thick collision envelope must not
+  // visually swallow jambs and wall-end posts. Legacy scenes retain their look.
+  const fabricThickness=maze.version===4?.006:WALL_THICKNESS;
   const material = fabricMaterial(maze.wallColor, maze.translucentFabric);
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const mesh = new THREE.InstancedMesh(geometry, material, segments.length);
@@ -20,14 +27,14 @@ export function mazeMesh(maze: Maze): THREE.Group {
   segments.forEach((wall, i) => {
     const horizontal = wall.z1 === wall.z2;
     dummy.position.set((wall.x1+wall.x2)/2, maze.wallHeight/2, (wall.z1+wall.z2)/2);
-    dummy.scale.set(horizontal ? wall.x2-wall.x1+WALL_THICKNESS : WALL_THICKNESS,
-      maze.wallHeight, horizontal ? WALL_THICKNESS : wall.z2-wall.z1+WALL_THICKNESS);
+    dummy.scale.set(horizontal ? wall.x2-wall.x1+fabricThickness : fabricThickness,
+      maze.wallHeight, horizontal ? fabricThickness : wall.z2-wall.z1+fabricThickness);
     dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
   });
   mesh.instanceMatrix.needsUpdate = true;
   mesh.computeBoundingSphere(); group.add(mesh);
   group.add(timberMesh(maze));
-  if (maze.roof && !maze.parameters.shape) {
+  if (maze.roof && !maze.parameters.shape && !maze.layout?.spaces) {
     const roof = new THREE.Mesh(new THREE.BoxGeometry(maze.width+WALL_THICKNESS,WALL_THICKNESS,maze.depth+WALL_THICKNESS),
       fabricMaterial(maze.wallColor,maze.translucentFabric,'roof'));
     roof.name='roof'; roof.castShadow=true; roof.receiveShadow=true; roof.customDepthMaterial=mesh.customDepthMaterial;

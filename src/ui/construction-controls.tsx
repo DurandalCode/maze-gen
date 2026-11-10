@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { Construction } from '../core/maze';
 
-export function ConstructionControls({ value, onChange }: {
+export function ConstructionControls({ value, onChange,fixedHeight=false }: {
   value: Construction;
+  fixedHeight?:boolean;
   onChange: (patch: Partial<Construction>) => void;
 }) {
   const [height, setHeight] = useState(String(value.wallHeight));
@@ -10,7 +11,7 @@ export function ConstructionControls({ value, onChange }: {
   return <fieldset className="construction-controls">
     <legend>ПАРАМЕТРЫ КОНСТРУКЦИИ</legend>
     <label className="field"><span>Высота стен</span><div className="input-unit">
-      <input aria-label="Высота стен" type="number" min="1.8" max="10" step="0.1" value={height}
+      <input disabled={fixedHeight} aria-label="Высота стен" type="number" min="1.8" max="10" step="0.1" value={height}
         onChange={event => {
           setHeight(event.target.value);
           const next = event.target.valueAsNumber;
@@ -27,6 +28,7 @@ export function ConstructionControls({ value, onChange }: {
       onChange={event => onChange({ translucentFabric: event.target.checked })} /><span>Просвечивающая ткань</span></label>
     <p className="fabric-help">Мелкие просветы видны вблизи. При свете с обратной стороны стены просвечивают, а крыша показывает пятно из светящихся точек.</p>
     <label className="route-toggle construction-roof"><input type="checkbox" checked={value.roof} onChange={event => onChange({ roof: event.target.checked })} /><span className="switch" />Крыша над лабиринтом</label>
+    {fixedHeight&&<p>Высота зафиксирована геометрией лестниц и перекрытия.</p>}
     <p>Применяются сразу · высота глаз 1,7 м</p>
   </fieldset>;
 }

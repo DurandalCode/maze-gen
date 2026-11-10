@@ -1,8 +1,11 @@
+import {storeyView,floorOf,stairAt} from '../core/two-storey';
+import {corridorSupports} from '../core/corridor-supports';
+import {corridorNavigation} from '../core/corridor-navigation';
 import type { HeatDisplay } from './coldspot-controls';
 import {visibleDeadEnds} from '../analysis/visible-deadends';
 import { cellAtPoint } from '../analysis/navigation';
 import { domainOf } from '../core/domain';
-import { portalPoint, walls, type Maze, type Point, type Portal } from '../core/maze';
+import { portalPoint, walls,routingSize, type Maze, type Point, type Portal } from '../core/maze';
 import { mazePortals, portalAtPoint, samePortal } from '../core/portals';
 import { moduleFootprints } from '../core/structure';
 import { routePoints } from '../core/pathfinding';
@@ -27,6 +30,7 @@ export class MapView {
   private frozenLayout: MapLayout | null = null;
   private observer: ResizeObserver;
   private events = new AbortController();
+  floor=0;
   heat: HeatDisplay|null = null;
   traps:readonly TrapOverlayEntry[]=[];
   criticalWalls:readonly CriticalWall[]=[];
@@ -103,15 +107,17 @@ export class MapView {
   dispose(): void { this.observer.disconnect(); this.events.abort(); }
 
   heatDetailsAt(x:number,y:number):string|null {
-    const {left,top,scale}=this.layout(),cell=cellAtPoint(this.maze,{x:(x-left)/scale,z:(y-top)/scale});
+    const {left,top,scale}=this.layout(),cell=cellAtPoint(this.maze,{x:(x-left)/scale,z:(y-top)/scale,floor:this.floor,...(this.maze.storeys?{stair:stairAt(this.maze,{x:(x-left)/scale,z:(y-top)/scale})?.id}:{})});
     if(cell===null) return null;
-    const trapText=trapDetailsAt(this.traps,cell),critical=criticalWallAt(this.criticalWalls,{x:(x-left)/scale,z:(y-top)/scale},6/scale);
+    const graph=this.maze.version===4?corridorNavigation(this.maze):null,trapCell=graph?graph.navigation!.representatives[graph.navigation!.originalToRegion[cell]!]!:cell;
+    const trapText=trapDetailsAt(this.traps,trapCell),critical=criticalWallAt(this.criticalWalls,{x:(x-left)/scale,z:(y-top)/scale},6/scale);
     if(critical)trapText.unshift(`Критическая стена: ${critical.protections.map(p=>p.reason).join('; ')}`);
     if(!this.heat)return trapText.length?trapText.join(' · '):null;
     const {analysis}=this.heat,p=analysis.probability[cell]!;
-    if(analysis.method==='sampled'&&analysis.options.profile!=='explorer'&&visibleDeadEnds(this.maze).cells.has(cell))trapText.push('Полностью видимый тупик: исследуется взглядом, без захода');
+    if(analysis.method==='sampled'&&analysis.options.profile!=='explorer'&&visibleDeadEnds(graph??this.maze).cells.has(graph?graph.navigation!.originalToRegion[cell]!:cell))trapText.push('Полностью видимый тупик: исследуется взглядом, без захода');
     const region=p<analysis.options.threshold?analysis.regions.find(r=>r.cells.includes(cell)):undefined;
     const fmt=(v:number)=>v.toLocaleString('ru-RU',{maximumFractionDigits:1});
+    if(this.heat.showDistricts){const district=analysis.sideDistricts?.districts.find(r=>r.problematic&&r.cells.includes(cell));if(district)trapText.push(`Холодный боковой район: ${fmt(district.area)} м²; подходов ${district.entryCount}, охват маршрута ${fmt(district.routeSpan)} м; холодно ${fmt(district.coldRatio*100)}%`);}
     const visibility=analysis.landmarks;
     const cues=visibility?[visibility.sun[cell]!>=0.2?'солнце':'',visibility.forest[cell]!>=0.2?'лес':'',visibility.boundary[cell]!>=0.2?'внешняя граница':''].filter(Boolean):[];
     const visibilityText=visibility?` · ${cues.length?cues.join(', '):'ориентиры скрыты'}`:'';
@@ -142,6 +148,7 @@ export class MapView {
 
   draw(): void {
     const { canvas, context: ctx, maze } = this;
+    const floorCells=domainOf(maze).cells.filter(c=>!maze.storeys||floorOf(maze,c)===this.floor||maze.storeys.nodes[c]?.stair!==undefined);
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
     const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -165,16 +172,16 @@ export class MapView {
     ctx.fillText(sunPosition.elevation < 0 ? 'СОЛНЦЕ ЗА ГОРИЗОНТОМ' : `СОЛНЦЕ · ${Math.round(sunPosition.elevation)}°`,
       Math.max(100, Math.min(w-100, handles.sun.x)), handles.sun.y+25);
     ctx.fillStyle = '#1b211b';
-    for (const cell of domainOf(maze).cells) { const r=domainOf(maze).rectangles[cell]!; ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s); }
-    for (const m of moduleFootprints(maze)) {
-      ctx.fillStyle = '#293023'; ctx.fillRect(px(m.x), py(m.z), m.size*s, m.size*s);
-      ctx.strokeStyle = '#576044'; ctx.lineWidth = 1; ctx.strokeRect(px(m.x), py(m.z), m.size*s, m.size*s);
+    for (const cell of floorCells) { const r=domainOf(maze).rectangles[cell]!; ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s); }
+    for (const m of moduleFootprints(maze.storeys?storeyView(maze,this.floor):maze)) {
+      ctx.fillStyle = '#293023'; ctx.fillRect(px(m.x), py(m.z), (m.width??m.size)*s, (m.depth??m.size)*s);
+      ctx.strokeStyle = '#576044'; ctx.lineWidth = 1; ctx.strokeRect(px(m.x), py(m.z), (m.width??m.size)*s, (m.depth??m.size)*s);
     }
     if(this.heat) {
       const {analysis,layer,coldOnly}=this.heat;
       let maximum=1;
-      if(layer==='visits') for(const cell of domainOf(maze).cells) maximum=Math.max(maximum,analysis.visits[cell]!);
-      for(const cell of domainOf(maze).cells) {
+      if(layer==='visits') for(const cell of floorCells) maximum=Math.max(maximum,analysis.visits[cell]!);
+      for(const cell of floorCells) {
         const p=analysis.probability[cell]!;
         if(coldOnly && p>=analysis.options.threshold) continue;
         const value=layer==='probability'?p:analysis.visits[cell]!/maximum,r=domainOf(maze).rectangles[cell]!;
@@ -186,7 +193,7 @@ export class MapView {
     ctx.strokeStyle = '#293027'; ctx.lineWidth = 1;
     const cell = maze.parameters.corridorWidth;
     ctx.beginPath();
-    for(const cellIndex of domainOf(maze).cells) {
+    for(const cellIndex of maze.version===4?[]:floorCells) {
       const r=domainOf(maze).rectangles[cellIndex]!;
       ctx.rect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);
     }
@@ -194,7 +201,7 @@ export class MapView {
     const line = (points: readonly Point[], color: string, width: number) => {
       if (!points.length) return;
       ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      ctx.beginPath(); points.forEach((p, i) => i ? ctx.lineTo(px(p.x), py(p.z)) : ctx.moveTo(px(p.x), py(p.z))); ctx.stroke();
+      ctx.beginPath();let drawing=false;for(const p of points){if(maze.storeys&&p.floor!==this.floor&&p.stair===undefined){drawing=false;continue;}if(drawing)ctx.lineTo(px(p.x),py(p.z));else ctx.moveTo(px(p.x),py(p.z));drawing=true;}ctx.stroke();
     };
     for(const trap of this.traps){
       for(const points of trap.falsePaths)line(points,'#ec8af144',Math.max(5,Math.min(16,cell*s*.5)));
@@ -204,8 +211,14 @@ export class MapView {
     line(this.trajectory, '#e2ab78', 3);
     ctx.strokeStyle = '#c4ccb7'; ctx.lineWidth = Math.max(1.3, Math.min(3, cell*s*0.065)); ctx.lineCap = 'square';
     ctx.beginPath();
-    for (const wall of this.segments) { ctx.moveTo(px(wall.x1), py(wall.z1)); ctx.lineTo(px(wall.x2), py(wall.z2)); }
+    for (const wall of this.segments) { if(maze.storeys&&((wall.y??0)>this.floor*maze.storeys.floorHeight+1.7||(wall.y??0)+(wall.height??maze.wallHeight)<this.floor*maze.storeys.floorHeight+1.7))continue; ctx.moveTo(px(wall.x1), py(wall.z1)); ctx.lineTo(px(wall.x2), py(wall.z2)); }
     ctx.stroke();
+    if(maze.version===4){ctx.fillStyle='#a4aa88';const size=Math.max(2,.12*s);for(const post of corridorSupports(maze))ctx.fillRect(px(post.x)-size/2,py(post.z)-size/2,size,size);}
+    if(this.heat?.showDistricts){
+      const domain=domainOf(maze),columns=routingSize(maze).columns;ctx.save();ctx.strokeStyle='#ee86ac';ctx.fillStyle='#ee86ac22';ctx.lineWidth=2;ctx.setLineDash([5,3]);
+      for(const district of this.heat.analysis.sideDistricts?.districts??[])if(district.problematic){const cells=new Set(district.cells);ctx.beginPath();for(const c of cells){if(maze.storeys&&floorOf(maze,c)!==this.floor)continue;const r=domain.rectangles[c];if(!r)continue;ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);for(const [n,x1,z1,x2,z2]of [[c-columns,r.x1,r.z1,r.x2,r.z1],[c+columns,r.x1,r.z2,r.x2,r.z2],[c%columns?c-1:-1,r.x1,r.z1,r.x1,r.z2],[c%columns<columns-1?c+1:-1,r.x2,r.z1,r.x2,r.z2]])if(!cells.has(n!)){ctx.moveTo(px(x1!),py(z1!));ctx.lineTo(px(x2!),py(z2!));}}ctx.stroke();}
+      ctx.restore();
+    }
     ctx.save();
     ctx.strokeStyle='#ffda75';ctx.lineWidth=Math.max(2.5,Math.min(4,cell*s*.12));
     for(const item of this.criticalWalls){const wall=item.wall;ctx.beginPath();ctx.moveTo(px(wall.x1),py(wall.z1));ctx.lineTo(px(wall.x2),py(wall.z2));ctx.stroke();}
@@ -223,7 +236,9 @@ export class MapView {
       ctx.fillStyle='#fff0ff';ctx.font='600 9px "Segoe UI", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(trap.label,x,y);
     }
     ctx.restore();
+    if(maze.storeys){ctx.fillStyle='#a4dcff';ctx.font='600 12px sans-serif';for(const st of maze.storeys.stairs){const p=this.floor===0?st.start:st.end;ctx.fillText(`Лестн.${st.id} ${this.floor===0?'↑':'↓'}`,px(p.x),py(p.z)-8);line([st.start,st.end].map(p=>({...p,floor:this.floor})),'#a4dcff',2);}}
     for (const [index, portal] of mazePortals(maze).entries()) {
+      if(maze.storeys&&this.floor!==0)continue;
       const start = samePortal(portal, maze.entrance), end = samePortal(portal, maze.exit);
       const label = `${index+1} · ${start ? 'СТАРТ' : end ? 'ФИНИШ' : 'ПРОЁМ'}`;
       const color = start ? '#d1ee86' : end ? '#e2ab78' : '#9acbdd';

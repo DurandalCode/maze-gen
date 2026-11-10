@@ -1,3 +1,4 @@
+import {spatialDistance} from '../core/two-storey';
 import type { Point } from '../core/maze';
 
 export interface Sample extends Point { time: number }
@@ -11,10 +12,10 @@ export class Recorder {
     this.samples = [{ ...start, time: 0 }];
   }
   record(point: Point, elapsed: number, force = false): void {
-    this.distance += Math.hypot(point.x-this.last.x, point.z-this.last.z);
+    this.distance += spatialDistance(point,this.last);
     this.last = { ...point }; this.elapsed = elapsed;
     const prev = this.samples[this.samples.length-1]!;
-    if (force || Math.hypot(point.x-prev.x, point.z-prev.z) >= 0.08)
+    if (force || (spatialDistance(point,prev) >= 0.08 || point.floor!==prev.floor || point.stair!==prev.stair))
       this.samples.push({ ...point, time: elapsed });
   }
 }

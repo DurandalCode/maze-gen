@@ -1,3 +1,4 @@
+import {recordJson} from './record-codec';
 import {preferWalk} from './walk-order';
 import {validateWalk} from './walk-json';
 import {isOfflineLibrary} from './platform';
@@ -9,7 +10,7 @@ import type { Recorder } from '../simulation/recorder';
 
 async function request<T>(path:string,body?:unknown):Promise<T> {
   if(isOfflineLibrary())return await offlineRequest(path,body) as T;
-  const response=await fetch(path,{...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),cache:'no-store'});
+  const response=await fetch(path,{...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:recordJson(body)}),cache:'no-store'});
   const data=await response.json();if(!response.ok)throw new Error(data.error??'Не удалось обратиться к библиотеке.');return data as T;
 }
 export const listLibraryMazes=()=>request<{mazes:Awaited<ReturnType<FileStore['listMazes']>>}>('/api/mazes');
@@ -25,7 +26,7 @@ export async function saveLibraryWalk(data:WalkData):Promise<{saved:boolean;queu
   try{const current=localStorage.getItem(key);if(current)pending=validateWalk(JSON.parse(current));}
   catch{/* A damaged legacy queue item cannot prevent a verified recording from being saved. */}
   if(pending)attempt=preferWalk(pending,data);
-  const text=JSON.stringify(attempt);
+  const text=recordJson(attempt);
   try{localStorage.setItem(key,text);queued=true;}catch{/* IndexedDB/server can still save when localStorage is full. */}
   try {
     await request('/api/walks',attempt);

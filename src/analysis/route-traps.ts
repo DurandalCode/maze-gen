@@ -1,7 +1,9 @@
+import {spatialLineVisible} from '../core/spatial-visibility';
+import {corridorNavigation} from '../core/corridor-navigation';
 import type {Maze} from '../core/maze';
-import {metrics} from '../core/metrics';
+import {componentCount,independentCycles} from '../core/graph';
 import {shortestPath} from '../core/pathfinding';
-import {prepareNavigation,prepareOutline} from './navigation';
+import {prepareNavigation,prepareOutline,edgeLength} from './navigation';
 import {decisionModel,decisionScore,choiceProbabilities} from './decision-model';
 import {spatialPerception} from './spatial-perception';
 import {minimaxRetreat} from './minimax-retreat';
@@ -19,12 +21,14 @@ export interface RouteTraps {supported:boolean; candidates:RouteTrap[]; qualifie
  * Exit distances use the footprint without internal walls. No solution is supplied to the player policy.
  */
 export function routeTraps(maze:Maze):RouteTraps {
-  const m=metrics(maze);
+ if(maze.version===4&&!maze.navigation){const graph=corridorNavigation(maze),result=routeTraps(graph),map=(c:number)=>graph.navigation!.representatives[c]!;return {...result,candidates:result.candidates.map(t=>({...t,fork:map(t.fork),deadEnd:map(t.deadEnd),falsePath:t.falsePath.map(map),correctAwayPath:t.correctAwayPath.map(map)})),best:result.best?{...result.best,fork:map(result.best.fork),deadEnd:map(result.best.deadEnd),falsePath:result.best.falsePath.map(map),correctAwayPath:result.best.correctAwayPath.map(map)}:null};}
+
+  const components=componentCount(maze),m={components,cycles:independentCycles(maze,components)};
   if(m.components!==1)return {supported:false,candidates:[],qualifiedCount:0,best:null};
   const ctx=prepareNavigation(maze);prepareOutline(maze,ctx);
   const distance=ctx.outlineDistances!,route=shortestPath(maze),onRoute=new Set(route),model=decisionModel(maze,ctx),sight=spatialPerception(maze,ctx);
   const minimumPeak=m.cycles?minimaxRetreat(maze,distance):null;
-  const edge=(a:number,b:number)=>Math.hypot(ctx.centers[a]!.x-ctx.centers[b]!.x,ctx.centers[a]!.z-ctx.centers[b]!.z);
+  const edge=(a:number,b:number)=>edgeLength(ctx,a,b);
   const candidates:RouteTrap[]=[];
   for(let i=0;i<route.length-1;i++){
     const fork=route[i]!,correct=route[i+1]!,choices=maze.passages[fork]!.filter(n=>n!==route[i-1]);
@@ -58,7 +62,7 @@ export function routeTraps(maze:Maze):RouteTraps {
         if(children.length){for(const c of children)stack.push({cell:c,parent:state.cell,path:[...state.path,c],length:state.length+edge(state.cell,c),toward:state.toward+Math.max(0,distance[state.cell]!-distance[c]!)});continue;}
         const deadEndDistance=distance[state.cell]!,falseApproach=distance[fork]!-deadEndDistance,entryProbability=(plus[k]!+minus[k]!)/2;
         const a=ctx.centers[fork]!,b=ctx.centers[state.cell]!,lineDistance=Math.hypot(b.x-a.x,b.z-a.z);
-        const deadEndVisible=sight.trace(fork,Math.atan2(b.z-a.z,b.x-a.x),lineDistance+1e-5).length>=lineDistance-1e-7;
+        const deadEndVisible=(!maze.storeys||spatialLineVisible(maze,{...a,y:(a.y??0)+1.7},{...b,y:(b.y??0)+1.7}))&&sight.trace(fork,Math.atan2(b.z-a.z,b.x-a.x),lineDistance+1e-5).length>=lineDistance-1e-7;
         const qualifies=falseApproach>=6&&state.length>=10&&state.toward/state.length>=.6&&requiredRetreat>=8&&awayLength>=8&&entryProbability>=.15&&!fs[k]!.deadEnd&&!fs[k]!.exitVisible&&!deadEndVisible;
         const score=entryProbability*Math.min(20,Math.max(0,falseApproach))*Math.min(20,requiredRetreat)/100;
         candidates.push({fork,deadEnd:state.cell,falsePath:state.path,correctAwayPath:[...correctAwayPath],forkDistance:distance[fork]!,deadEndDistance,falseApproach,falsePathLength:state.length,returnLength:state.length,requiredRetreat,awayLength,entryProbability,deadEndVisible,qualifies,score});

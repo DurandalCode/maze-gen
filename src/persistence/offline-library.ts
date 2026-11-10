@@ -1,3 +1,4 @@
+import {recordJson,restoreRecord} from './record-codec';
 import type {SavedMaze,SavedWalk} from '../../server/store';
 import {deserialize} from './maze-json';
 import {validateWalk} from './walk-json';
@@ -18,15 +19,15 @@ const database=():Promise<IDBDatabase>=>opened??=new Promise<IDBDatabase>((resol
  request.onblocked=()=>reject(new Error('Закройте другое окно приложения для обновления библиотеки.'));
 }).catch(error=>{opened=undefined;throw error;});
 async function all<T>(store:string):Promise<T[]>{
- const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readonly'),req=tx.objectStore(store).getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+ const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readonly'),req=tx.objectStore(store).getAll();req.onsuccess=()=>resolve(req.result.map(restoreRecord));req.onerror=()=>reject(req.error);});
 }
 async function get<T>(store:string,id:string):Promise<T|null>{
- const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readonly'),req=tx.objectStore(store).get(id);req.onsuccess=()=>resolve(req.result??null);req.onerror=()=>reject(req.error);});
+ const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readonly'),req=tx.objectStore(store).get(id);req.onsuccess=()=>resolve(restoreRecord(req.result??null));req.onerror=()=>reject(req.error);});
 }
 async function update<T>(store:string,id:string,change:(old:T|null)=>T):Promise<T>{
  const db=await database();return new Promise((resolve,reject)=>{
   const tx=db.transaction(store,'readwrite'),s=tx.objectStore(store),req=s.get(id);let result:T;
-  req.onsuccess=()=>{try{result=change(req.result??null);s.put(result);}catch(e){tx.abort();reject(e);}};
+  req.onsuccess=()=>{try{result=change(restoreRecord(req.result??null));s.put(JSON.parse(recordJson(result)));}catch(e){tx.abort();reject(e);}};
   tx.oncomplete=()=>resolve(result!);tx.onabort=tx.onerror=()=>reject(new Error('Не удалось сохранить данные на устройстве. Экспортируйте имеющиеся записи.'));
  });
 }

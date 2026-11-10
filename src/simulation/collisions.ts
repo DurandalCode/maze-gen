@@ -1,3 +1,4 @@
+import {wallDistance} from '../free/geometry';
 import { WALL_THICKNESS, type Point, type Wall } from '../core/maze';
 
 /** Spatial hash keeps collision queries local even for a 100 × 100 grid. */
@@ -17,6 +18,8 @@ export class CollisionWorld {
     for (let x = Math.floor((p.x-radius) / this.bucketSize); x <= Math.floor((p.x+radius) / this.bucketSize); x++)
       for (let z = Math.floor((p.z-radius) / this.bucketSize); z <= Math.floor((p.z+radius) / this.bucketSize); z++)
         for (const w of this.buckets.get(`${x},${z}`) ?? []) {
+          if(w.y!==undefined&&((p.y??0)+1.7<=w.y+.001||(p.y??0)+.05>=w.y+(w.height??2.5)-.001))continue;
+          if(w.x1!==w.x2&&w.z1!==w.z2){if(wallDistance(p,w)<radius-1e-10)return true;continue;}
           const half = (w.thickness ?? WALL_THICKNESS) / 2;
           const closestX = Math.max(Math.min(w.x1, w.x2)-half, Math.min(p.x, Math.max(w.x1, w.x2)+half));
           const closestZ = Math.max(Math.min(w.z1, w.z2)-half, Math.min(p.z, Math.max(w.z1, w.z2)+half));

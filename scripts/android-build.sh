@@ -16,6 +16,8 @@ GRADLE=${MAZE_GRADLE:-"$TOOLCHAIN/gradle-8.11.1/bin/gradle"}
 [[ -x "$GRADLE" ]] || GRADLE="$ROOT/android/gradlew"
 BUN=${MAZE_BUN:-"$ROOT/../work/bun-runtime/node_modules/.bin/bun"}
 [[ -x "$GRADLE" ]] || { echo "Gradle missing: see android/README.md" >&2; exit 1; }
+# Both desktop keyboard and Android thumbsticks share the tested stair locomotion.
+(cd "$ROOT" && "$BUN" test tests/two-storey.test.ts)
 if [[ "${1:-}" != '--skip-web' ]]; then
   (cd "$ROOT" && "$BUN" run build)
 fi

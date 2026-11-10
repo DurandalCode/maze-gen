@@ -1,3 +1,7 @@
+import {physicalStoreyIdentity} from '../src/core/two-storey';
+import {freeIdentity} from '../src/free/json';
+import {recordJson,restoreRecord} from '../src/persistence/record-codec';
+import {corridorPhysicalIdentity} from '../src/persistence/corridor-json';
 import { mkdir,readFile,readdir,rename,writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash,randomUUID } from 'node:crypto';
@@ -8,7 +12,7 @@ import { domainOf } from '../src/core/domain';
 import type { Maze } from '../src/core/maze';
 
 export interface SavedMaze {id:string;title:string;createdAt:string;updatedAt:string;maze:Maze;status?:'candidate'|'rejected';rejectionReason?:string}
-export function topologyId(maze:Maze):string {const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,loopTrapCount:______,generationType:_______,...geometry}=maze.parameters;return createHash('sha256').update(canonical({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]})).digest('hex').slice(0,24);}
+export function topologyId(maze:Maze):string {if(maze.storeys)return createHash('sha256').update(canonical(physicalStoreyIdentity(maze))).digest('hex').slice(0,24);if(maze.version===5)return createHash('sha256').update(canonical(freeIdentity(maze))).digest('hex').slice(0,24);if(maze.version===4)return createHash('sha256').update(canonical(corridorPhysicalIdentity(maze))).digest('hex').slice(0,24);const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,loopTrapCount:______,generationType:_______,...geometry}=maze.parameters;return createHash('sha256').update(canonical({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]})).digest('hex').slice(0,24);}
 export interface SavedWalk {id:string;mazeId:string;createdAt:string;updatedAt:string;walk:WalkData;assessment:WalkAssessment}
 const validId=(id:string)=>/^[a-zA-Z0-9_-]{1,80}$/.test(id);
 function canonical(value:unknown):string {
@@ -24,13 +28,13 @@ export class FileStore {
     return join(this.root,folder,id+'.json');
   }
   private async read<T>(folder:string,id:string):Promise<T|null> {
-    try{return JSON.parse(await readFile(this.file(folder,id),'utf8')) as T;}
+    try{return restoreRecord(JSON.parse(await readFile(this.file(folder,id),'utf8')) as T);}
     catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return null;throw error;}
   }
   private async write(folder:string,id:string,value:unknown) {
     await mkdir(join(this.root,folder),{recursive:true});
     const file=this.file(folder,id),temp=file+'.'+randomUUID()+'.tmp';
-    await writeFile(temp,JSON.stringify(value),'utf8');await rename(temp,file);
+    await writeFile(temp,recordJson(value),'utf8');await rename(temp,file);
   }
   private async locked<T>(key:string,task:()=>Promise<T>):Promise<T> {
     const previous=this.pending.get(key)??Promise.resolve();

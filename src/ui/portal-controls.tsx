@@ -1,4 +1,4 @@
-import { routingSize, type Maze, type Portal } from '../core/maze';
+import { portalPoint,routingSize, type Maze, type Portal } from '../core/maze';
 import { mazePortals, samePortal, withPortals } from '../core/portals';
 
 export type PortalEdit = 'add' | number | null;
@@ -14,6 +14,7 @@ export function PortalControls({ maze, edit, onEdit, onChange }: {
       [other]: samePortal(selected, maze[other]) ? maze[key] : maze[other] });
   };
   const label = (p: Portal, i: number) => {
+    if(maze.version===4){const q=portalPoint(maze,p);return `${i+1} · ${sideNames[p.side]} · X ${q.x.toFixed(1)}, Z ${q.z.toFixed(1)} м`;}
     const position = p.side === 'north' || p.side === 'south' ? p.cell%size.columns : Math.floor(p.cell/size.columns);
     return `${i+1} · ${sideNames[p.side]} · ${position+1}`;
   };

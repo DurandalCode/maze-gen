@@ -1,9 +1,12 @@
+import {corridorNavigation} from '../core/corridor-navigation';
 import {domainOf} from '../core/domain';
 import {cellCenter,portalPoint,type Maze} from '../core/maze';
 import {shortestPath} from '../core/pathfinding';
 export interface NetworkStructure {interlinkedCycles:number;junctions:number;routeJunctions:number;cells:number}
 /** Biconnected blocks distinguish interlinked detours from rings hanging off one junction. */
 export function networkStructure(maze:Maze):NetworkStructure{
+ if(maze.version===4&&!maze.navigation)return networkStructure(corridorNavigation(maze));
+
  const domain=domainOf(maze),route=new Set(shortestPath(maze)),disc=new Int32Array(maze.passages.length),low=new Int32Array(disc.length),parent=new Int32Array(disc.length).fill(-1),edges:[number,number][]=[];
  let clock=0,best:NetworkStructure={interlinkedCycles:0,junctions:0,routeJunctions:0,cells:0};
  const block=(p:number,u:number)=>{

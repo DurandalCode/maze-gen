@@ -1,3 +1,6 @@
+import {generateFree} from '../free/generate';
+import {generateTwoStorey} from './two-storey';
+import {generateCorridor} from './corridor';
 import {livingBase} from './living-base';
 import {generateLiving} from './living';
 import { connect, emptyMaze, neighbors, type Maze, type Parameters } from '../core/maze';
@@ -11,6 +14,9 @@ import {addConstrainedConnections} from './constrained-connections';
 
 /** Unmodified seeded spanning-tree algorithms; also used to complete constrained forests. */
 export function generateBase(parameters: Parameters): Maze {
+  if(parameters.placementMode==='free')return generateFree(parameters);
+  if(parameters.generationType==='two-storey')return generateTwoStorey(parameters);
+  if(parameters.generationType==='corridor')return generateCorridor(parameters);
   if(parameters.generationType==='living')return livingBase(emptyMaze(parameters));
   const maze = emptyMaze(parameters), rng = random(parameters.seed);
   (parameters.algorithm === 'prim' ? prim : backtracker)(maze, rng);
@@ -25,6 +31,9 @@ export function generateBase(parameters: Parameters): Maze {
 }
 
 export function generate(parameters:Parameters,previous?:Maze,onProgress?:(message:string)=>void):Maze {
+  if(parameters.placementMode==='free')return generateFree(parameters,previous,onProgress);
+  if(parameters.generationType==='two-storey')return generateTwoStorey(parameters,previous,onProgress);
+  if(parameters.generationType==='corridor')return generateCorridor(parameters,previous,onProgress);
   if(parameters.generationType==='living'){
     // Portal remapping validates connectivity, so provide a connected target first.
     let maze=previous?generateBase(parameters):emptyMaze(parameters);

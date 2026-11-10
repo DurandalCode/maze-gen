@@ -77,8 +77,8 @@ export class WalkScene {
   render(player: Player): void {
     // A bounded shadow region follows the visitor instead of spreading over 100×100 cells.
     const x = Math.round(player.position.x*2)/2, z = Math.round(player.position.z*2)/2;
-    this.sun.position.set(x, 0, z).add(this.sunDirection); this.sun.target.position.set(x, 0, z);
-    this.camera.position.set(player.position.x, 1.7, player.position.z);
+    this.sun.position.set(x, player.position.y??0, z).add(this.sunDirection); this.sun.target.position.set(x, player.position.y??0, z);
+    this.camera.position.set(player.position.x, (player.position.y??0)+1.7, player.position.z);
     this.camera.rotation.set(player.pitch, player.yaw, 0);
     this.wallSorter?.update(this.camera);
     this.landmarks?.update(this.camera);

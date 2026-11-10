@@ -1,3 +1,7 @@
+import {outlineDistances} from '../free/analysis-geometry';
+import {spatialCellAt,spatialDistance,spatialEdgeLength,storeyView} from '../core/two-storey';
+import {freeRuntime,connectionGeometry} from '../free/layout';
+import {pointIn} from '../free/geometry';
 import { domainOf } from '../core/domain';
 import { axisBounds, cellCenter, neighbors, portalPoint, routingSize, type Maze, type Point } from '../core/maze';
 export type NavigationProfile = 'explorer' | 'compass' | 'outline';
@@ -5,6 +9,7 @@ export const PROFILE_NAMES: Record<NavigationProfile, string> = {
   explorer: 'Без предпочтения направления', compass: 'Знает направление на выход', outline: 'Знает направление и контур',
 };
 export interface NavigationContext {
+  edgeLengths?:Map<string,number>;
   cells: number[];
   adjacent: number[][];
   centers: Point[];
@@ -19,10 +24,22 @@ export function prepareNavigation(maze: Maze): NavigationContext {
     adjacent[cell] = neighbors(maze, cell);
     centers[cell] = cellCenter(maze, cell);
   }
-  return { cells, adjacent, centers, goal: portalPoint(maze, maze.exit) };
+  const edgeLengths=maze.storeys?new Map<string,number>():undefined;if(edgeLengths)for(const a of cells)for(const b of adjacent[a]!)edgeLengths.set(a+':'+b,spatialEdgeLength(maze,a,b));
+  return { cells, adjacent, centers,edgeLengths, goal: portalPoint(maze, maze.exit) };
 }
 /** Footprint-only distances and visible waypoints: no internal maze passages are consulted. */
 export function prepareOutline(maze: Maze, context: NavigationContext): void {
+  if(maze.storeys){if(context.outlineTargets)return;const lower=storeyView(maze,0),known=prepareNavigation(lower);prepareOutline(lower,known);context.outlineTargets=[];context.outlineDistances=new Float64Array(maze.passages.length);for(const c of context.cells){const n=maze.storeys.nodes[c]!,p=n.center;context.outlineTargets[c]=n.local===undefined?context.goal:known.outlineTargets![n.local]??context.goal;context.outlineDistances[c]=n.local===undefined?Math.hypot(p.x-context.goal.x,p.z-context.goal.z):known.outlineDistances![n.local]!;}return;}
+  if(maze.version===5){context.outlineTargets=context.centers.map(()=>context.goal);context.outlineDistances=Float64Array.from(outlineDistances(maze,context.centers));return;}
+  if(maze.navigation){if(context.outlineTargets)return;const original=prepareNavigation(maze.navigation.source);prepareOutline(maze.navigation.source,original);context.outlineDistances=Float64Array.from(maze.navigation.representatives,c=>original.outlineDistances![c]!);context.outlineTargets=maze.navigation.representatives.map(c=>original.outlineTargets![c]!);return;}
+  if(maze.layout?.spaces){
+    if(context.outlineTargets)return;
+    // The player knows the site outline, not the generated network or islands.
+    const plot:Maze={...maze,layout:{modules:maze.layout.modules}},known=prepareNavigation(plot);prepareOutline(plot,known);
+    context.outlineTargets=[];context.outlineDistances=new Float64Array(maze.passages.length).fill(Infinity);
+    for(const c of context.cells){const cell=cellAtPoint(plot,context.centers[c]!);if(cell!==null){context.outlineTargets[c]=known.outlineTargets![cell]!;context.outlineDistances[c]=known.outlineDistances![cell]!;}}
+    return;
+  }
   if (context.outlineTargets)
     return;
   const size = maze.passages.length, distances = new Float64Array(size).fill(Infinity);
@@ -120,10 +137,14 @@ export function directionScore(context: NavigationContext, from: number, to: num
   return norm ? (dx * gx + dz * gz) / norm : 0;
 }
 export function edgeLength(context: NavigationContext, a: number, b: number): number {
+  const physical=context.edgeLengths?.get(`${a}:${b}`);if(physical!==undefined)return physical;
   const p = context.centers[a]!, q = context.centers[b]!;
-  return Math.hypot(q.x - p.x, q.z - p.z);
+  return spatialDistance(p,q);
 }
 export function cellAtPoint(maze: Maze, point: Point): number | null {
+  if(maze.storeys)return spatialCellAt(maze,point);
+  if(maze.version===5){const r=freeRuntime(maze),i=r.rooms.findIndex(s=>pointIn(point,s.polygon)&&!s.holes.some(h=>pointIn(point,h,false)));if(i>=0)return i;const c=maze.free!.connections.find(c=>{try{return pointIn(point,connectionGeometry(maze.free!,c).polygon);}catch{return false;}});return c?r.rooms.findIndex(s=>s.id===c.a.room):null;}
+  if(maze.navigation){const c=cellAtPoint(maze.navigation.source,point);return c===null?null:maze.navigation.originalToRegion[c]!;}
   const xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z');
   const x = xs.findIndex((v, i) => i > 0 && point.x < v) - 1;
   const z = zs.findIndex((v, i) => i > 0 && point.z < v) - 1;
