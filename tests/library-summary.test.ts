@@ -18,7 +18,7 @@ test('persisted v1-v6 snapshots retain the exact topology ID and module count wi
 });
 test('cold library lists reuse stored assessments and topology IDs; opening still restores the full snapshot',async()=>{
  const root=await mkdtemp(join(tmpdir(),'maze-summary-'));try{
-  const store=new FileStore(root),m=free(),maze=await store.saveMaze(m,'Free summary'),assessment={distance:4,ratio:123,interpretation:'movement-only'};
+  const store=new FileStore(root),m=free(),maze=await store.saveMaze(m,'Free summary'),assessment={exploration:null,distance:4,optimalLength:4,ratio:123,coveredAreaRatio:1,decisionCount:0,comparableCorridorChoices:0,longestCorridorChoices:0,continuedStraight:0,interpretation:'movement-only' as const};
   await mkdir(join(root,'walks'),{recursive:true});await writeFile(join(root,'walks','legacy.json'),JSON.stringify({id:'legacy',mazeId:maze.id,createdAt:'2026',updatedAt:'2026',topologyId:topologyId(m),assessment,walk:{maze:JSON.parse(serialize(m)),status:'stopped',finished:false,recording:{distance:4,elapsed:3,samples:[]}}}));
   const cold=new FileStore(root),mazes=await cold.listMazes(),walks=await cold.listWalks();expect(mazes[0]!.modules).toBe(2);expect(walks[0]!.assessment).toEqual(assessment);expect(walks[0]!.topologyId).toBe(topologyId(m));expect(canonical((await cold.getMaze(maze.id))!.maze)).toBe(canonical(m));
  }finally{await rm(root,{recursive:true,force:true});}
