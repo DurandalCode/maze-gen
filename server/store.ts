@@ -8,12 +8,12 @@ import { createHash,randomUUID } from 'node:crypto';
 import { deserialize } from '../src/persistence/maze-json';
 import { validateWalk,type WalkData } from '../src/persistence/walk-json';
 import { assessWalk,type WalkAssessment } from '../src/analysis/walk-assessment';
-import { domainOf } from '../src/core/domain';
+import {storedModuleCount,storedTopologyPayload} from '../src/persistence/library-summary';
 import type { Maze } from '../src/core/maze';
 
 export interface SavedMaze {id:string;title:string;createdAt:string;updatedAt:string;maze:Maze;status?:'candidate'|'rejected';rejectionReason?:string}
 export function topologyId(maze:Maze):string {if(maze.storeys)return createHash('sha256').update(canonical(physicalStoreyIdentity(maze))).digest('hex').slice(0,24);if(maze.version===5)return createHash('sha256').update(canonical(freeIdentity(maze))).digest('hex').slice(0,24);if(maze.version===4)return createHash('sha256').update(canonical(corridorPhysicalIdentity(maze))).digest('hex').slice(0,24);const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,loopTrapCount:______,generationType:_______,...geometry}=maze.parameters;return createHash('sha256').update(canonical({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]})).digest('hex').slice(0,24);}
-export interface SavedWalk {id:string;mazeId:string;createdAt:string;updatedAt:string;walk:WalkData;assessment:WalkAssessment}
+export interface SavedWalk {id:string;mazeId:string;createdAt:string;updatedAt:string;walk:WalkData;assessment:WalkAssessment;topologyId?:string}
 const validId=(id:string)=>/^[a-zA-Z0-9_-]{1,80}$/.test(id);
 function canonical(value:unknown):string {
   if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
@@ -27,8 +27,8 @@ export class FileStore {
     if(!validId(id))throw new Error('Некорректный идентификатор.');
     return join(this.root,folder,id+'.json');
   }
-  private async read<T>(folder:string,id:string):Promise<T|null> {
-    try{return restoreRecord(JSON.parse(await readFile(this.file(folder,id),'utf8')) as T);}
+  private async read<T>(folder:string,id:string,restore=true):Promise<T|null> {
+    try{const value=JSON.parse(await readFile(this.file(folder,id),'utf8')) as T;return restore?restoreRecord(value):value;}
     catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return null;throw error;}
   }
   private async write(folder:string,id:string,value:unknown) {
@@ -68,16 +68,16 @@ export class FileStore {
   getWalk(id:string){return this.read<SavedWalk>('walks',id);}
   private async list<T>(folder:string):Promise<T[]> {
     let names:string[];try{names=await readdir(join(this.root,folder));}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return [];throw error;}
-    const rows=await Promise.all(names.filter(name=>/^[a-zA-Z0-9_-]{1,80}\.json$/.test(name)).map(name=>this.read<T>(folder,name.slice(0,-5))));
+    const rows=await Promise.all(names.filter(name=>/^[a-zA-Z0-9_-]{1,80}\.json$/.test(name)).map(name=>this.read<T>(folder,name.slice(0,-5),false)));
     return rows.filter(row=>row!==null) as T[];
   }
   async listMazes() {
     return (await this.list<SavedMaze>('mazes')).sort((a,b)=>(a.status==='rejected'?1:0)-(b.status==='rejected'?1:0)||b.updatedAt.localeCompare(a.updatedAt)).map(row=>({id:row.id,title:row.title,createdAt:row.createdAt,updatedAt:row.updatedAt,status:row.status??'candidate',rejectionReason:row.rejectionReason,
-      columns:row.maze.parameters.columns,rows:row.maze.parameters.rows,generationType:row.maze.parameters.generationType??'classical',modules:row.maze.parameters.moduleSize===undefined?null:domainOf(row.maze).modules.reduce((a,b)=>a+b,0)}));
+      columns:row.maze.parameters.columns,rows:row.maze.parameters.rows,generationType:row.maze.parameters.generationType??'classical',modules:row.maze.parameters.moduleSize===undefined?null:storedModuleCount(row.maze)}));
   }
   async listWalks() {
     return (await this.list<SavedWalk>('walks')).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).map(row=>({id:row.id,mazeId:row.mazeId,createdAt:row.createdAt,updatedAt:row.updatedAt,
-      topologyId:topologyId(row.walk.maze),status:row.walk.status,finished:row.walk.finished,elapsed:row.walk.recording.elapsed,distance:row.walk.recording.distance,assessment:assessWalk(row.walk.maze,row.walk.recording.samples,row.walk.recording.distance,row.walk.finished),
+      topologyId:row.topologyId??createHash('sha256').update(canonical(storedTopologyPayload(row.walk.maze))).digest('hex').slice(0,24),status:row.walk.status,finished:row.walk.finished,elapsed:row.walk.recording.elapsed,distance:row.walk.recording.distance,assessment:row.assessment??assessWalk(deserialize(JSON.stringify(row.walk.maze)),row.walk.recording.samples,row.walk.recording.distance,row.walk.finished),
       columns:row.walk.maze.parameters.columns,rows:row.walk.maze.parameters.rows}));
   }
   async saveWalk(raw:unknown):Promise<SavedWalk> {
@@ -89,7 +89,7 @@ export class FileStore {
         (previous.walk.status==='stopped'&&walk.status==='in-progress'&&previous.walk.recording.elapsed>=walk.recording.elapsed)))return previous;
       const now=new Date().toISOString();
       const record:SavedWalk={id:walk.id,mazeId:maze.id,createdAt:previous?.createdAt??now,updatedAt:now,walk,
-        assessment:assessWalk(walk.maze,walk.recording.samples,walk.recording.distance,walk.finished)};
+        assessment:assessWalk(walk.maze,walk.recording.samples,walk.recording.distance,walk.finished),topologyId:topologyId(walk.maze)};
       await this.write('walks',walk.id,record);return record;
     });
   }
