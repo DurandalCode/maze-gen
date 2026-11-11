@@ -1,3 +1,5 @@
+import {siteGeometry} from '../free/layout';
+import {segmentDistance} from '../free/geometry';
 import {spatialVisibleCells} from '../core/spatial-visibility';
 import {rayDistance,openingMidpoint} from '../core/corridor-navigation';
 import {cellAtPoint} from './navigation';
@@ -81,14 +83,13 @@ export function spatialPerception(maze: Maze, context: NavigationContext) {
 /** Known footprint only; no hidden maze walls or solution path are used. */
 export function perimeterPerception(maze: Maze, context: NavigationContext) {
   const domain = domainOf(maze), distances = new Float64Array(maze.passages.length);
+  const boundary=maze.free?siteGeometry(maze.parameters).boundaries.map(wall=>({wall})):maze.storeys?domainOf(maze.storeys.floors[0]).boundary:domain.boundary;
   let scale = 0;
   for (const cell of context.cells) {
     const p = context.centers[cell]!;
     let distance = Infinity;
-    for (const { wall: w } of (maze.storeys?domainOf(maze.storeys.floors[0]).boundary:domain.boundary)) {
-      const x = Math.max(Math.min(w.x1, w.x2), Math.min(Math.max(w.x1, w.x2), p.x));
-      const z = Math.max(Math.min(w.z1, w.z2), Math.min(Math.max(w.z1, w.z2), p.z));
-      distance = Math.min(distance, Math.hypot(p.x - x, p.z - z));
+    for (const { wall: w } of boundary) {
+      distance = Math.min(distance,segmentDistance(p,w));
     }
     distances[cell] = distance;
     const r = domain.rectangles[cell]!;

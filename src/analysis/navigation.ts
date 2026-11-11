@@ -25,7 +25,7 @@ export function prepareNavigation(maze: Maze): NavigationContext {
     adjacent[cell] = neighbors(maze, cell);
     centers[cell] = cellCenter(maze, cell);
   }
-  const edgeLengths=maze.storeys?new Map<string,number>():undefined;if(edgeLengths)for(const a of cells)for(const b of adjacent[a]!)edgeLengths.set(a+':'+b,spatialEdgeLength(maze,a,b));
+  const edgeLengths=maze.storeys||maze.free?new Map<string,number>():undefined;if(edgeLengths)for(const a of cells)for(const b of adjacent[a]!)edgeLengths.set(a+':'+b,maze.free?freeRuntime(maze).edgePaths.get(`${a}:${b}`)!.slice(1).reduce((sum,p,i)=>{const q=freeRuntime(maze).edgePaths.get(`${a}:${b}`)![i]!;return sum+Math.hypot(p.x-q.x,p.z-q.z,(p.y??0)-(q.y??0));},0):spatialEdgeLength(maze,a,b));
   return { cells, adjacent, centers,edgeLengths, goal: portalPoint(maze, maze.exit) };
 }
 /** Footprint-only distances and visible waypoints: no internal maze passages are consulted. */

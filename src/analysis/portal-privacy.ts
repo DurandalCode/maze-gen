@@ -1,3 +1,4 @@
+import {freePortalPrivacy} from '../free/portal-privacy';
 import {storeyView} from '../core/two-storey';
 import { domainOf } from '../core/domain';
 import { walls, WALL_THICKNESS, type Maze, type Point, type Portal, type Wall } from '../core/maze';
@@ -65,6 +66,7 @@ function clearRay(a: Point, b: Point, obstacles: readonly Wall[]): boolean {
 export function portalPrivacy(maze: Maze, portal: Portal, maxPocketCells = 3, findWitness = true): PortalPrivacy {
   if (!Number.isInteger(maxPocketCells) || maxPocketCells < 1 || maxPocketCells > 12)
     throw new Error('Недопустимый размер кармана проёма.');
+  if(maze.free)return freePortalPrivacy(maze,portal,maxPocketCells,findWitness);
   if(maze.storeys){const lower=storeyView(maze,0);return portalPrivacy(lower,portal,maxPocketCells,findWitness);}
   const domain = domainOf(maze), boundary = domain.boundary.find(e => samePortal(e.portal, portal));
   if (!boundary)

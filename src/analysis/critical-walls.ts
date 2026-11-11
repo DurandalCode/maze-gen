@@ -1,3 +1,6 @@
+import {segmentDistance} from '../free/geometry';
+import {freePortalPrivacy} from '../free/portal-privacy';
+import {freeRuntime} from '../free/layout';
 import {validFloorChanges} from '../core/two-storey';
 import type {Maze,Wall,Point} from '../core/maze';
 import {neighbors} from '../core/maze';
@@ -18,6 +21,16 @@ function overlaps(a:Wall,b:Wall){
  * These are derived protections, not user pins. Combined edits still require revalidation.
  */
 export function criticalWalls(maze:Maze):CriticalWall[]{
+ if(maze.free){
+  const r=freeRuntime(maze),result:CriticalWall[]=[],portals=[['входа',maze.entrance],['выхода',maze.exit]] as const;
+  const before=portals.map(([,p])=>freePortalPrivacy(maze,p,3,false));
+  for(const [index,wall]of r.panels.entries()){
+   const protections:WallProtection[]=[];
+   for(const [i,[name,portal]]of portals.entries())if(before[i]!.certified&&before[i]!.blockers.includes(wall)&&!freePortalPrivacy(maze,portal,3,false,index).certified)protections.push({kind:'portal',element:name,reason:`Экранирование ${name}`});
+   if(protections.length)result.push({a:-1,b:-1,wall,protections});
+  }
+  return result;
+ }
  const domain=domainOf(maze),privacy=mazePortalPrivacy(maze,false),traps=detailedCriticalWallsAvailable(maze)?routeTraps(maze):null,order=new Map(shortestPath(maze).map((c,i)=>[c,i]));
  const forks=[...new Set((traps?.candidates??[]).filter(t=>t.qualifies).map(t=>t.fork))].sort((a,b)=>order.get(a)!-order.get(b)!);
  const loops=detailedCriticalWallsAvailable(maze)?loopTraps(maze).candidates.filter(t=>t.qualifies):[];
@@ -42,6 +55,6 @@ export function criticalWalls(maze:Maze):CriticalWall[]{
 }
 export function criticalWallAt(walls:readonly CriticalWall[],point:Point,tolerance:number):CriticalWall|undefined {
  let best:CriticalWall|undefined,distance=tolerance;
- for(const item of walls){const w=item.wall,x=Math.max(w.x1,Math.min(w.x2,point.x)),z=Math.max(w.z1,Math.min(w.z2,point.z)),d=Math.hypot(x-point.x,z-point.z);if(d<=distance){best=item;distance=d;}}
+ for(const item of walls){const d=segmentDistance(point,item.wall);if(d<=distance){best=item;distance=d;}}
  return best;
 }

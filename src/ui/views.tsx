@@ -4,7 +4,7 @@ import type { HeatDisplay } from './coldspot-controls';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {trapOverlay} from './trap-overlay';
 import {routeTraps} from '../analysis/route-traps';
-import {criticalWalls,detailedCriticalWallsAvailable} from '../analysis/critical-walls';
+import {type CriticalWall,detailedCriticalWallsAvailable} from '../analysis/critical-walls';
 import { walls, type Maze, type Portal } from '../core/maze';
 import { mazePortals, samePortal } from '../core/portals';
 import type { Environment } from '../core/environment';
@@ -25,7 +25,20 @@ export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePort
   const [trapState,setTrapState]=useState<{maze:Maze|null;show:boolean;critical:boolean;selected:string}>({maze:null,show:false,critical:false,selected:'all'});
   const showTraps=trapState.maze===maze&&trapState.show,selected=trapState.maze===maze?trapState.selected:'all';
   const showCritical=trapState.maze===maze&&trapState.critical;
-  const protectedWalls=useMemo(()=>showCritical?criticalWalls(maze):[],[maze,showCritical]);
+  const [criticalState,setCriticalState]=useState<{maze:Maze;walls:CriticalWall[];error?:string}|null>(null);
+  const protectedWalls=useMemo(()=>showCritical&&criticalState?.maze===maze?criticalState.walls:[],[maze,showCritical,criticalState]);
+  const criticalPending=showCritical&&criticalState?.maze!==maze;
+  useEffect(()=>{
+    if(!showCritical||criticalState?.maze===maze)return;
+    let worker:Worker|undefined,active=true;
+    try{
+      worker=new Worker(new URL('../analysis/critical-walls-worker.ts',import.meta.url),{type:'module'});
+      worker.onmessage=e=>{if(active)setCriticalState({maze,walls:e.data.walls??[],error:e.data.error});worker?.terminate();};
+      worker.onerror=e=>{e.preventDefault();if(active)setCriticalState({maze,walls:[],error:e.message||'Ошибка расчёта критических стен.'});worker?.terminate();};
+      worker.postMessage(maze);
+    }catch(e){setCriticalState({maze,walls:[],error:String(e)});}
+    return ()=>{active=false;worker?.terminate();};
+  },[maze,showCritical,criticalState]);
   const trapAnalysis=useMemo(()=>showTraps?routeTraps(maze):null,[maze,showTraps]);
   const allTraps=useMemo(()=>trapAnalysis?trapOverlay(maze,trapAnalysis):[],[maze,trapAnalysis]);
   const visibleTraps=useMemo(()=>selected==='all'?allTraps:allTraps.filter(t=>String(t.fork)===selected),[allTraps,selected]);
@@ -67,7 +80,8 @@ export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePort
       {showTraps&&<><span role="status">{!trapAnalysis?.supported?'Нужна связная область':allTraps.length?`Ловушек по критериям модели: ${allTraps.length}`:'Подходящих ловушек не найдено'}</span>
       {allTraps.length>1&&<select aria-label="Выбрать ловушку" value={selected} onChange={e=>setTrapState({maze,show:true,critical:showCritical,selected:e.target.value})}><option value="all">Все ловушки</option>{allTraps.map(t=><option key={t.fork} value={t.fork}>{t.label}</option>)}</select>}</>}
       <label><input type="checkbox" aria-label="Критические стены" checked={showCritical} onChange={e=>setTrapState({maze,show:showTraps,critical:e.target.checked,selected})}/> Критические стены</label>
-      {showCritical&&<span role="status">Защищённых стен: {protectedWalls.length}{!detailedCriticalWallsAvailable(maze)?' · на большой карте только проёмы':''}</span>}
+      {showCritical&&<span role="status" aria-label="Расчёт критических стен">{criticalPending?'Вычисляем критические стены…':criticalState?.error?`Не удалось рассчитать: ${criticalState.error}`:`Защищённых стен: ${protectedWalls.length}${maze.free?' · свободная планировка: экранирование проёмов':!detailedCriticalWallsAvailable(maze)?' · на большой карте только проёмы':''}`}</span>}
+      {showCritical&&criticalState?.error&&<button onClick={()=>setCriticalState(null)}>Повторить расчёт</button>}
     </div>
     {(showTraps&&allTraps.length>0||showCritical)&&<div className={`trap-map-legend ${heat?'with-heat':''}`} aria-label="Легенда ловушек">{showTraps&&allTraps.length>0&&<><span><i className="trap-false"/> Ложный путь · × тупик</span><span><i className="trap-away"/> Путь дальше</span><span>Л1… · тупиковые · К1… · кольцевые</span></>}{showCritical&&<span><i className="trap-protected"/> Критические стены</span>}</div>}
     {hover && <div className="heat-tooltip" role="status" style={{left:hover.x,top:hover.y}}>{hover.text}</div>}

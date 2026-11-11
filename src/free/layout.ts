@@ -314,7 +314,7 @@ export function freeDomain(maze: Maze): Domain {
   const cached=domainCache.get(maze.free!);if(cached)return cached;
   const r = freeRuntime(maze), cells = r.rooms.map((_, i) => i);
   const result:Domain={
-    active: new Uint8Array(cells.length).fill(1), cells, modules: new Uint8Array(maze.free!.modules.length).fill(1), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: r.rooms.flatMap((s, i) => edges(s.polygon).map(w => ({ wall: w, portal: { cell: i, side: 'north' as const } }))), area: (maze.free!.bridges??[]).reduce((sum,b)=>{const g=bridgeGeometry(maze.free!,b);return sum+b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun);},0)+r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: p => p.bridge!==undefined ? (()=>{const surface=bridgeSurface(maze.free!,p);return !!surface&&Math.abs((p.y??0)-surface.y!)<1e-5;})() : (p.y??0)===0&&r.contains(p), constrain(from, to) {
+    active: new Uint8Array(cells.length).fill(1), cells, modules: new Uint8Array(maze.free!.modules.length).fill(1), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: maze.free!.openings.map(o=>({wall:anchorGeometry(maze.free!,o,o.width).wall,portal:{freeId:o.id,cell:r.rooms.findIndex(s=>s.id===o.room),side:'north' as const,width:o.width}})), area: (maze.free!.bridges??[]).reduce((sum,b)=>{const g=bridgeGeometry(maze.free!,b);return sum+b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun);},0)+r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: p => p.bridge!==undefined ? (()=>{const surface=bridgeSurface(maze.free!,p);return !!surface&&Math.abs((p.y??0)-surface.y!)<1e-5;})() : (p.y??0)===0&&r.contains(p), constrain(from, to) {
       if (segmentInside(from, to, r.contains, r.boundaries)) return { ...to };
       let lo = 0, hi = 1;
       for (let i = 0; i < 30; i++) {
@@ -427,3 +427,9 @@ export function freeMaze(d: FreeDraft, check = true): Maze {
 
 
 export function freeIslands(layout:FreeLayout):FreeIsland[]{const p=physical(layout);return detectFreeIslands(p.panels,p.contains);}
+
+/** Physical paths for a specified graph walk, including bends and bridge height. */
+export function freeGraphPath(maze:Maze,regions:readonly number[]):Point[]{
+ const r=freeRuntime(maze);if(!regions.length)return [];const points:Point[]=[r.centers[regions[0]!]!];
+ for(let i=1;i<regions.length;i++){const path=r.edgePaths.get(`${regions[i-1]}:${regions[i]}`);if(!path)throw Error('Несвязный маршрут свободной планировки.');points.push(...path.slice(1));}return points;
+}

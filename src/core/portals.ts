@@ -1,8 +1,10 @@
+import {segmentDistance} from '../free/geometry';
 import {validFloorChanges} from './two-storey';
 import {corridorBoundaryPortals,corridorPortalWall,validCorridorPortal,overlappingCorridorPortals} from './corridor-portals';
 import { domainOf } from './domain';
 import { routingSize, portalPoint, type Maze, type Point, type Portal } from './maze';
 
+const portalKey=(p:Portal)=>p.freeId??`${p.cell}:${p.side}`;
 export const samePortal = (a: Portal, b: Portal): boolean => a.freeId!==undefined||b.freeId!==undefined?a.freeId===b.freeId:a.cell === b.cell && a.side === b.side;
 export const mazePortals = (maze: Maze): readonly Portal[] => maze.portals ?? [maze.entrance, maze.exit];
 
@@ -12,9 +14,7 @@ export function portalAtPoint(maze: Maze, point: Point, tolerance: number): Port
   for(const edge of maze.version===4?corridorBoundaryPortals(maze).map(portal=>({portal,wall:corridorPortalWall(maze,portal)!})):domainOf(maze).boundary) {
     const w=edge.wall;
     if(maze.version===4&&Math.hypot(w.x2-w.x1,w.z2-w.z1)<1-1e-7)continue;
-    const x=Math.max(Math.min(w.x1,w.x2),Math.min(point.x,Math.max(w.x1,w.x2)));
-    const z=Math.max(Math.min(w.z1,w.z2),Math.min(point.z,Math.max(w.z1,w.z2)));
-    const d=Math.hypot(point.x-x,point.z-z);
+    const d=segmentDistance(point,w);
     if(d<=distance && (best===null || d<distance)) { best=edge.portal; distance=d; }
   }
   return best;
@@ -22,13 +22,13 @@ export function portalAtPoint(maze: Maze, point: Point, tolerance: number): Port
 
 export function boundaryPortal(maze: Maze, portal: Portal): boolean {
   if(maze.version===4)return validCorridorPortal(maze,portal);
-  return domainOf(maze).boundary.some(e=>samePortal(e.portal,portal)&&(maze.version!==4||Math.hypot(e.wall.x2-e.wall.x1,e.wall.z2-e.wall.z1)>=1-1e-7&&Math.hypot(e.wall.x2-e.wall.x1,e.wall.z2-e.wall.z1)<=maze.parameters.corridorWidth+1e-7));
+  return domainOf(maze).boundary.some(e=>samePortal(e.portal,portal)&&(!maze.free||e.portal.cell===portal.cell)&&(maze.version!==4||Math.hypot(e.wall.x2-e.wall.x1,e.wall.z2-e.wall.z1)>=1-1e-7&&Math.hypot(e.wall.x2-e.wall.x1,e.wall.z2-e.wall.z1)<=maze.parameters.corridorWidth+1e-7));
 }
 
 /** Replace openings while keeping the selected traversal pair whenever possible. */
 export function withPortals(maze: Maze, portals: readonly Portal[]): Maze {
   if (portals.length < 2 || portals.some(p => !boundaryPortal(maze, p))
-    || new Set(portals.map(p => `${p.cell}:${p.side}`)).size !== portals.length)
+    || new Set(portals.map(portalKey)).size !== portals.length)
     throw new Error('Нужны хотя бы два разных проёма на границе области.');
   if(maze.version===4)for(let a=0;a<portals.length;a++)for(let b=a+1;b<portals.length;b++)if(overlappingCorridorPortals(maze,portals[a]!,portals[b]!))throw Error('Проёмы не должны пересекаться.');
   const entrance = portals.find(p => samePortal(p, maze.entrance)) ?? portals[0]!;
@@ -41,33 +41,34 @@ export function withPortals(maze: Maze, portals: readonly Portal[]): Maze {
   }
   if (portals.some(p => !visited[p.cell])) throw new Error('Все входы-выходы должны быть соединены проходами.');
   const result={ ...maze, portals: portals.map(p => ({ ...p })), entrance: { ...entrance }, exit: { ...exit } };
+  if(maze.free)result.free={...maze.free,openings:maze.free.openings.filter(o=>portals.some(p=>p.freeId===o.id)),entrance:entrance.freeId!,exit:exit.freeId!};
   if(!validFloorChanges(result))throw Error('Пара проёмов обходит обязательные смены этажей.');return result;
 }
 
 /** Preserve perimeter positions proportionally when changing the module grid. */
 export function transferPortals(from: Maze, to: Maze): Maze {
   if(to.storeys)return from.storeys?withPortals({...to,entrance:from.entrance,exit:from.exit},mazePortals(from)):to;
-  if (from.version===4||to.version===4||from.parameters.shape || to.parameters.shape) {
+  if (from.free||to.free||from.version===4||to.version===4||from.parameters.shape || to.parameters.shape) {
     const originals=mazePortals(from), available=to.version===4?corridorBoundaryPortals(to):domainOf(to).boundary.map(e=>e.portal);
     const oldGrid=routingSize(from), newGrid=routingSize(to);
-    const samePlacement=from.version!==4&&to.version!==4&&(from.parameters.moduleSize === undefined) === (to.parameters.moduleSize === undefined)
+    const samePlacement=!from.free&&!to.free&&from.version!==4&&to.version!==4&&(from.parameters.moduleSize === undefined) === (to.parameters.moduleSize === undefined)
       && (from.version === 1 && from.parameters.moduleSize !== undefined) === (to.version === 1 && to.parameters.moduleSize !== undefined);
     const mapped: (Portal | undefined)[]=originals.map(p=> {
       const x=p.cell%oldGrid.columns, z=Math.floor(p.cell/oldGrid.columns);
       const next={cell:z*newGrid.columns+x,side:p.side};
       return samePlacement && x<newGrid.columns && z<newGrid.rows && boundaryPortal(to,next)?next:undefined;
     });
-    const used=new Set(mapped.filter((p):p is Portal=>!!p).map(p=>`${p.cell}:${p.side}`));
+    const used=new Set(mapped.filter((p):p is Portal=>!!p).map(portalKey));
     for(let i=0;i<originals.length;i++) if(!mapped[i]) {
       const point=portalPoint(from,originals[i]!);
       let best:Portal|undefined, distance=Infinity;
       for(const p of available) {
-        if(used.has(`${p.cell}:${p.side}`)||to.version===4&&mapped.some(q=>q&&overlappingCorridorPortals(to,q,p))) continue;
+        if(used.has(portalKey(p))||to.version===4&&mapped.some(q=>q&&overlappingCorridorPortals(to,q,p))) continue;
         const q=portalPoint(to,p), d=(q.x-point.x)**2+(q.z-point.z)**2;
         if(d<distance) {distance=d;best=p;}
       }
       if(!best) throw new Error('На новой границе недостаточно места для всех проёмов. Удалите лишние проёмы.');
-      mapped[i]=best;used.add(`${best.cell}:${best.side}`);
+      mapped[i]=best;used.add(portalKey(best));
     }
     const portals=mapped as Portal[];
     const entrance=portals[originals.findIndex(p=>samePortal(p,from.entrance))]!;

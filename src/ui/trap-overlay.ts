@@ -1,3 +1,4 @@
+import {freeGraphPath} from '../free/layout';
 import {corridorPathPoints,corridorNavigation,corridorRoute} from '../core/corridor-navigation';
 import {cellCenter,type Maze,type Point} from '../core/maze';
 import {shortestPath} from '../core/pathfinding';
@@ -13,17 +14,18 @@ export function trapOverlay(maze:Maze,analysis:RouteTraps=routeTraps(maze)):Trap
   const groups=new Map<number,RouteTrap[]>();
   for(const trap of analysis.candidates)if(trap.qualifies){const group=groups.get(trap.fork)??[];group.push(trap);groups.set(trap.fork,group);}
   const graph=maze.version===4?corridorNavigation(maze):null,route=graph?corridorRoute(maze).regions.map(c=>graph.navigation!.representatives[c]!):shortestPath(maze),point=(c:number)=>graph?graph.navigation!.centers[graph.navigation!.originalToRegion[c]!]!:cellCenter(maze,c);
+  const path=(cells:number[])=>maze.free?freeGraphPath(maze,cells):maze.version===4?corridorPathPoints(maze,cells):cells.map(c=>cellCenter(maze,c));
   const order=new Map(route.map((c,i)=>[c,i]));
   const dead:TrapOverlayEntry[]=[...groups.entries()].sort(([a],[b])=>order.get(a)!-order.get(b)!).map(([fork,members],index)=>{
     const unique=[...new Map(members.map(t=>[t.falsePath.join(','),t])).values()];
     return {kind:'dead-end',label:`Л${index+1}`,fork,point:point(fork),members:unique,
-      falsePaths:unique.map(t=>maze.version===4?corridorPathPoints(maze,t.falsePath):t.falsePath.map(c=>cellCenter(maze,c))),
-      awayPath:maze.version===4?corridorPathPoints(maze,unique[0]!.correctAwayPath):unique[0]!.correctAwayPath.map(c=>cellCenter(maze,c)),
+      falsePaths:unique.map(t=>path(t.falsePath)),
+      awayPath:path(unique[0]!.correctAwayPath),
       deadEnds:[...new Set(unique.map(t=>t.deadEnd))].map(c=>cellCenter(maze,c))};
   });
   const loops:TrapOverlayEntry[]=loopTraps(maze).candidates.filter(t=>t.qualifies).sort((a,b)=>order.get(a.fork)!-order.get(b.fork)!).map((t,i)=>({
     kind:'loop',loop:t,label:`К${i+1}`,fork:t.fork,point:point(t.fork),members:[],
-    falsePaths:[maze.version===4?corridorPathPoints(maze,t.loop):t.loop.map(c=>cellCenter(maze,c))],awayPath:maze.version===4?corridorPathPoints(maze,t.correctPath):t.correctPath.map(c=>cellCenter(maze,c)),deadEnds:[]
+    falsePaths:[path(t.loop)],awayPath:path(t.correctPath),deadEnds:[]
   }));
   return [...dead,...loops];
 }

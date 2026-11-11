@@ -15,8 +15,9 @@ export function contourStructure(maze:Maze):ContourStructure{
  for(const [a,b] of pairs)if(depth[a]===depth[b]){preferred.add(contourKey(a,b));const x=root(a),y=root(b);if(x!==y){parent[y]=x;forestCapacity++;}}
  const result={depth,layers:domain.cells.reduce((max,c)=>Math.max(max,depth[c]!+1),0),pairs,preferred,forestCapacity,cycleCapacity:preferred.size-forestCapacity};versions.set(maze.version,result);return result;
 }
-export interface ContourQuality {layers:number;retained:number;maximum:number;ratio:number|null;separation:number|null;certified:boolean}
+export interface ContourQuality {supported?:boolean;reason?:string;layers:number;retained:number;maximum:number;ratio:number|null;separation:number|null;certified:boolean}
 export function contourQuality(maze:Maze,cycles?:number):ContourQuality{
+ if(maze.free)return {supported:false,reason:'Контурная оценка сетки не применяется к свободным модулям.',layers:0,retained:0,maximum:0,ratio:null,separation:null,certified:false};
  const s=contourStructure(maze);let edges=0,retained=0;
  for(const a of domainOf(maze).cells)for(const b of maze.passages[a]!)if(b>a){edges++;if(s.preferred.has(contourKey(a,b)))retained++;}
  const count=cycles??Math.max(0,edges-domainOf(maze).cells.length+1),maximum=s.forestCapacity+Math.min(count,s.cycleCapacity),ratio=maximum?retained/maximum:null;

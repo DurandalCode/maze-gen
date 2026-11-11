@@ -1,3 +1,4 @@
+import {freeGraphPath} from '../free/layout';
 import {loopCredibility,type LoopCredibility} from './loop-credibility';
 import {corridorNavigation,openingMidpoint,roomAnchor} from '../core/corridor-navigation';
 import type {Maze} from '../core/maze';
@@ -44,7 +45,7 @@ export function loopTraps(maze:Maze):LoopTraps {
    if(!parent.has(b))continue;
    const path=[b];while(path.at(-1)!==a)path.push(parent.get(path.at(-1)!)!);path.reverse();
    const loop=[fork,...path,fork];
-   const points=maze.navigation?loop.slice(1).flatMap((c,j)=>{const p=openingMidpoint(maze,loop[j]!,c);return [roomAnchor(maze,loop[j]!,p),roomAnchor(maze,c,p)];}):loop.map(c=>ctx.centers[c]!);
+   const points=maze.free?freeGraphPath(maze,loop):maze.navigation?loop.slice(1).flatMap((c,j)=>{const p=openingMidpoint(maze,loop[j]!,c);return [roomAnchor(maze,loop[j]!,p),roomAnchor(maze,c,p)];}):loop.map(c=>ctx.centers[c]!);
    if(maze.navigation)points.push(points[0]!);
    const length=maze.navigation?points.slice(1).reduce((s,p,j)=>s+Math.hypot(p.x-points[j]!.x,p.z-points[j]!.z),0):loop.slice(1).reduce((s,c,j)=>s+edge(loop[j]!,c),0);
    let turns=0;for(let j=0;j<points.length-1;j++){const a=points[(j+points.length-2)%(points.length-1)]!,b=points[j]!,c=points[j+1]!;if(Math.abs((b.x-a.x)*(c.z-b.z)-(b.z-a.z)*(c.x-b.x))>1e-7)turns++;}

@@ -16,7 +16,8 @@
     "test:generation:browser": "bun scripts/generation-ux-check.ts",
     "test:bridges:browser": "bun scripts/free-bridges-check.ts",
     "test:repairs:browser": "bun scripts/main-repair-check.ts && bun scripts/free-repair-check.ts",
-    "test:zones:browser": "bun scripts/free-zones-check.ts"
+    "test:zones:browser": "bun scripts/free-zones-check.ts",
+    "test:free-audit:browser": "bun scripts/free-grid-audit-check.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
