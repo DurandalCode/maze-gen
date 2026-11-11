@@ -85,6 +85,7 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
         return;
       }
       const result = data.result as OptimizationResult;
+      if(result.freeQuality){setNotice(`Проверено ${result.attempted} вариантов. ${result.changed?'Найдено улучшение без ухудшения других показателей.':'Улучшения без ухудшения других показателей не найдено.'} `+result.freeQuality.after.map(p=>`${p.profile}: холод ${(p.coldRatio*100).toFixed(1)}%, область ${p.largestColdArea.toFixed(1)} м², неразведано ${(p.unseenRatio*100).toFixed(1)}%`).join(' · '));if(result.changed)onOptimized(result);return;}
       if (result.objective === 'exploration') {
         if (result.changed) {
           setNotice(maze.parameters.generationType==='living'?`Проверено ${result.attempted} вариантов. Контуры сохранены; неразведанная площадь для подбора ${fmt((result.afterPotential?.worstColdRatio??0)*100)}%.`:result.afterPotential?.treeForecast===false?`Проверено ${result.attempted} вариантов. Кольца и защиты сохранены; холодная площадь ${fmt(result.afterPotential.worstColdRatio*100)}%.`:`Проверено ${result.attempted} вариантов. Проёмы скрыты; прогноз разведки боковой площади ${fmt((result.afterPotential?.minOptionalCoverage ?? 0) * 100)}–${fmt((result.afterPotential?.maxOptionalCoverage ?? 0) * 100)}%.`);
@@ -143,7 +144,7 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
   <div><dt>Средний путь модели</dt><dd>{fmt(analysis.expectedLength)} м · {fmt(analysis.searchRatio, 2)}× кратчайшего</dd></div>
   </dl>
   <p className="field-note">{analysis.method === 'exact-tree' ? 'Точный расчёт для модели на дереве.' : `Оценка по ${analysis.samples} воспроизводимым прохождениям; значения около порога могут колебаться.`} {maze.version===5?'Модель предполагает точную память исследованных соединений; она не прогнозирует потерю ориентации и не моделирует видимость внешних ориентиров.':'Видимость солнца, леса и внешней ткани проверяется лучами. Без ориентиров уверенность сохраняется на уровне внутреннего удержания курса. Это приближённая модель, не статистика людей.'}</p>
-  {maze.version===5?<p className="field-note">Улучшение размещения доступно в редакторе свободного размещения — включите тумблер над картой.</p>:<>
+  {maze.version===5?<><p className="field-note">Локальный подбор размещения сохраняет модули, связи, проёмы и ограничения. Колдспоты, крупнейшая холодная область и неразведанная площадь сравниваются отдельно по трём стратегиям; ухудшение одного показателя не компенсируется другим. Это модель покрытия, не рейтинг сложности для человека.</p><button className="coldspot-action" disabled={optimizing||calculating} onClick={optimize}>Улучшить размещение</button>{optimizing&&<div role="status">{progress}<button onClick={cancel}>Отмена</button></div>}</>:<>
   <details className="analysis-options"><summary>Улучшение лабиринта</summary>
   <div className="section-label"><span>АВТОПОДБОР ПЛАНИРОВКИ</span></div>
   <label className="field"><span>Цель подбора</span><select aria-label="Цель подбора" value={objective} disabled={optimizing} onChange={e => setObjective(e.target.value as OptimizationObjective)}><option value="exploration">Сложные решения и скрытые проёмы</option><option value="coldspots">Меньше колдспотов</option></select></label>

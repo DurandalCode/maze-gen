@@ -1,3 +1,4 @@
+import {optimizeFree,type FreeProfileQuality} from '../free/optimize';
 import {optimizeTwoStorey} from './two-storey-optimize';
 import {optimizeCorridor} from './corridor-optimize';
 import {optimizeLiving} from '../generators/living';
@@ -18,6 +19,7 @@ import { prepareNavigation, type NavigationContext, type NavigationProfile } fro
 export type OptimizationObjective = 'coldspots' | 'exploration';
 export type OptimizationMethod = 'seeds' | 'walls';
 export interface OptimizationResult {
+  freeQuality?:{before:FreeProfileQuality[];after:FreeProfileQuality[]};
   objective?: OptimizationObjective;
   beforePotential?: PotentialDifficulty;
   afterPotential?: PotentialDifficulty;
@@ -50,6 +52,7 @@ export function optimizeColdspots(base: Maze, options: AnalysisOptions, method: 
     throw new Error('Некорректные параметры оптимизации.');
   if (!['coldspots', 'exploration'].includes(objective))
     throw new Error('Неизвестная цель подбора.');
+  if(base.free){const r=optimizeFree(base,attempts,options.samples,progress);return {maze:r.maze,changed:r.improved,attempted:r.attempted,accepted:r.accepted,before:Math.max(...r.before.map(p=>p.coldRatio)),after:Math.max(...r.after.map(p=>p.coldRatio)),freeQuality:{before:r.before,after:r.after},objective:'coldspots'};}
   if(base.storeys)return optimizeTwoStorey(base,options,method,attempts,progress,objective);
   if(base.parameters.generationType==='corridor')return optimizeCorridor(base,options,attempts,progress,objective);
   if(base.parameters.generationType==='living')return optimizeLiving(base,options,method,attempts,progress,objective);

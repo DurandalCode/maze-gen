@@ -214,6 +214,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
         setAnalysis(e.data.analysis);
         setNotice('Анализ завершён: локальная модель поиска, не прогноз поведения человека.');
       } else {
+        if(kind==='improve'&&!e.data.improved){setNotice('Улучшения без ухудшения других показателей по трём стратегиям не найдено. Текущая карта сохранена.');return;}
         update(mazeDraft(e.data.maze));
         setNotice(kind === 'improve' && !e.data.improved ? 'Допустимого улучшения не найдено.' : 'Размещение готово.');
       }
