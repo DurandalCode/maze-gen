@@ -1,0 +1,18 @@
+import {expect,test} from 'bun:test';
+import {freeRooms,roomPanels} from './fixtures/free-rooms';
+import {mazeDraft} from '../src/free/json';
+import {freeMaze} from '../src/free/layout';
+import {shortestPath} from '../src/core/pathfinding';
+import {metrics} from '../src/core/metrics';
+import {portalPoint,walls} from '../src/core/maze';
+import {serialize,deserialize} from '../src/persistence/maze-json';
+import {Player} from '../src/simulation/player';
+import {CollisionWorld} from '../src/simulation/collisions';
+import {supportColliders} from '../src/core/structure';
+const world=(m:ReturnType<typeof freeRooms>)=>new CollisionWorld([...walls(m),...supportColliders(m)]);
+test('v5 physical routing chooses a shortest cycle route and reports disconnected rooms',()=>{const m=freeRooms(2,2);expect(shortestPath(m)).toHaveLength(3);expect(shortestPath(m,2,2)).toEqual([2]);expect(metrics(m).cycles).toBe(1);expect(metrics(m).deadEnds).toBe(0);const d=mazeDraft(m);d.layout.connections=[];roomPanels(d.layout);expect(shortestPath(freeMaze(d,false))).toEqual([]);});
+test('v5 cycle rank counts components while degree-one rooms remain dead ends',()=>{const d=mazeDraft(freeRooms(3,2)),keep=new Set(['link-0-1','link-1-4','link-3-4','link-0-3','link-1-2']);d.layout.connections=d.layout.connections.filter(c=>keep.has(c.id));roomPanels(d.layout);const m=metrics(freeMaze(d,false));expect(m.components).toBe(2);expect(m.cycles).toBe(1);expect(m.deadEnds).toBe(1);expect(m.junctions).toBe(1);});
+test('v5 restores the saved geometry even when the seed no longer describes it',()=>{const m=freeRooms(),before=structuredClone(m.free);m.parameters.seed='changed-after-generation';const restored=deserialize(serialize(m));expect(restored.version).toBe(5);expect(restored.free).toEqual(before);expect(metrics(restored)).toEqual(metrics(m));});
+test('v5 entrance cannot bypass the site or record imaginary motion during a large backwards step',()=>{const m=freeRooms(1,1),p=new Player(m,world(m)),start=portalPoint(m,m.entrance);p.update(10,new Set(['KeyS']));expect(p.position).toEqual(start);expect(p.recorder.distance).toBe(0);p.update(10,new Set(['KeyW']));expect(p.finished).toBe(true);expect(p.recorder.distance).toBeGreaterThanOrEqual(metrics(m).optimalLength-.03);expect(p.recorder.distance).toBeLessThanOrEqual(metrics(m).optimalLength+1e-7);});
+test('v5 loaded opposite portals work in all four walking directions',()=>{for(const [a,b]of [[0,2],[2,0],[1,3],[3,1]]){const d=mazeDraft(freeRooms(1,1));d.layout.openings[0]!.edge=a!;d.layout.openings[1]!.edge=b!;roomPanels(d.layout);const m=deserialize(serialize(freeMaze(d))),p=new Player(m,world(m));for(let i=0;i<200&&!p.finished;i++)p.update(1/60,new Set(['KeyW']));expect(p.finished).toBe(true);expect(p.recorder.distance).toBeGreaterThanOrEqual(metrics(m).optimalLength-.03);expect(p.recorder.distance).toBeLessThanOrEqual(metrics(m).optimalLength+1e-7);}});
+test('v5 clips a long step at the first island even when its endpoint re-enters accessible floor',async()=>{const {domainOf}=await import('../src/core/domain'),m=freeRooms(5,2,[1]),d=domainOf(m);expect(d.contains({x:9,z:1})).toBe(true);expect(d.constrain({x:1,z:1},{x:9,z:1})).toEqual({x:2,z:1});});

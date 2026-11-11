@@ -319,6 +319,10 @@ export function freeDomain(maze: Maze): Domain {
   const result:Domain={
     active: new Uint8Array(cells.length).fill(1), cells, modules: new Uint8Array(maze.free!.modules.length).fill(1), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: maze.free!.openings.map(o=>({wall:anchorGeometry(maze.free!,o,o.width).wall,portal:{freeId:o.id,cell:r.rooms.findIndex(s=>s.id===o.room),side:'north' as const,width:o.width}})), area: (maze.free!.bridges??[]).reduce((sum,b)=>{const g=bridgeGeometry(maze.free!,b);return sum+b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun);},0)+r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: p => p.bridge!==undefined ? (()=>{const surface=bridgeSurface(maze.free!,p);return !!surface&&Math.abs((p.y??0)-surface.y!)<1e-5;})() : (p.y??0)===0&&r.contains(p), constrain(from, to) {
       if (segmentInside(from, to, r.contains, r.boundaries)) return { ...to };
+      // Clip to the real boundary, not the EPS-wide outside band accepted by
+      // polygon predicates. This also stops at the first hole on a long step.
+      const cuts=[...new Set(r.boundaries.map(w=>intersection(from,to,...ends(w))).filter((t):t is number=>t!==null))].sort((a,b)=>a-b),length=distance(from,to);
+      for(let i=0;i<cuts.length;i++){const t=cuts[i]!,next=cuts[i+1]??1,after=next>t?(t+next)/2:t+1e-5/Math.max(length,1e-5);if(!r.contains(lerp(from,to,after)))return lerp(from,to,t);}
       let lo = 0, hi = 1;
       for (let i = 0; i < 30; i++) {
         const mid = (lo + hi) / 2;

@@ -1,11 +1,11 @@
+import {physicalRaycaster} from './physical-ray';
 import {siteGeometry} from '../free/layout';
 import {segmentDistance} from '../free/geometry';
 import {spatialVisibleCells} from '../core/spatial-visibility';
-import {rayDistance,openingMidpoint} from '../core/corridor-navigation';
-import {cellAtPoint} from './navigation';
-import { axisBounds, routingSize, type Maze, type Point } from '../core/maze';
+import {openingMidpoint} from '../core/corridor-navigation';
+import {pointLocator} from './navigation';
+import { type Maze, type Point } from '../core/maze';
 import { domainOf } from '../core/domain';
-import { FRAME_POST_SIZE } from '../core/structure';
 import type { NavigationContext } from './navigation';
 import { CORRIDOR_SIGHT_METRES } from './corridor-view';
 export interface SightRay {
@@ -22,36 +22,16 @@ export interface OpeningView extends SightRay {
 }
 /** Eye-level visibility inside the footprint. Fabric identifies a boundary but does not reveal its passages. */
 export function spatialPerception(maze: Maze, context: NavigationContext) {
-  const domain = domainOf(maze), xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z'), columns = routingSize(maze).columns;
+  const cast=maze.storeys?null:physicalRaycaster(maze),locate=pointLocator(maze);
   const trace = (from: number, angle: number, limit = CORRIDOR_SIGHT_METRES): SightRay => {
     const start = context.centers[from];
     if (!start || !Number.isFinite(angle) || !Number.isFinite(limit) || limit <= 0)
       throw new Error('Некорректный луч видимости.');
     if(maze.storeys){const ray=spatialVisibleCells(maze,from,angle,limit);return {...ray,blocked:ray.length<limit-1e-7,angle};}
-    if(maze.navigation||(maze.version===5||maze.version===7)){const start=context.centers[from]!,length=rayDistance(maze.navigation?.source??maze,start,angle,limit),point={x:start.x+Math.cos(angle)*length,z:start.z+Math.sin(angle)*length};let firstCell:number|null=null;for(let d=.05;d<length;d+=.1){const c=cellAtPoint(maze,{x:start.x+Math.cos(angle)*d,z:start.z+Math.sin(angle)*d});if(c!==null&&c!==from){firstCell=c;break;}}const endCell=cellAtPoint(maze,{x:start.x+Math.cos(angle)*Math.max(0,length-.01),z:start.z+Math.sin(angle)*Math.max(0,length-.01)})??from;return {length,endCell,point,blocked:length<limit-1e-7,firstCell,angle};}
-    const dx = Math.cos(angle), dz = Math.sin(angle), sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
-    let cell = from, firstCell: number | null = null;
-    const finish = (length: number, blocked: boolean): SightRay => ({ length, endCell: cell, point: { x: start.x + dx * length, z: start.z + dz * length }, blocked, firstCell, angle });
-    // A ray crosses at most columns+rows cell boundaries before leaving this bounded grid.
-    for (let step = 0; step < xs.length + zs.length; step++) {
-      const x = cell % columns, z = Math.floor(cell / columns);
-      const tx = Math.abs(dx) < 1e-12 ? Infinity : (xs[x + (sx > 0 ? 1 : 0)]! - start.x) / dx;
-      const tz = Math.abs(dz) < 1e-12 ? Infinity : (zs[z + (sz > 0 ? 1 : 0)]! - start.z) / dz;
-      const t = Math.min(tx, tz);
-      if (t >= limit)
-        return finish(limit, false);
-      const px = start.x + dx * t, pz = start.z + dz * t;
-      // Corner uprights block eye-level rays, including exact diagonal corner contact.
-      const clearance = tx < tz ? Math.min(pz - zs[z]!, zs[z + 1]! - pz) : Math.min(px - xs[x]!, xs[x + 1]! - px);
-      if (clearance <= FRAME_POST_SIZE / 2 + 1e-9)
-        return finish(t, true);
-      const next = tx < tz ? cell + sx : cell + sz * columns;
-      if (!domain.active[next] || !maze.passages[cell]!.includes(next))
-        return finish(t, true);
-      firstCell ??= next;
-      cell = next;
-    }
-    return finish(limit, false);
+    const length=cast!(start,angle,limit),point={x:start.x+Math.cos(angle)*length,z:start.z+Math.sin(angle)*length};
+    let firstCell:number|null=null;for(let d=.05;d<length;d+=.1){const c=locate({x:start.x+Math.cos(angle)*d,z:start.z+Math.sin(angle)*d});if(c!==null&&c!==from){firstCell=c;break;}}
+    const endCell=locate({x:start.x+Math.cos(angle)*Math.max(0,length-.01),z:start.z+Math.sin(angle)*Math.max(0,length-.01)})??from;
+    return {length,endCell,point,blocked:length<limit-1e-7,firstCell,angle};
   };
   const cache = new Map<string, OpeningView>();
   const view = (from: number, to: number): OpeningView => {

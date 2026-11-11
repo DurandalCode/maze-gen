@@ -54,9 +54,14 @@ export function validateCorridorParameters(p:Parameters):void{
 export function validatePlacement(maze:Maze):void{
  const list=maze.layout?.modules;if(!Array.isArray(list)||!list.length||list.length>2500)throw Error('Некорректное размещение модулей.');
  validateSpaces(maze);const ids=new Set<string>();
+ // Snapshot explicit regions once. Re-rounding and scanning every rectangle
+ // for each 10 cm module sample dominated large legacy imports/generation.
+ const spaces=maze.layout!.spaces,index=new Map<string,Rectangle[]>(),bucket=2000;
+ for(const r of spaces??[]){const box={x1:mm(r.x),z1:mm(r.z),x2:mm(r.x+r.width),z2:mm(r.z+r.height)};for(let x=Math.floor(box.x1/bucket);x<=Math.floor(box.x2/bucket);x++)for(let z=Math.floor(box.z1/bucket);z<=Math.floor(box.z2/bucket);z++){const key=`${x}:${z}`,list=index.get(key)??[];list.push(box);index.set(key,list);}}
+ const contains=(x:number,z:number)=>footprintContains(maze.parameters,x,z)&&(!spaces||(index.get(`${Math.floor(x/bucket)}:${Math.floor(z/bucket)}`)??[]).some(r=>x>=r.x1&&x<=r.x2&&z>=r.z1&&z<=r.z2));
  for(let i=0;i<list.length;i++){
   const m=list[i]!;if(!m||typeof m.id!=='string'||ids.has(m.id)||!['2x2','2x6'].includes(m.type)||![0,90].includes(m.rotation)||![m.x,m.z].every(v=>Number.isFinite(v)&&Math.abs(v*10-Math.round(v*10))<1e-7))throw Error('Некорректный модуль.');ids.add(m.id);
-  const r=footprint(m);for(let x=r.x1+50;x<r.x2;x+=100)for(let z=r.z1+50;z<r.z2;z+=100)if(!walkableContains(maze,x,z))throw Error('Модуль вне доступной области.');
+  const r=footprint(m);for(let x=r.x1+50;x<r.x2;x+=100)for(let z=r.z1+50;z<r.z2;z+=100)if(!contains(x,z))throw Error('Модуль вне доступной области.');
   for(let j=0;j<i;j++){const q=footprint(list[j]!);if(Math.min(r.x2,q.x2)>Math.max(r.x1,q.x1)&&Math.min(r.z2,q.z2)>Math.max(r.z1,q.z1))throw Error('Модули пересекаются.');}
  }
 }

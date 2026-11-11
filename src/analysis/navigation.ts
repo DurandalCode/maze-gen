@@ -154,3 +154,13 @@ export function cellAtPoint(maze: Maze, point: Point): number | null {
   const cell = z * routingSize(maze).columns + x;
   return domainOf(maze).active[cell] ? cell : null;
 }
+
+/** Snapshot the geometry once for repeated sight queries; legacy node indexing
+ * remains confined to this coordinate adapter, not the ray traversal. */
+export function pointLocator(maze:Maze):(point:Point)=>number|null{
+ if(maze.free||maze.storeys)return point=>cellAtPoint(maze,point);
+ if(maze.navigation){const locate=pointLocator(maze.navigation.source),mapping=maze.navigation.originalToRegion;return p=>{const c=locate(p);return c===null?null:mapping[c]!;};}
+ const xs=axisBounds(maze,'x'),zs=axisBounds(maze,'z'),columns=routingSize(maze).columns,active=domainOf(maze).active;
+ const index=(bounds:number[],v:number)=>{let lo=0,hi=bounds.length;while(lo<hi){const mid=(lo+hi)>>>1;if(bounds[mid]!<=v)lo=mid+1;else hi=mid;}return lo-1;};
+ return p=>{if(p.x<0||p.z<0)return null;const x=index(xs,p.x),z=index(zs,p.z);if(x<0||z<0||x>=xs.length-1||z>=zs.length-1)return null;const cell=z*columns+x;return active[cell]?cell:null;};
+}

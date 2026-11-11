@@ -1,10 +1,12 @@
+import {removeFreePanel} from '../src/free/wall-removal';
+import {freePrivacyFixture} from './fixtures/free-privacy';
 import {expect,test} from 'bun:test';
 import {DEFAULT_CONSTRUCTION} from '../src/core/maze';
 import {emptyLayout,type FreeDraft} from '../src/free/model';
 import {freeMaze,freeRuntime} from '../src/free/layout';
 import {criticalWalls,criticalWallAt} from '../src/analysis/critical-walls';
 import {portalPrivacy} from '../src/analysis/portal-privacy';
-import {freePortalPrivacy,separatesApertures} from '../src/free/portal-privacy';
+import {separatesApertures} from '../src/free/portal-privacy';
 import {deserialize} from '../src/persistence/maze-json';
 import {bridgeFixture} from './fixtures/free-bridge';
 function fixture(angle:number){
@@ -15,8 +17,8 @@ function fixture(angle:number){
  const d:FreeDraft={kind:'maze-lab-free-draft',version:1,parameters:{placementMode:'free',columns:30,rows:30,moduleSize:2,corridorWidth:2,extraConnections:0,algorithm:'prim',seed:'privacy'},construction:{...DEFAULT_CONSTRUCTION},layout};return freeMaze(d);
 }
 test('free critical walls protect physical shielding panels for arbitrary module angles',()=>{
- for(const angle of [0,19,37]){const m=fixture(angle),privacy=portalPrivacy(m,m.entrance,3,false);expect(privacy.certified).toBe(true);const walls=criticalWalls(m);expect(walls.length).toBeGreaterThan(0);
- for(const item of walls){expect(freeRuntime(m).panels).toContainEqual(item.wall);expect(item.protections.every(p=>p.kind==='portal')).toBe(true);const i=freeRuntime(m).panels.indexOf(item.wall);for(const p of item.protections)expect(freePortalPrivacy(m,p.element==='входа'?m.entrance:m.exit,3,false,i).certified).toBe(false);expect(criticalWallAt([item],{x:(item.wall.x1+item.wall.x2)/2,z:(item.wall.z1+item.wall.z2)/2},.1)).toBe(item);}
+ for(const angle of [0,19,37]){const m=freePrivacyFixture(angle),privacy=portalPrivacy(m,m.entrance,3,false);expect(privacy.certified).toBe(true);const walls=criticalWalls(m);expect(walls.length).toBeGreaterThan(0);
+ for(const item of walls){expect(freeRuntime(m).panels).toContainEqual(item.wall);expect(item.protections.every(p=>p.kind==='portal')).toBe(true);const i=freeRuntime(m).panels.indexOf(item.wall);for(const p of item.protections)expect(portalPrivacy(removeFreePanel(m,i),p.element==='входа'?m.entrance:m.exit,3,false).certified).toBe(false);expect(criticalWallAt([item],{x:(item.wall.x1+item.wall.x2)/2,z:(item.wall.z1+item.wall.z2)/2},.1)).toBe(item);}
  }
 });
 test('oriented aperture certificate rejects diagonal bounding-box false positives',()=>{
@@ -41,3 +43,5 @@ test('free audit: physical edges include bridge stairs, portal identities and pl
 });
 
 test('low panels cannot certify occlusion at eye level',()=>{const m=fixture(19);m.wallHeight=1;expect(portalPrivacy(m,m.entrance,3,false).certified).toBe(false);expect(criticalWalls(m)).toEqual([]);});
+
+test('redundant physical screens are not marked critical merely because the first certificate used one',()=>{for(const angle of [0,19,37]){const m=fixture(angle);expect(portalPrivacy(m,m.entrance,3,false).certified).toBe(true);expect(criticalWalls(m)).toEqual([]);}});

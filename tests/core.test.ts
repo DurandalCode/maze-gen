@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { cellCenter, connect, emptyMaze, walls, type Parameters } from '../src/core/maze';
+import { cellCenter, walls, type Parameters } from '../src/core/maze';
 import { componentCount } from '../src/core/graph';
 import { metrics } from '../src/core/metrics';
 import { shortestPath } from '../src/core/pathfinding';
@@ -51,27 +51,8 @@ for (const algorithm of ['backtracker', 'prim'] as const) describe(algorithm, ()
   });
 });
 
-test('BFS chooses shortest route in a cycle and reports unreachable cells', () => {
-  const maze = emptyMaze({ ...parameters, columns: 2, rows: 2 });
-  expect(shortestPath(maze)).toEqual([]);
-  connect(maze, 0, 2); connect(maze, 2, 3); connect(maze, 0, 1); connect(maze, 1, 3);
-  expect(shortestPath(maze).length).toBe(3);
-  expect(shortestPath(maze, 2, 2)).toEqual([2]);
-  expect(metrics(maze).cycles).toBe(1);
-  expect(metrics(maze).deadEnds).toBe(0);
-});
 
-test('cycle rank uses component count, dead ends use degree one', () => {
-  const maze = emptyMaze({ ...parameters, columns: 3, rows: 2 });
-  connect(maze, 0, 1); connect(maze, 1, 4); connect(maze, 4, 3); connect(maze, 3, 0); connect(maze, 1, 2);
-  const m = metrics(maze);
-  expect(m.components).toBe(2); expect(m.cycles).toBe(1); expect(m.deadEnds).toBe(1); expect(m.junctions).toBe(1);
-});
 
-test('round trip preserves topology even when seed no longer describes it', () => {
-  const maze = generate(parameters); maze.parameters.seed = 'changed-after-generation';
-  expect(deserialize(serialize(maze))).toEqual(maze);
-});
 
 test('rejects invalid parameters and malformed saved topology', () => {
   for (const columns of [0, -1, 1.2, 101, Infinity]) expect(() => generate({ ...parameters, columns })).toThrow();
@@ -132,35 +113,4 @@ test('one-cell traversal finishes at exit and records matching boundary-to-bound
   expect(player.recorder.distance).toBeCloseTo(1.5);
   expect(metrics(maze).optimalLength).toBeCloseTo(1.5);
   expect(player.recorder.samples.length).toBeGreaterThan(5);
-});
-
-test('entrance cannot be used to bypass the site boundary', () => {
-  const maze = generate(parameters);
-  const player = new Player(maze, new CollisionWorld(walls(maze)));
-  player.update(1, new Set(['KeyS']));
-  expect(player.position.x).toBe(0);
-  expect(player.recorder.distance).toBe(0);
-});
-
-test('loaded north/south and east/west portals work in every walking direction', () => {
-  for (const [entrance, exit] of [['north', 'south'], ['south', 'north'], ['east', 'west'], ['west', 'east']] as const) {
-    const maze = generate({ ...parameters, columns: 1, rows: 1 });
-    maze.entrance.side = entrance; maze.exit.side = exit;
-    const restored = deserialize(serialize(maze));
-    const player = new Player(restored, new CollisionWorld(walls(restored)));
-    for (let i = 0; i < 200 && !player.finished; i++) player.update(1/60, new Set(['KeyW']));
-    expect(player.finished).toBe(true);
-    expect(player.recorder.distance).toBeCloseTo(1.5);
-  }
-});
-
-test('large boundary-clamped steps do not record imaginary travel outside the site', () => {
-  const maze = generate({ ...parameters, columns: 1, rows: 1 });
-  const player = new Player(maze, new CollisionWorld(walls(maze)));
-  player.update(10, new Set(['KeyS']));
-  expect(player.position.x).toBe(0);
-  expect(player.recorder.distance).toBe(0);
-  player.update(10, new Set(['KeyW']));
-  expect(player.finished).toBe(true);
-  expect(player.recorder.distance).toBeCloseTo(1.5);
 });

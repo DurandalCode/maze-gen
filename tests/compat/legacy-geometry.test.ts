@@ -1,0 +1,7 @@
+import {expect,test} from 'bun:test';
+import type {Maze} from '../../src/core/maze';
+import {validatePlacement} from '../../src/core/corridor-geometry';
+/** Old wire geometry remains validated at the compatibility boundary. */
+function input(){return {parameters:{generationType:'corridor',columns:8,rows:4,corridorWidth:2,moduleSize:2,algorithm:'prim',extraConnections:0,seed:'import'},layout:{modules:[{id:'a',type:'2x2',rotation:0,x:0,z:0},{id:'b',type:'2x2',rotation:0,x:4,z:0}],spaces:[{kind:'corridor',x:0,z:0,width:2,height:2},{kind:'corridor',x:4,z:0,width:2,height:2}]}} as Maze;}
+test('legacy placement validation observes edits of existing region objects without stale membership',()=>{const m=input();expect(()=>validatePlacement(m)).not.toThrow();m.layout!.spaces![0]!.width=1.9;expect(()=>validatePlacement(m)).toThrow('Модуль вне доступной области');m.layout!.spaces![0]!.width=2;expect(()=>validatePlacement(m)).not.toThrow();});
+test('legacy region indexing accepts a continuous union but rejects a real narrow void',()=>{const m=input();m.layout!.modules=[{id:'span',type:'2x2',rotation:0,x:1,z:0}];m.layout!.spaces=[{kind:'corridor',x:0,z:0,width:2,height:2},{kind:'corridor',x:2,z:0,width:2,height:2}];expect(()=>validatePlacement(m)).not.toThrow();m.layout!.spaces[1]!.x=2.1;m.layout!.spaces[1]!.width=1.9;expect(()=>validatePlacement(m)).toThrow('Модуль вне доступной области');});
