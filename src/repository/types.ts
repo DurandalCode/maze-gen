@@ -1,5 +1,5 @@
 import type { SessionState, Session, WalkChunk } from '../session/types';
-import type { Definition, Document, MapRevision, Versions } from '../domain';
+import type { Definition, Document, MapRevision, Versions, GenerationOrigin } from '../domain';
 export interface Project {
   projectId: string;
   title: string;
@@ -9,6 +9,7 @@ export interface Project {
   originId?: string;
 }
 export interface StoredMap {
+  generationOrigin?: GenerationOrigin;
   revisionHash: string;
   document: Omit<Document, 'definitions'>;
   definitionHashes: string[];
@@ -50,6 +51,7 @@ export interface WalkSummary {
   lastCommittedSequence: number;
 }
 export interface Draft {
+  generationOrigin?: GenerationOrigin;
   projectId: string;
   document: Document;
   commandRevision: number;

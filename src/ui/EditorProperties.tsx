@@ -26,7 +26,7 @@ export function NumberField({
   change: (value: number) => void;
   min?: number;
   max?: number;
-  step?: number;
+  step?: number | 'any';
 }) {
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);

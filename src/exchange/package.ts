@@ -1,4 +1,5 @@
 import { canonical, documentHashes, hashValue, normalizeDocument, VERSIONS } from '../domain';
+import { normalizeGenerationOrigin } from '../generation/manifest';
 import type { Definition, Document, MapRevision } from '../domain';
 import { validateCatalogDefinition } from '../catalog/catalog';
 import { parseChunk, parseCondition, normalizeSample } from '../session/format';
@@ -222,7 +223,14 @@ export function validatePackage(value: unknown): ValidatedPackage {
   for (const raw of rawMaps) {
     const m = object(
       raw,
-      ['revisionHash', 'document', 'definitionHashes', 'versions', 'validationSummary'],
+      [
+        'revisionHash',
+        'document',
+        'definitionHashes',
+        'versions',
+        'validationSummary',
+        'generationOrigin',
+      ],
       'map',
     );
     const revisionHash = hash(m.revisionHash, 'revisionHash');
@@ -262,8 +270,12 @@ export function validatePackage(value: unknown): ValidatedPackage {
       validation.diagnostics.length
     )
       error('NOT_READY', 'Пакет содержит непроверенную карту');
+    const origin = m.generationOrigin
+      ? { generationOrigin: normalizeGenerationOrigin(m.generationOrigin) }
+      : {};
     const { definitions: _, ...storedDocument } = document;
     maps.push({
+      ...origin,
       revisionHash,
       document: storedDocument,
       definitionHashes: hashes,
@@ -271,6 +283,7 @@ export function validatePackage(value: unknown): ValidatedPackage {
       validationSummary: { ready: true, diagnostics: [] },
     });
     revisions.push({
+      ...origin,
       revisionHash,
       document,
       versions: { ...VERSIONS },
@@ -381,6 +394,9 @@ export function storedRevision(revision: MapRevision): StoredMap {
     definitionHashes: definitions.map((d) => d.contentHash),
     versions: revision.versions,
     validationSummary: revision.validationSummary,
+    ...(revision.generationOrigin
+      ? { generationOrigin: normalizeGenerationOrigin(revision.generationOrigin) }
+      : {}),
   };
 }
 export function hydrate(map: StoredMap, definitions: Definition[]): Document {

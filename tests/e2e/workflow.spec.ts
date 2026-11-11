@@ -65,7 +65,11 @@ test('explicit preview persists knowledge and touch uses the same recorder', asy
   await page.getByRole('button', { name: 'Подготовить попытку' }).waitFor();
   await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.getByRole('button', { name: 'Посмотреть', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Две комнаты', exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Выбранная карта' })
+      .getByRole('heading', { name: 'Две комнаты', exact: true }),
+  ).toBeVisible();
   await expect(page.getByLabel('План лабиринта', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Сцена 3D' }).click();
   await expect(page.getByLabel('Трёхмерный лабиринт', { exact: true })).toBeVisible();

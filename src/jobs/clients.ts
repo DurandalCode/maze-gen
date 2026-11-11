@@ -18,3 +18,12 @@ export function storageJobs(): JobManager {
       }) as unknown as WorkerPort,
   );
 }
+export function generationJobs(): JobManager {
+  return new JobManager(
+    () =>
+      new Worker(new URL('./generation-worker.ts', import.meta.url), {
+        type: 'module',
+        name: 'maze-generation',
+      }) as unknown as WorkerPort,
+  );
+}

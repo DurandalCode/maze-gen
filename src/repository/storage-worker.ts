@@ -1,3 +1,5 @@
+import { normalizeGenerationOrigin } from '../generation/manifest';
+import type { GenerationOrigin } from '../domain';
 import { DomainError, normalizeDocument } from '../domain';
 import { isJobRequest, response, STORAGE_OPERATIONS } from '../jobs/protocol';
 import { MazeRepository } from './repository';
@@ -47,9 +49,15 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
   // Emergency draft backup/restore must also work when IndexedDB cannot be opened.
   if (request.operation === 'export' && input.kind === 'draft') {
     const document = normalizeDocument(input.document),
-      blob = new Blob([JSON.stringify({ kind: 'maze-reboot-draft', schemaVersion: 1, document })], {
-        type: 'application/json',
-      });
+      origin = input.generationOrigin
+        ? { generationOrigin: normalizeGenerationOrigin(input.generationOrigin) }
+        : {},
+      blob = new Blob(
+        [JSON.stringify({ kind: 'maze-reboot-draft', schemaVersion: 1, document, ...origin })],
+        {
+          type: 'application/json',
+        },
+      );
     if (blob.size > PACKAGE_LIMITS.bytes)
       throw new StorageError('FILE_TOO_LARGE', 'Черновик не помещается в 32 MiB');
     return { blob, filename: 'maze-reboot-draft.json' };
@@ -71,10 +79,17 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
       Array.isArray(value) ||
       value.kind !== 'maze-reboot-draft' ||
       value.schemaVersion !== 1 ||
-      Object.keys(value).some((key) => !['kind', 'schemaVersion', 'document'].includes(key))
+      Object.keys(value).some(
+        (key) => !['kind', 'schemaVersion', 'document', 'generationOrigin'].includes(key),
+      )
     )
       throw new StorageError('UNSUPPORTED_FORMAT', 'Нужен файл maze-reboot-draft версии 1');
-    return normalizeDocument(value.document);
+    return {
+      document: normalizeDocument(value.document),
+      ...(value.generationOrigin
+        ? { generationOrigin: normalizeGenerationOrigin(value.generationOrigin) }
+        : {}),
+    };
   }
   const repo = await getRepository();
   switch (request.operation) {
@@ -124,6 +139,8 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
         input.document,
         (input.baseRevisionHash ?? null) as string | null,
         input.commandRevision as number,
+        undefined,
+        input.generationOrigin as GenerationOrigin | undefined,
       );
       return { saved: true };
     case 'rename':

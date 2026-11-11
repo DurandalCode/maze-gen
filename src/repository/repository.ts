@@ -1,5 +1,6 @@
 import { canonical, documentHashes, normalizeDocument, parseDefinition, VERSIONS } from '../domain';
-import type { Document, MapRevision } from '../domain';
+import { normalizeGenerationOrigin } from '../generation/manifest';
+import type { Document, MapRevision, GenerationOrigin } from '../domain';
 import { bounds } from '../geometry/predicates';
 import { contourPolygon } from '../geometry/kernel/contour';
 import { SessionRepository } from './session-repository';
@@ -83,6 +84,9 @@ export class MazeRepository {
       { definitions, ...document } = normalized,
       definitionHashes = definitions.map((d) => d.contentHash);
     const map: StoredMap = {
+      ...(revision.generationOrigin
+        ? { generationOrigin: normalizeGenerationOrigin(revision.generationOrigin) }
+        : {}),
       revisionHash: hash,
       document,
       definitionHashes,
@@ -194,6 +198,9 @@ export class MazeRepository {
         document,
         versions: stored.map.versions,
         validationSummary: stored.map.validationSummary,
+        ...(stored.map.generationOrigin
+          ? { generationOrigin: normalizeGenerationOrigin(stored.map.generationOrigin) }
+          : {}),
       };
     } catch (error) {
       if (error instanceof StorageError) throw error;
@@ -278,8 +285,10 @@ export class MazeRepository {
     baseRevisionHash: string | null,
     commandRevision: number,
     now = Date.now(),
+    origin?: GenerationOrigin,
   ): Promise<void> {
-    const document = normalizeDocument(value);
+    const document = normalizeDocument(value),
+      generationOrigin = origin ? normalizeGenerationOrigin(origin) : undefined;
     if (!Number.isSafeInteger(commandRevision) || commandRevision < 0)
       throw new StorageError('INVALID_REVISION', 'Invalid command revision');
     timestamp(now);
@@ -301,6 +310,7 @@ export class MazeRepository {
         commandRevision,
         baseRevisionHash,
         updatedAt: now,
+        ...(generationOrigin ? { generationOrigin } : {}),
       } satisfies Draft);
     });
   }
@@ -312,7 +322,13 @@ export class MazeRepository {
       async (tx) => (await request(tx.objectStore('drafts').get(projectId))) as Draft | undefined,
     );
     if (!draft) return null;
-    return { ...draft, document: normalizeDocument(draft.document) };
+    return {
+      ...draft,
+      document: normalizeDocument(draft.document),
+      ...(draft.generationOrigin
+        ? { generationOrigin: normalizeGenerationOrigin(draft.generationOrigin) }
+        : {}),
+    };
   }
   async listDrafts(): Promise<Draft[]> {
     return transaction(

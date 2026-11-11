@@ -166,6 +166,7 @@ export class ImportRepository {
       document: hydrate(map, definitions),
       versions: map.versions,
       validationSummary: map.validationSummary,
+      ...(map.generationOrigin ? { generationOrigin: map.generationOrigin } : {}),
     };
   }
   /** Proofs are the results of the application's compute-worker jobs, never flags read from JSON. */

@@ -1,3 +1,4 @@
+import type { GenerationOrigin } from './generation';
 export interface Point {
   x: number;
   z: number;
@@ -115,6 +116,7 @@ export interface Versions {
   navigation: string;
 }
 export interface MapRevision {
+  generationOrigin?: GenerationOrigin;
   revisionHash: string;
   document: Document;
   versions: Versions;

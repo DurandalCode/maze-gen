@@ -557,3 +557,70 @@ summary {
   margin: 8px 0;
   min-height: 64px;
 }
+.generation-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.generation-layout fieldset {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #c9cdbf;
+  padding: 20px;
+}
+.generation-layout fieldset label {
+  display: grid;
+  gap: 5px;
+}
+.generation-layout label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.generation-layout input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+.generation-layout h2 {
+  font-size: 1.1rem;
+  margin: 20px 0 4px;
+}
+.generation-layout legend {
+  font-weight: 700;
+}
+.generation-catalog-entry,
+.generation-constraint {
+  border-bottom: 1px solid #dde0d5;
+  padding-bottom: 12px;
+  display: grid;
+  gap: 8px;
+}
+.variant-card {
+  background: #fffef8;
+  border: 1px solid #c9cdbf;
+  padding: 20px;
+  margin: 16px 0;
+  border-radius: 8px;
+}
+.variant-card dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 20px;
+}
+.variant-card dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.variant-card button {
+  margin: 12px 8px 0 0;
+}
+.generation-layout details {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 800px) {
+  .generation-layout {
+    grid-template-columns: 1fr;
+  }
+}

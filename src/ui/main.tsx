@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { emptyDocument } from '../domain';
-import type { Document, MapRevision } from '../domain';
+import type { Document, MapRevision, GenerationOrigin } from '../domain';
 import type { PreparedWorld } from '../jobs/compute';
 import type {
   Draft,
@@ -19,6 +19,10 @@ import { starterDocument } from './starter';
 const WorldView = lazy(() => import('./WorldView').then((m) => ({ default: m.WorldView })));
 const WalkView = lazy(() => import('./WalkView').then((m) => ({ default: m.WalkView })));
 const EditorView = lazy(() => import('./EditorView').then((m) => ({ default: m.EditorView })));
+const GenerationView = lazy(() =>
+  import('./GenerationView').then((m) => ({ default: m.GenerationView })),
+);
+import { generationOrigin } from '../generation/manifest';
 import type { EditorInput } from './EditorView';
 import { nativeExportAvailable } from '../platform/native-export';
 import { ImportPanel } from './ImportPanel';
@@ -76,6 +80,7 @@ function useListing<T>(
 }
 type Selection = { world: PreparedWorld; title: string; preview: boolean; mapHash: string };
 function App() {
+  const [generationSource, setGenerationSource] = useState<Document | null>(null);
   const [editor, setEditor] = useState<EditorInput | null>(null);
   const [drafts, setDrafts] = useState<DraftSummary[]>([]);
   const desktopEditing = !nativeExportAvailable() && !/Android/i.test(navigator.userAgent);
@@ -207,6 +212,7 @@ function App() {
         },
         projectId: current ? row.projectId : crypto.randomUUID(),
         baseRevisionHash: current ? row.revisionHash : null,
+        generationOrigin: saved.generationOrigin,
         notice: current ? '' : 'Предыдущая ревизия открыта как черновик нового проекта.',
       });
       setLoading('');
@@ -239,6 +245,7 @@ function App() {
         projectId: fork ? crypto.randomUUID() : row.projectId,
         baseRevisionHash: fork ? null : draft.baseRevisionHash,
         commandRevision: draft.commandRevision,
+        generationOrigin: draft.generationOrigin,
         recovered: !fork,
         notice: fork
           ? 'Проект изменился. Черновик открыт отдельной копией.'
@@ -252,14 +259,19 @@ function App() {
       }
     }
   };
-  const newEditor = (document?: Document) => {
+  const newEditor = (document?: Document, origin?: GenerationOrigin) => {
     cancel();
     const doc = document ?? emptyDocument(crypto.randomUUID());
     if (!document) {
       const now = new Date().toISOString();
       doc.metadata = { ...doc.metadata, createdAt: now, updatedAt: now };
     }
-    setEditor({ document: doc, projectId: crypto.randomUUID(), baseRevisionHash: null });
+    setEditor({
+      document: doc,
+      generationOrigin: origin,
+      projectId: crypto.randomUUID(),
+      baseRevisionHash: null,
+    });
   };
   const create = async () => {
     const job = begin('Подготавливаем две комнаты…');
@@ -360,6 +372,25 @@ function App() {
       setPendingWrite(false);
     }
   };
+  if (generationSource)
+    return (
+      <Suspense
+        fallback={
+          <main>
+            <p role="status">Открываем генератор…</p>
+          </main>
+        }
+      >
+        <GenerationView
+          source={generationSource}
+          onClose={() => setGenerationSource(null)}
+          onChoose={(variant) => {
+            setGenerationSource(null);
+            newEditor(variant.document, generationOrigin(variant));
+          }}
+        />
+      </Suspense>
+    );
   if (editor)
     return (
       <Suspense
@@ -387,6 +418,10 @@ function App() {
             setRefresh((n) => n + 1);
           }}
           onImport={newEditor}
+          onGenerate={(input) => {
+            setEditor(input);
+            setGenerationSource(input.document);
+          }}
         />
       </Suspense>
     );
@@ -418,14 +453,18 @@ function App() {
           <h1>Библиотека лабиринтов</h1>
           <p className="intro">Проектируйте пространство. Исследуйте маршрут.</p>
         </div>
-        <button
-          className="primary"
-          disabled={pendingWrite || !!loading}
-          onClick={() => void create()}
-        >
+        <button disabled={pendingWrite || !!loading} onClick={() => void create()}>
           Создать две комнаты
         </button>
         {desktopEditing && <button onClick={() => newEditor()}>Новый проект</button>}
+        {desktopEditing && (
+          <button
+            className="primary"
+            onClick={() => setGenerationSource(emptyDocument(crypto.randomUUID()))}
+          >
+            Создать лабиринт
+          </button>
+        )}
       </header>
       {notice && (
         <aside className="notice" role="status">
@@ -537,7 +576,7 @@ function App() {
             </h2>
             <p>
               {tab === 'maps'
-                ? 'Создайте карту из двух комнат или измените поиск.'
+                ? 'Создайте лабиринт или откройте пример из двух комнат.'
                 : 'Выберите карту и начните прохождение.'}
             </p>
           </div>
@@ -558,7 +597,11 @@ function App() {
                   <p className="eyebrow">
                     КАРТА {index + 1} · {row.revisionHash.slice(0, 8)}
                   </p>
-                  <h2>Неизвестный маршрут</h2>
+                  <h2>
+                    {localStorage.getItem(`maze-preview:${row.revisionHash}`) === '1'
+                      ? row.title
+                      : 'Неизвестный маршрут'}
+                  </h2>
                   <p>Готова к прохождению</p>
                 </div>
                 <div className="actions">

@@ -1,5 +1,5 @@
 import earcut from 'earcut';
-import { integerClip, integerOffset } from './clipper-adapter';
+import { integerClip, integerOffset, INTEGER_SCALE } from './clipper-adapter';
 import type { ClipMulti, ClipPolygon } from './clipper-adapter';
 import { AREA_EPSILON_M2, GEOMETRY_EPSILON_M } from '../../domain/profile';
 import { DomainError, LIMITS } from '../../domain/types';
@@ -42,6 +42,14 @@ function clipArea(polygons: ClipMulti): number {
     }
   return total;
 }
+function clipPerimeter(polygons: ClipMulti): number {
+  let result = 0;
+  for (const polygon of polygons)
+    for (const ring of polygon)
+      for (let i = 1; i < ring.length; i++)
+        result += Math.hypot(ring[i]![0] - ring[i - 1]![0], ring[i]![1] - ring[i - 1]![1]);
+  return result;
+}
 function bounded(polygons: MultiPolygon): MultiPolygon {
   let count = 0;
   for (const polygon of polygons)
@@ -58,6 +66,34 @@ function bounded(polygons: MultiPolygon): MultiPolygon {
     }
   return polygons.map((polygon, i) => validatePolygon(polygon, `polygon[${i}]`));
 }
+/** Drop only sub-tolerance consecutive vertices/residual rings, then validate all topology. */
+function cleanOutput(output: MultiPolygon): MultiPolygon {
+  const clean: MultiPolygon = [];
+  for (const polygon of output) {
+    const rings: Polygon = [];
+    for (let i = 0; i < polygon.length; i++) {
+      const ring: Point[] = [];
+      for (const point of polygon[i]!) {
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.z))
+          throw new Error('Non-finite boolean output');
+        if (!ring.length || distance(ring[ring.length - 1]!, point) > GEOMETRY_EPSILON_M)
+          ring.push(point);
+      }
+      if (ring.length > 1 && distance(ring[0]!, ring[ring.length - 1]!) <= GEOMETRY_EPSILON_M)
+        ring.pop();
+      if (ring.length < 3 || Math.abs(signedArea(ring)) <= AREA_EPSILON_M2) {
+        if (Math.abs(signedArea(polygon[i]!)) > AREA_EPSILON_M2)
+          throw new Error('Significant ring collapsed during tolerance cleanup');
+        if (i === 0) break;
+        continue;
+      }
+      rings.push(ring);
+    }
+    if (rings.length) clean.push(rings);
+  }
+  return bounded(clean);
+}
+
 export class PreparedGeometry {
   readonly polygons: MultiPolygon;
   readonly clip: ClipMulti;
@@ -92,7 +128,7 @@ export class GeometryKernel {
     if (!normalized.length) return [];
     try {
       const raw = integerOffset(toClip(normalized), deltaM, arcToleranceM);
-      return bounded(raw.map((p) => p.map((r) => r.map(([x, z]) => ({ x, z })))));
+      return cleanOutput(raw.map((p) => p.map((r) => r.map(([x, z]) => ({ x, z })))));
     } catch (error) {
       if (error instanceof DomainError && error.diagnostic.code === 'RESOURCE_LIMIT') throw error;
       fail(
@@ -142,47 +178,28 @@ export class GeometryKernel {
           return ring.map((p) => ({ x: p[0], z: p[1] }));
         }),
       );
-      // Remove only numerical residues within the public geometry tolerances.
-      // Significant degeneracy still fails validation; library exceptions are never retried as success.
-      const clean: MultiPolygon = [];
-      for (const polygon of output) {
-        const rings: Polygon = [];
-        for (let i = 0; i < polygon.length; i++) {
-          const ring: Point[] = [];
-          for (const point of polygon[i]!) {
-            if (!Number.isFinite(point.x) || !Number.isFinite(point.z))
-              throw new Error('Non-finite boolean output');
-            if (!ring.length || distance(ring[ring.length - 1]!, point) > GEOMETRY_EPSILON_M)
-              ring.push(point);
-          }
-          if (ring.length > 1 && distance(ring[0]!, ring[ring.length - 1]!) <= GEOMETRY_EPSILON_M)
-            ring.pop();
-          if (ring.length < 3 || Math.abs(signedArea(ring)) <= AREA_EPSILON_M2) {
-            if (Math.abs(signedArea(polygon[i]!)) > AREA_EPSILON_M2)
-              throw new Error('Significant ring collapsed during tolerance cleanup');
-            if (i === 0) break;
-            continue;
-          }
-          rings.push(ring);
-        }
-        if (rings.length) clean.push(rings);
-      }
-      const valid = bounded(clean);
+      const valid = cleanOutput(output);
       const resultArea = multiArea(valid),
-        subjectArea = clipArea(subjectClip);
+        subjectArea = clipArea(subjectClip),
+        // Intersections are rounded onto the same 0.1µm grid as operands. An area
+        // error bound scales with boundary length, including thin rotated polygons.
+        areaTolerance =
+          AREA_EPSILON_M2 +
+          (clipPerimeter(subjectClip) +
+            otherClips.reduce((n, p) => n + clipPerimeter(p), 0) +
+            clipPerimeter(raw)) /
+            INTEGER_SCALE;
       if (!Number.isFinite(resultArea) || resultArea < 0) throw new Error('Invalid result area');
       if (
         operation === 'union' &&
-        resultArea <
-          Math.max(subjectArea, ...otherClips.map(clipArea)) - 1e-8 * Math.max(1, subjectArea)
+        resultArea < Math.max(subjectArea, ...otherClips.map(clipArea)) - areaTolerance
       )
         throw new Error('Union lost an operand');
-      if (operation === 'difference' && resultArea > subjectArea + 1e-8 * Math.max(1, subjectArea))
+      if (operation === 'difference' && resultArea > subjectArea + areaTolerance)
         throw new Error('Difference grew the subject');
       if (
         operation === 'intersection' &&
-        resultArea >
-          Math.min(subjectArea, ...otherClips.map(clipArea)) + 1e-8 * Math.max(1, subjectArea)
+        resultArea > Math.min(subjectArea, ...otherClips.map(clipArea)) + areaTolerance
       )
         throw new Error('Intersection grew an operand');
       return valid;

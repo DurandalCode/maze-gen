@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "frozenBeforeTuning": "2026-11-11",
+  "profile": "generator.md defaults: 50x50, square/rectangle equal weights, free, cyclic 8, soft coverage 0.65, straight12m/forced20m, 3 variants, 8 attempts/50000 checks per variant, 60000ms watchdog",
+  "development": [
+    "development-01",
+    "development-02",
+    "development-03",
+    "development-04",
+    "development-05",
+    "development-06",
+    "development-07",
+    "development-08",
+    "development-09",
+    "development-10"
+  ],
+  "regression": [
+    "regression-01",
+    "regression-02",
+    "regression-03",
+    "regression-04",
+    "regression-05",
+    "regression-06",
+    "regression-07",
+    "regression-08",
+    "regression-09",
+    "regression-10"
+  ],
+  "policy": "Tune only against development. Freeze algorithm/version before regression. Include exhausted/timeout/internal errors in all rates. Do not change defaults or the seed sets to improve success rate. Initial algorithm is not accepted: first development-01 probe exhausted with a geometry offset diagnostic.",
+  "status": "deferred-for-web-prototype"
+}

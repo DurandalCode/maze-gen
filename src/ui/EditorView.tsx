@@ -1,6 +1,14 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { controlCatalog, instantiate } from '../catalog/catalog';
-import type { Definition, Diagnostic, Document, MapRevision, Opening, Point } from '../domain';
+import type {
+  Definition,
+  Diagnostic,
+  Document,
+  MapRevision,
+  Opening,
+  Point,
+  GenerationOrigin,
+} from '../domain';
 import { CommandStore, removal, snapped } from '../editor/commands';
 import type { Selection } from '../editor/commands';
 import { nearestBoundary } from '../editor/plan';
@@ -12,6 +20,7 @@ import { EditorProperties, rotateWall } from './EditorProperties';
 import { compute, message, store } from './services';
 const WorldView = lazy(() => import('./WorldView').then((m) => ({ default: m.WorldView })));
 export interface EditorInput {
+  generationOrigin?: GenerationOrigin;
   document: Document;
   projectId: string;
   baseRevisionHash: string | null;
@@ -23,7 +32,8 @@ export interface EditorInput {
 export interface EditorViewProps extends EditorInput {
   onClose: () => void;
   onPlay: (world: PreparedWorld) => void;
-  onImport: (document: Document) => void;
+  onImport: (document: Document, origin?: GenerationOrigin) => void;
+  onGenerate?: (input: EditorInput) => void;
 }
 type PendingDraft = { document: Document; projectId: string; baseRevisionHash: string | null };
 const pendingState: EditorPreparationState = {
@@ -141,6 +151,7 @@ export function EditorView(props: EditorViewProps) {
             document: item.document,
             baseRevisionHash: item.baseRevisionHash,
             commandRevision: item.document.revision,
+            generationOrigin: props.generationOrigin,
           });
           writtenRevision.current = item.document.revision;
         } catch (e) {
@@ -534,6 +545,7 @@ export function EditorView(props: EditorViewProps) {
       if (!copy && writtenRevision.current !== source.document.revision) await saveDraft();
       const target = copy ? crypto.randomUUID() : project.current;
       const revision: MapRevision = {
+        ...(props.generationOrigin ? { generationOrigin: props.generationOrigin } : {}),
         revisionHash: checked.world.revisionHash,
         document: source.document,
         versions: checked.world.versions,
@@ -596,6 +608,7 @@ export function EditorView(props: EditorViewProps) {
     try {
       const data = await store<{ blob: Blob; filename: string }>('export', {
         kind: 'draft',
+        generationOrigin: props.generationOrigin,
         document: commands.getSnapshot().document,
       });
       const url = URL.createObjectURL(data.blob),
@@ -611,9 +624,12 @@ export function EditorView(props: EditorViewProps) {
   const loadBackup = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const doc = await store<Document>('get', { kind: 'draft-file', file });
+      const backup = await store<{ document: Document; generationOrigin?: GenerationOrigin }>(
+        'get',
+        { kind: 'draft-file', file },
+      );
       if (commands.getSnapshot().document.revision !== committedRevision.current) await saveDraft();
-      props.onImport(doc);
+      props.onImport(backup.document, backup.generationOrigin);
     } catch (e) {
       report(e);
     }
@@ -646,6 +662,28 @@ export function EditorView(props: EditorViewProps) {
           </label>
         </div>
         <div className="actions">
+          {props.onGenerate && (
+            <button
+              disabled={saving}
+              onClick={() => {
+                void saveDraft()
+                  .then(() =>
+                    props.onGenerate?.({
+                      document: commands.getSnapshot().document,
+                      projectId: project.current,
+                      baseRevisionHash: base.current,
+                      recovered: true,
+                      forkRequired,
+                      generationOrigin: props.generationOrigin,
+                      commandRevision: commands.getSnapshot().document.revision,
+                    }),
+                  )
+                  .catch(report);
+              }}
+            >
+              Создать лабиринт
+            </button>
+          )}
           <button disabled={saving} onClick={() => void close()}>
             В библиотеку
           </button>

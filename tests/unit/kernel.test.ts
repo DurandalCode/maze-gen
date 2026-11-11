@@ -12,6 +12,7 @@ import {
   segmentPoint,
   validatePolygon,
 } from '../../src/geometry/kernel/contour';
+import { ringEdges, pointSegmentDistance } from '../../src/geometry/predicates';
 import type { Polygon } from '../../src/geometry/kernel/contour';
 const box = (x: number, z: number, w: number, d: number): Polygon => [
   [
@@ -208,4 +209,43 @@ test('quantized boolean identity preserves rotated geometry without false librar
       ].map(([x, z]) => ({ x: x! * c - z! * s + 0.1234567, z: x! * s + z! * c + 5.3333333 }));
     expect(Math.abs(multiArea(kernel.boolean('union', [[ring]], [[ring]])) - 4)).toBeLessThan(1e-5);
   }
+});
+
+test('generated offset with submicrometre consecutive edges remains conservative without losing a large component', async () => {
+  const fixture = (await import('../fixtures/offset-short-edges.json')).default;
+  const source = fixture.subject;
+  const result = kernel.offset(source, fixture.delta, fixture.tolerance);
+  expect(result.length).toBeGreaterThan(0);
+  // Erosion cannot add area; known >40m² component must survive numerical cleanup.
+  expect(multiArea(result)).toBeGreaterThan(40);
+  expect(multiArea(result)).toBeLessThan(multiArea(source));
+  for (const polygon of result)
+    for (const ring of polygon)
+      for (const point of ring) {
+        expect(pointInMulti(point, source)).toBe(true);
+        const d = Math.min(
+          ...source
+            .flatMap((p) => p.flatMap(ringEdges))
+            .map(([a, b]) => pointSegmentDistance(point, a, b)),
+        );
+        expect(d).toBeGreaterThanOrEqual(Math.abs(fixture.delta) - fixture.tolerance - 2e-6);
+      }
+});
+test('rotated containment intersection respects the integer-grid area bound', async () => {
+  const { subject, rest } = (await import('../fixtures/boolean-grid-rounding.json')).default;
+  const result = kernel.boolean('intersection', subject, ...rest);
+  expect(multiArea(result)).toBeCloseTo(4, 6);
+  // Every returned point remains within public geometric tolerance of both inputs.
+  for (const p of result)
+    for (const ring of p)
+      for (const point of ring)
+        for (const operand of [subject, ...rest])
+          expect(
+            pointInMulti(point, operand) ||
+              Math.min(
+                ...operand
+                  .flatMap((p) => p.flatMap(ringEdges))
+                  .map(([a, b]) => pointSegmentDistance(point, a, b)),
+              ) <= 1e-6,
+          ).toBe(true);
 });

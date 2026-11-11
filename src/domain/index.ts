@@ -4,3 +4,4 @@ export * from './hash';
 export * from './random';
 export * from './validate';
 export * from './document';
+export type { GenerationOrigin, GenerationRequest } from './generation';
