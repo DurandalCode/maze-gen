@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
+import { sharedLibraryPlugin } from './scripts/shared-library';
 
 export default defineConfig({
+  plugins: [sharedLibraryPlugin()],
   base: './',
   optimizeDeps: {
     include: [

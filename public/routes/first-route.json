@@ -1,0 +1,951 @@
+{
+  "kind": "maze-reboot-package",
+  "schemaVersion": 1,
+  "exportedAt": "2026-11-11T00:00:00.000Z",
+  "definitions": [
+    {
+      "id": "square-2x2",
+      "version": 1,
+      "boundaryLoops": [
+        {
+          "id": "boundary",
+          "role": "outer",
+          "segments": [
+            {
+              "id": "edge-0",
+              "kind": "line",
+              "from": {
+                "x": -1,
+                "z": -1
+              },
+              "to": {
+                "x": 1,
+                "z": -1
+              }
+            },
+            {
+              "id": "edge-1",
+              "kind": "line",
+              "from": {
+                "x": 1,
+                "z": -1
+              },
+              "to": {
+                "x": 1,
+                "z": 1
+              }
+            },
+            {
+              "id": "edge-2",
+              "kind": "line",
+              "from": {
+                "x": 1,
+                "z": 1
+              },
+              "to": {
+                "x": -1,
+                "z": 1
+              }
+            },
+            {
+              "id": "edge-3",
+              "kind": "line",
+              "from": {
+                "x": -1,
+                "z": 1
+              },
+              "to": {
+                "x": -1,
+                "z": -1
+              }
+            }
+          ]
+        }
+      ],
+      "parameters": [
+        {
+          "id": "depth",
+          "min": 1,
+          "max": 20,
+          "default": 2
+        },
+        {
+          "id": "width",
+          "min": 1,
+          "max": 20,
+          "default": 2
+        }
+      ],
+      "builder": {
+        "kind": "rectangle",
+        "width": "width",
+        "depth": "depth"
+      },
+      "openingRegions": [
+        {
+          "id": "region-edge-0",
+          "segmentId": "edge-0",
+          "uMin": 0,
+          "uMax": 1,
+          "wrap": false,
+          "minWidthM": 1,
+          "maxWidthM": 3,
+          "connectionClass": "passage"
+        },
+        {
+          "id": "region-edge-1",
+          "segmentId": "edge-1",
+          "uMin": 0,
+          "uMax": 1,
+          "wrap": false,
+          "minWidthM": 1,
+          "maxWidthM": 3,
+          "connectionClass": "passage"
+        },
+        {
+          "id": "region-edge-2",
+          "segmentId": "edge-2",
+          "uMin": 0,
+          "uMax": 1,
+          "wrap": false,
+          "minWidthM": 1,
+          "maxWidthM": 3,
+          "connectionClass": "passage"
+        },
+        {
+          "id": "region-edge-3",
+          "segmentId": "edge-3",
+          "uMin": 0,
+          "uMax": 1,
+          "wrap": false,
+          "minWidthM": 1,
+          "maxWidthM": 3,
+          "connectionClass": "passage"
+        }
+      ],
+      "constructionProfile": {
+        "profileRef": "physical-v1",
+        "maxSpanM": 3,
+        "supportPattern": "corners-and-openings"
+      },
+      "contentHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b"
+    }
+  ],
+  "maps": [
+    {
+      "revisionHash": "414afbd67f1ac4cbd7f0c4d140307e45e289b85ea3357d8f2a8a79d9522e1e22",
+      "document": {
+        "schemaVersion": 1,
+        "documentId": "generated-08d3db7bc182a7cc216db25da129a18c",
+        "revision": 0,
+        "site": {
+          "boundaryLoops": [
+            {
+              "id": "site",
+              "role": "outer",
+              "segments": [
+                {
+                  "id": "site-0",
+                  "kind": "line",
+                  "from": {
+                    "x": 0,
+                    "z": 0
+                  },
+                  "to": {
+                    "x": 20,
+                    "z": 0
+                  }
+                },
+                {
+                  "id": "site-1",
+                  "kind": "line",
+                  "from": {
+                    "x": 20,
+                    "z": 0
+                  },
+                  "to": {
+                    "x": 20,
+                    "z": 20
+                  }
+                },
+                {
+                  "id": "site-2",
+                  "kind": "line",
+                  "from": {
+                    "x": 20,
+                    "z": 20
+                  },
+                  "to": {
+                    "x": 0,
+                    "z": 20
+                  }
+                },
+                {
+                  "id": "site-3",
+                  "kind": "line",
+                  "from": {
+                    "x": 0,
+                    "z": 20
+                  },
+                  "to": {
+                    "x": 0,
+                    "z": 0
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "instances": [
+          {
+            "id": "grid-08d3db7bc182a7cc/room-0",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 6.4,
+              "z": 7.6
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-1",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 8.8,
+              "z": 7.6
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-10",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 11.2,
+              "z": 12.4
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-11",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 13.6,
+              "z": 12.4
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-2",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 11.2,
+              "z": 7.6
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-3",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 13.6,
+              "z": 7.6
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-4",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 6.4,
+              "z": 10
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-5",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 8.8,
+              "z": 10
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-6",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 11.2,
+              "z": 10
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-7",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 13.6,
+              "z": 10
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-8",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 6.4,
+              "z": 12.4
+            },
+            "rotationRad": 0
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-9",
+            "definitionHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b",
+            "parameterValues": {
+              "depth": 2,
+              "width": 2
+            },
+            "position": {
+              "x": 8.8,
+              "z": 12.4
+            },
+            "rotationRad": 0
+          }
+        ],
+        "openings": [
+          {
+            "id": "grid-08d3db7bc182a7cc/room-0/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-0",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-1/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-1",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-1/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-1",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-10/edge-0",
+            "instanceId": "grid-08d3db7bc182a7cc/room-10",
+            "regionId": "region-edge-0",
+            "boundarySegmentId": "edge-0",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-10/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-10",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-11/edge-0",
+            "instanceId": "grid-08d3db7bc182a7cc/room-11",
+            "regionId": "region-edge-0",
+            "boundarySegmentId": "edge-0",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-2/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-2",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-2/edge-2",
+            "instanceId": "grid-08d3db7bc182a7cc/room-2",
+            "regionId": "region-edge-2",
+            "boundarySegmentId": "edge-2",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-2/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-2",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-3/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-3",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-4/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-4",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-4/edge-2",
+            "instanceId": "grid-08d3db7bc182a7cc/room-4",
+            "regionId": "region-edge-2",
+            "boundarySegmentId": "edge-2",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-5/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-5",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-6/edge-0",
+            "instanceId": "grid-08d3db7bc182a7cc/room-6",
+            "regionId": "region-edge-0",
+            "boundarySegmentId": "edge-0",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-6/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-6",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-6/edge-2",
+            "instanceId": "grid-08d3db7bc182a7cc/room-6",
+            "regionId": "region-edge-2",
+            "boundarySegmentId": "edge-2",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-7/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-7",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "exit"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-7/edge-2",
+            "instanceId": "grid-08d3db7bc182a7cc/room-7",
+            "regionId": "region-edge-2",
+            "boundarySegmentId": "edge-2",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-7/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-7",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-8/edge-0",
+            "instanceId": "grid-08d3db7bc182a7cc/room-8",
+            "regionId": "region-edge-0",
+            "boundarySegmentId": "edge-0",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-8/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-8",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-8/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-8",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "entrance"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-9/edge-1",
+            "instanceId": "grid-08d3db7bc182a7cc/room-9",
+            "regionId": "region-edge-1",
+            "boundarySegmentId": "edge-1",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/room-9/edge-3",
+            "instanceId": "grid-08d3db7bc182a7cc/room-9",
+            "regionId": "region-edge-3",
+            "boundarySegmentId": "edge-3",
+            "uCenter": 0.5,
+            "widthM": 1.4,
+            "role": "ordinary"
+          }
+        ],
+        "connections": [
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-0",
+            "openingA": "grid-08d3db7bc182a7cc/room-8/edge-1",
+            "openingB": "grid-08d3db7bc182a7cc/room-9/edge-3"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-1",
+            "openingA": "grid-08d3db7bc182a7cc/room-8/edge-0",
+            "openingB": "grid-08d3db7bc182a7cc/room-4/edge-2"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-10",
+            "openingA": "grid-08d3db7bc182a7cc/room-1/edge-3",
+            "openingB": "grid-08d3db7bc182a7cc/room-0/edge-1"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-2",
+            "openingA": "grid-08d3db7bc182a7cc/room-4/edge-1",
+            "openingB": "grid-08d3db7bc182a7cc/room-5/edge-3"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-3",
+            "openingA": "grid-08d3db7bc182a7cc/room-9/edge-1",
+            "openingB": "grid-08d3db7bc182a7cc/room-10/edge-3"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-4",
+            "openingA": "grid-08d3db7bc182a7cc/room-10/edge-0",
+            "openingB": "grid-08d3db7bc182a7cc/room-6/edge-2"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-5",
+            "openingA": "grid-08d3db7bc182a7cc/room-6/edge-1",
+            "openingB": "grid-08d3db7bc182a7cc/room-7/edge-3"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-6",
+            "openingA": "grid-08d3db7bc182a7cc/room-7/edge-2",
+            "openingB": "grid-08d3db7bc182a7cc/room-11/edge-0"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-7",
+            "openingA": "grid-08d3db7bc182a7cc/room-6/edge-0",
+            "openingB": "grid-08d3db7bc182a7cc/room-2/edge-2"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-8",
+            "openingA": "grid-08d3db7bc182a7cc/room-2/edge-1",
+            "openingB": "grid-08d3db7bc182a7cc/room-3/edge-3"
+          },
+          {
+            "id": "grid-08d3db7bc182a7cc/connection-9",
+            "openingA": "grid-08d3db7bc182a7cc/room-2/edge-3",
+            "openingB": "grid-08d3db7bc182a7cc/room-1/edge-1"
+          }
+        ],
+        "freeWalls": [],
+        "physicalProfile": {
+          "id": "physical-v1",
+          "panelThicknessM": 0.006,
+          "boardWidthM": 0.12,
+          "boardThicknessM": 0.04,
+          "postWidthM": 0.12,
+          "headerDepthM": 0.14,
+          "wallHeightM": 2.5,
+          "playerRadiusM": 0.25,
+          "eyeHeightM": 1.7,
+          "minClearanceM": 1,
+          "maxConnectionSpanM": 3
+        },
+        "environment": {
+          "roof": true,
+          "translucentFabric": true,
+          "wallColor": "#181818",
+          "sun": {
+            "day": 15,
+            "minutes": 780
+          },
+          "forest": {
+            "side": "north",
+            "distance": 12,
+            "offset": 0
+          }
+        },
+        "metadata": {
+          "title": "Первый маршрут",
+          "createdAt": "1970-01-01T00:00:00.000Z",
+          "updatedAt": "1970-01-01T00:00:00.000Z"
+        }
+      },
+      "definitionHashes": ["f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b"],
+      "versions": {
+        "geometry": "geometry-v3-clipper2",
+        "approximation": "chord-v1",
+        "navigation": "nav-v2-round-offset"
+      },
+      "validationSummary": {
+        "ready": true,
+        "diagnostics": []
+      },
+      "generationOrigin": {
+        "schemaVersion": 1,
+        "sourceRevisionHash": "414afbd67f1ac4cbd7f0c4d140307e45e289b85ea3357d8f2a8a79d9522e1e22",
+        "requestHash": "63fc41610b85f363a6194ee3ab155be7c5127ce762014efa1a54f7d339d1b026",
+        "request": {
+          "requestId": "server-first-route",
+          "schemaVersion": 1,
+          "generatorVersion": "prototype-grid-v1",
+          "geometryVersion": "geometry-v3-clipper2",
+          "catalogSnapshots": [
+            {
+              "definition": {
+                "id": "square-2x2",
+                "version": 1,
+                "boundaryLoops": [
+                  {
+                    "id": "boundary",
+                    "role": "outer",
+                    "segments": [
+                      {
+                        "id": "edge-0",
+                        "kind": "line",
+                        "from": {
+                          "x": -1,
+                          "z": -1
+                        },
+                        "to": {
+                          "x": 1,
+                          "z": -1
+                        }
+                      },
+                      {
+                        "id": "edge-1",
+                        "kind": "line",
+                        "from": {
+                          "x": 1,
+                          "z": -1
+                        },
+                        "to": {
+                          "x": 1,
+                          "z": 1
+                        }
+                      },
+                      {
+                        "id": "edge-2",
+                        "kind": "line",
+                        "from": {
+                          "x": 1,
+                          "z": 1
+                        },
+                        "to": {
+                          "x": -1,
+                          "z": 1
+                        }
+                      },
+                      {
+                        "id": "edge-3",
+                        "kind": "line",
+                        "from": {
+                          "x": -1,
+                          "z": 1
+                        },
+                        "to": {
+                          "x": -1,
+                          "z": -1
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "parameters": [
+                  {
+                    "id": "depth",
+                    "min": 1,
+                    "max": 20,
+                    "default": 2
+                  },
+                  {
+                    "id": "width",
+                    "min": 1,
+                    "max": 20,
+                    "default": 2
+                  }
+                ],
+                "builder": {
+                  "kind": "rectangle",
+                  "width": "width",
+                  "depth": "depth"
+                },
+                "openingRegions": [
+                  {
+                    "id": "region-edge-0",
+                    "segmentId": "edge-0",
+                    "uMin": 0,
+                    "uMax": 1,
+                    "wrap": false,
+                    "minWidthM": 1,
+                    "maxWidthM": 3,
+                    "connectionClass": "passage"
+                  },
+                  {
+                    "id": "region-edge-1",
+                    "segmentId": "edge-1",
+                    "uMin": 0,
+                    "uMax": 1,
+                    "wrap": false,
+                    "minWidthM": 1,
+                    "maxWidthM": 3,
+                    "connectionClass": "passage"
+                  },
+                  {
+                    "id": "region-edge-2",
+                    "segmentId": "edge-2",
+                    "uMin": 0,
+                    "uMax": 1,
+                    "wrap": false,
+                    "minWidthM": 1,
+                    "maxWidthM": 3,
+                    "connectionClass": "passage"
+                  },
+                  {
+                    "id": "region-edge-3",
+                    "segmentId": "edge-3",
+                    "uMin": 0,
+                    "uMax": 1,
+                    "wrap": false,
+                    "minWidthM": 1,
+                    "maxWidthM": 3,
+                    "connectionClass": "passage"
+                  }
+                ],
+                "constructionProfile": {
+                  "profileRef": "physical-v1",
+                  "maxSpanM": 3,
+                  "supportPattern": "corners-and-openings"
+                },
+                "contentHash": "f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b"
+              },
+              "weight": 1
+            }
+          ],
+          "site": {
+            "boundaryLoops": [
+              {
+                "id": "site",
+                "role": "outer",
+                "segments": [
+                  {
+                    "id": "site-0",
+                    "kind": "line",
+                    "from": {
+                      "x": 0,
+                      "z": 0
+                    },
+                    "to": {
+                      "x": 20,
+                      "z": 0
+                    }
+                  },
+                  {
+                    "id": "site-1",
+                    "kind": "line",
+                    "from": {
+                      "x": 20,
+                      "z": 0
+                    },
+                    "to": {
+                      "x": 20,
+                      "z": 20
+                    }
+                  },
+                  {
+                    "id": "site-2",
+                    "kind": "line",
+                    "from": {
+                      "x": 20,
+                      "z": 20
+                    },
+                    "to": {
+                      "x": 0,
+                      "z": 20
+                    }
+                  },
+                  {
+                    "id": "site-3",
+                    "kind": "line",
+                    "from": {
+                      "x": 0,
+                      "z": 20
+                    },
+                    "to": {
+                      "x": 0,
+                      "z": 0
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "physicalProfile": {
+            "id": "physical-v1",
+            "panelThicknessM": 0.006,
+            "boardWidthM": 0.12,
+            "boardThicknessM": 0.04,
+            "postWidthM": 0.12,
+            "headerDepthM": 0.14,
+            "wallHeightM": 2.5,
+            "playerRadiusM": 0.25,
+            "eyeHeightM": 1.7,
+            "minClearanceM": 1,
+            "maxConnectionSpanM": 3
+          },
+          "seed": "first-walk-2026-11-11",
+          "placement": {
+            "mode": "orthogonal",
+            "baseRotationRad": 0
+          },
+          "topology": {
+            "mode": "tree",
+            "extraConnections": 0
+          },
+          "terminals": {
+            "mode": "auto"
+          },
+          "allocation": {
+            "mode": "module-budget",
+            "maxModules": 12,
+            "minModules": 12,
+            "caps": {}
+          },
+          "constraints": {
+            "coverageTarget": 0,
+            "hardCoverage": false,
+            "maxStraightM": null,
+            "maxForcedM": null
+          },
+          "requestedVariants": 1,
+          "budgets": {
+            "attemptsPerVariant": 1,
+            "placementChecksPerVariant": 50000,
+            "watchdogMs": 30000
+          }
+        },
+        "variantIndex": 0,
+        "attemptIndex": 0,
+        "variantSeed": "08d3db7bc182a7cc216db25da129a18cdf724a3ed7902eb2790aa5775b84100f",
+        "counters": {
+          "placementChecks": 12,
+          "roots": 1,
+          "acceptedModules": 12,
+          "cycleChecks": 0,
+          "fullValidations": 2
+        },
+        "unusedModules": {},
+        "stopReason": "module-limit"
+      }
+    }
+  ],
+  "projects": [],
+  "sessions": [],
+  "chunks": [],
+  "manifest": {
+    "counts": {
+      "definitions": 1,
+      "maps": 1,
+      "projects": 0,
+      "sessions": 0,
+      "chunks": 0,
+      "samples": 0
+    },
+    "entityHashes": {
+      "definition:f2331280bd0957579b4ad4f88d79a14ef0908cf4193b63cd0cd7fdd0e96bb45b": "f311a556801b0d39febc5d78820c0dbff00d03de76e1040f74b445f03566ffc6",
+      "map:414afbd67f1ac4cbd7f0c4d140307e45e289b85ea3357d8f2a8a79d9522e1e22": "e41d208f2c4b0644f266ac93ae636029c966d129a0602cfe23c8760d5e016986"
+    }
+  }
+}

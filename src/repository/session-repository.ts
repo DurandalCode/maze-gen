@@ -192,6 +192,13 @@ export class SessionRepository {
     for (let sequence = 0; sequence <= session.lastCommittedSequence; sequence++)
       yield await this.chunk(sessionId, sequence);
   }
+  async unfinished(): Promise<Session[]> {
+    return transaction(this.database, ['sessions'], 'readonly', async (tx) =>
+      ((await request(tx.objectStore('sessions').getAll())) as Session[]).filter(
+        (s) => !terminal(s.state),
+      ),
+    );
+  }
   async recover(now = Date.now()): Promise<Session[]> {
     return transaction(this.database, ['sessions', 'walkSummaries'], 'readwrite', async (tx) => {
       const sessions = (await request(tx.objectStore('sessions').getAll())) as Session[],

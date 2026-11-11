@@ -33,9 +33,11 @@ test('production assets run offline at the embedded HTTPS origin with CSP, worke
       ? 'text/javascript'
       : file.endsWith('.css')
         ? 'text/css'
-        : file.endsWith('.svg')
-          ? 'image/svg+xml'
-          : 'text/html';
+        : file.endsWith('.json')
+          ? 'application/json'
+          : file.endsWith('.svg')
+            ? 'image/svg+xml'
+            : 'text/html';
     await route.fulfill({
       body: await readFile(file),
       contentType,

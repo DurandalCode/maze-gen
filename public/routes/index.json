@@ -1,0 +1,5 @@
+{
+  "kind": "maze-server-routes",
+  "schemaVersion": 1,
+  "routes": [{ "id": "first-route", "title": "Первый маршрут · 12 комнат" }]
+}

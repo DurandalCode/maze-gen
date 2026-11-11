@@ -29,6 +29,10 @@ import { ImportPanel } from './ImportPanel';
 import { ExportPanel } from './ExportPanel';
 import type { ExportSelection } from '../exchange/export-repository';
 import { stateLabels } from './session-labels';
+import { ServerRoutes } from './ServerRoutes';
+const ServerRouteView = lazy(() =>
+  import('./ServerRouteView').then((m) => ({ default: m.ServerRouteView })),
+);
 import './styles.css';
 
 interface Listing<T> {
@@ -80,6 +84,21 @@ function useListing<T>(
 }
 type Selection = { world: PreparedWorld; title: string; preview: boolean; mapHash: string };
 function App() {
+  const [serverRoute, setServerRoute] = useState(() =>
+    new URLSearchParams(window.location.search).get('route'),
+  );
+  const closeServerRoute = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('route');
+    window.history.replaceState(null, '', url);
+    setServerRoute(null);
+  };
+  const [sharedMode, setSharedMode] = useState<boolean | null>(null);
+  useEffect(() => {
+    void store<{ shared: boolean }>('get', { kind: 'storage-mode' })
+      .then((m) => setSharedMode(m.shared))
+      .catch(() => {});
+  }, []);
   const [generationSource, setGenerationSource] = useState<Document | null>(null);
   const [editor, setEditor] = useState<EditorInput | null>(null);
   const [drafts, setDrafts] = useState<DraftSummary[]>([]);
@@ -109,6 +128,14 @@ function App() {
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const [pendingWrite, setPendingWrite] = useState(false);
+  useEffect(() => {
+    if (!sharedMode || active || editor || generationSource || serverRoute !== null) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') setRefresh((n) => n + 1);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [sharedMode, active, editor, generationSource, serverRoute]);
+
   const [rename, setRename] = useState<MapSummary | null>(null);
   const [title, setTitle] = useState('');
   const [deletion, setDeletion] = useState<{
@@ -372,6 +399,26 @@ function App() {
       setPendingWrite(false);
     }
   };
+  if (serverRoute !== null)
+    return (
+      <Suspense
+        fallback={
+          <main>
+            <p role="status">Загружаем маршрут…</p>
+          </main>
+        }
+      >
+        <ServerRouteView
+          id={serverRoute}
+          onClose={closeServerRoute}
+          onReady={(value) => {
+            setServerRoute(null);
+            setActive(value);
+            setRefresh((n) => n + 1);
+          }}
+        />
+      </Suspense>
+    );
   if (generationSource)
     return (
       <Suspense
@@ -439,6 +486,7 @@ function App() {
           session={active.session}
           onClose={() => {
             setActive(null);
+            closeServerRoute();
             setRefresh((n) => n + 1);
           }}
         />
@@ -474,6 +522,14 @@ function App() {
           </button>
         </aside>
       )}
+      {sharedMode !== null && (
+        <p>
+          {sharedMode
+            ? 'Общая JSON-библиотека dev-сервера: карты и прохождения доступны во всех браузерах.'
+            : 'Локальная библиотека этого браузера.'}
+        </p>
+      )}
+      <ServerRoutes />
       <ImportPanel
         onCommitted={(notice) => {
           setNotice(notice);
