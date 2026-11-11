@@ -1,3 +1,4 @@
+import {FreeBridgeWorld} from './free-bridge-world';
 import {TwoStoreyWorld} from './two-storey-world';
 import {freePortal} from '../free/layout';
 import {segmentDistance} from '../free/geometry';
@@ -12,14 +13,16 @@ export class Player {
   pitch = 0;
   readonly recorder: Recorder;
   finished = false;
-  private spatialWorld?:TwoStoreyWorld;
+  private spatialWorld?:TwoStoreyWorld|FreeBridgeWorld;
   constructor(private maze: Maze, private world: CollisionWorld, readonly mode:'walk'|'inspection'='walk') {
     this.position = {...portalPoint(maze, maze.entrance)};
     this.yaw = { west: -Math.PI/2, east: Math.PI/2, north: Math.PI, south: 0 }[maze.entrance.side];
-    if(maze.version===5){const n=freePortal(maze,maze.free!.entrance).normal;this.yaw=Math.atan2(n.x,n.z);}
+    if((maze.version===5||maze.version===7)){const n=freePortal(maze,maze.free!.entrance).normal;this.yaw=Math.atan2(n.x,n.z);}
     if(mode==='inspection'){this.position={x:maze.width/2,z:maze.depth+6,y:0,floor:0};this.yaw=0;}
+    if(maze.free?.bridges?.length&&mode==='walk')this.position={...this.position,y:0,floor:0};
     this.recorder = new Recorder(this.position);
     if(maze.storeys&&mode==='walk')this.spatialWorld=new TwoStoreyWorld(maze);
+    else if(maze.free?.bridges?.length&&mode==='walk'){this.position={...this.position,y:0,floor:0};this.spatialWorld=new FreeBridgeWorld(maze);}
   }
 
   update(dt: number, keys: ReadonlySet<string>): void {
@@ -75,8 +78,9 @@ export class Player {
   }
 
   private atExit(point: Point): boolean {
+    if(point.bridge!==undefined||(point.y??0)>.01)return false;
     if(this.maze.storeys&&((point.floor??0)!==0||point.stair!==undefined||(point.y??0)>.01))return false;
-    if(this.maze.version===5){const g=freePortal(this.maze,this.maze.free!.exit);return segmentDistance(point,g.wall)<.03&&Math.hypot(point.x-g.mid.x,point.z-g.mid.z)<=this.maze.exit.width!/2-.25;}
+    if((this.maze.version===5||this.maze.version===7)){const g=freePortal(this.maze,this.maze.free!.exit);return segmentDistance(point,g.wall)<.03&&Math.hypot(point.x-g.mid.x,point.z-g.mid.z)<=this.maze.exit.width!/2-.25;}
     const exit = portalPoint(this.maze, this.maze.exit);
     const side = this.maze.exit.side;
     const size = cellSize(this.maze, this.maze.exit.cell);

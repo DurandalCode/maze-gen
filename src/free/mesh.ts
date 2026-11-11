@@ -1,3 +1,4 @@
+import {bridgeMesh} from './bridge-mesh';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Maze } from '../core/maze';
@@ -18,6 +19,7 @@ export function freeMesh(maze: Maze): THREE.Group {
   });
   walls.instanceMatrix.needsUpdate=true;walls.computeBoundingSphere();group.add(walls);
   group.add(timberMesh(maze));
+  if(maze.free!.bridges?.length)group.add(bridgeMesh(maze));
   if (maze.roof) {
     const roofMaterial = fabricMaterial(maze.wallColor, maze.translucentFabric, 'roof');
     roofMaterial.side = THREE.DoubleSide;

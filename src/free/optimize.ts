@@ -1,6 +1,5 @@
 import type {Maze} from '../core/maze';
 import {random} from '../core/random';
-import {freeAreaWeights} from './analysis-geometry';
 import {mazeDraft} from './json';
 import {freeMaze,validateFree} from './layout';
 import {analyzeFree,checkFreeQuality} from './quality';
@@ -15,12 +14,11 @@ export interface FreeOptimizationResult {
   before:FreeProfileQuality[]; after:FreeProfileQuality[];
 }
 export function freeQualityVector(maze:Maze,samples=256):FreeProfileQuality[]{
-  const weights=freeAreaWeights(maze),total=weights.reduce((a,b)=>a+b,0);
   return FREE_PROFILES.map(profile=>{
     const result=analyzeFree(maze,samples,profile);
     return {profile,completion:result.finishedRatio,coldRatio:result.coldAreaRatio,
       largestColdArea:result.largestColdArea,
-      unseenRatio:weights.reduce((sum,w,i)=>sum+w*(1-result.probability[i]!),0)/total};
+      unseenRatio:result.unseenAreaRatio};
   });
 }
 /** No profile or metric may pay for deterioration in another. Route kilometres

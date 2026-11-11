@@ -1,3 +1,4 @@
+import {bridgeGeometry,bridgeUprights} from '../free/bridges';
 import {storeyWalls,nodePoint,twoStoreyParameters,type TwoStoreyLayout} from './two-storey';
 import type {FreeLayout} from '../free/model';
 import {freeRuntime,freeDomain,freePortal} from '../free/layout';
@@ -26,6 +27,7 @@ export interface Parameters {
   placementMode?:'grid'|'free';
   freeAngleSpread?:number;
   freeJunctionDegree?:3|5;
+  freeBridgeCount?:number;
   generationType?:GenerationType;
   design?:DesignLimits;
   /** Requested minimum number of distinct directional-trap forks; absent means zero. */
@@ -62,7 +64,7 @@ export function validateConstruction(value: Construction): void {
   if (typeof value.roof !== 'boolean') throw new Error('Параметр крыши должен быть логическим значением.');
 }
 export interface Maze extends Construction {
-  version: 1 | 2 | 3 | 4 | 5 | 6;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   free?:FreeLayout;
   storeys?:TwoStoreyLayout;
   /** Transient construction projection: no frame members may obstruct a shaft. */
@@ -81,8 +83,8 @@ export interface Maze extends Construction {
   portals?: Portal[];
   environment?: Environment;
 }
-export interface Point { x: number; z: number; y?:number; floor?:number; stair?:number }
-export interface Wall { x1: number; z1: number; x2: number; z2: number; thickness?: number; y?:number; height?:number; floor?:number; stair?:number }
+export interface Point { bridge?:string; x: number; z: number; y?:number; floor?:number; stair?:number }
+export interface Wall { bridge?:string; x1: number; z1: number; x2: number; z2: number; thickness?: number; y?:number; height?:number; floor?:number; stair?:number }
 export const WALL_THICKNESS = 0.06;
 
 export function validateParameters(p: Parameters): void {
@@ -100,6 +102,7 @@ export function validateParameters(p: Parameters): void {
   if((p.loopTrapCount??0)>p.extraConnections)throw new Error('Для каждой кольцевой ловушки нужно хотя бы одно дополнительное соединение.');
   if(p.routeTrapCount!==undefined&&(!Number.isInteger(p.routeTrapCount)||p.routeTrapCount<0||p.routeTrapCount>6))throw new Error('Число ловушек должно быть целым от 0 до 6.');
   if(p.placementMode==='free'&&p.generationType==='two-storey')throw Error('Свободное размещение доступно для одноэтажных типов.');
+  if(p.freeBridgeCount!==undefined&&(!Number.isInteger(p.freeBridgeCount)||p.freeBridgeCount<0||p.freeBridgeCount>2||p.freeBridgeCount>p.extraConnections))throw Error('Крытых мостов: от 0 до 2, не больше числа дополнительных соединений.');
   if(p.freeAngleSpread!==undefined&&(!Number.isFinite(p.freeAngleSpread)||p.freeAngleSpread<0||p.freeAngleSpread>120))throw Error('Разброс углов: от 0 до 120°.');
   if(p.freeJunctionDegree!==undefined&&![3,5].includes(p.freeJunctionDegree))throw Error('Перекрёсток: 3 или 5 проходов.');
   if(p.placementMode!==undefined&&!['grid','free'].includes(p.placementMode))throw Error('Неизвестный режим размещения.');
@@ -144,7 +147,7 @@ export function emptyMaze(parameters: Parameters, version: 1 | 2 | 3 = parameter
 }
 
 export function routingSize(maze: Maze): { columns: number; rows: number } {
-  if(maze.version===5)return {columns:maze.passages.length,rows:1};
+  if((maze.version===5||maze.version===7))return {columns:maze.passages.length,rows:1};
   if(maze.version===4)return {columns:axisCuts(maze,'x').length-1,rows:axisCuts(maze,'z').length-1};
   const p = maze.parameters;
   const offset = maze.version === 1 ? 1 : -1;
@@ -152,7 +155,7 @@ export function routingSize(maze: Maze): { columns: number; rows: number } {
 }
 
 export function axisBounds(maze: Maze, axis: 'x' | 'z'): number[] {
-  if(maze.version===5)return axis==='x'?[0,maze.width]:[0,maze.depth];
+  if((maze.version===5||maze.version===7))return axis==='x'?[0,maze.width]:[0,maze.depth];
   if(maze.version===4)return axisCuts(maze,axis);
   const p = maze.parameters, count = routingSize(maze)[axis === 'x' ? 'columns' : 'rows'];
   const result = [0];
@@ -162,7 +165,7 @@ export function axisBounds(maze: Maze, axis: 'x' | 'z'): number[] {
 }
 
 export function cellSize(maze: Maze, cell: number): { width: number; depth: number } {
-  if(maze.version===5){const r=freeDomain(maze).rectangles[cell]!;return {width:r.x2-r.x1,depth:r.z2-r.z1};}
+  if((maze.version===5||maze.version===7)){const r=freeDomain(maze).rectangles[cell]!;return {width:r.x2-r.x1,depth:r.z2-r.z1};}
   if(maze.storeys){const r=maze.storeys.nodes[cell]!.rect;return {width:r.x2-r.x1,depth:r.z2-r.z1};}
   if(maze.navigation){const r=maze.navigation.domain.rectangles[cell]!;return {width:r.x2-r.x1,depth:r.z2-r.z1};}
   if(maze.version===4){const w=routingSize(maze).columns,x=cell%w,z=Math.floor(cell/w),xs=axisBounds(maze,'x'),zs=axisBounds(maze,'z');return {width:xs[x+1]!-xs[x]!,depth:zs[z+1]!-zs[z]!};}
@@ -176,7 +179,7 @@ export function cellSize(maze: Maze, cell: number): { width: number; depth: numb
 }
 
 export function neighbors(maze: Maze, cell: number): number[] {
-  if(maze.version===5)return maze.passages[cell]??[];
+  if((maze.version===5||maze.version===7))return maze.passages[cell]??[];
   if(maze.storeys)return maze.storeys.adjacent[cell]??[];
   if(maze.navigation)return maze.passages[cell]??[];
   const { columns, rows } = routingSize(maze);
@@ -199,7 +202,7 @@ export function connect(maze: Maze, a: number, b: number): void {
 }
 
 export function cellCenter(maze: Maze, cell: number): Point {
-  if(maze.version===5)return freeRuntime(maze).centers[cell]!;
+  if((maze.version===5||maze.version===7))return freeRuntime(maze).centers[cell]!;
   if(maze.storeys)return {...nodePoint(maze,cell)};
   if(maze.navigation)return maze.navigation.centers[cell]!;
   if(maze.version===4){const w=routingSize(maze).columns,x=cell%w,z=Math.floor(cell/w),xs=axisBounds(maze,'x'),zs=axisBounds(maze,'z');return {x:(xs[x]!+xs[x+1]!)/2,z:(zs[z]!+zs[z+1]!)/2};}
@@ -215,7 +218,7 @@ export function cellCenter(maze: Maze, cell: number): Point {
 }
 
 export function portalPoint(maze: Maze, portal: Portal): Point {
-  if(maze.version===5)return freePortal(maze,portal.freeId!).mid;
+  if((maze.version===5||maze.version===7))return freePortal(maze,portal.freeId!).mid;
   if(maze.navigation)return originalPortalPoint(maze,portal);
   if(maze.version===4&&portal.width!==undefined){const w=corridorPortalWall(maze,portal);if(w)return {x:(w.x1+w.x2)/2,z:(w.z1+w.z2)/2};}
   const center = cellCenter(maze, portal.cell), size = cellSize(maze, portal.cell);
@@ -228,7 +231,7 @@ export function portalPoint(maze: Maze, portal: Portal): Point {
 
 /** Unique segments shared by map, scene and collisions. */
 export function walls(maze: Maze): Wall[] {
-  if(maze.version===5)return freeRuntime(maze).panels;
+  if((maze.version===5||maze.version===7))return maze.free!.bridges?.length?[...freeRuntime(maze).panels.map(w=>({...w,y:0,height:maze.wallHeight})),...maze.free!.bridges.flatMap(b=>bridgeGeometry(maze.free!,b).walls(maze.wallHeight)),...bridgeUprights(maze.free!,maze.wallHeight)]:freeRuntime(maze).panels;
   if(maze.storeys)return storeyWalls(maze);
   if(maze.navigation)return walls(maze.navigation.source);
   const domain = domainOf(maze), result: Wall[] = [];

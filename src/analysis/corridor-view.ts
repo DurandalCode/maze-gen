@@ -15,7 +15,7 @@ export const CORRIDOR_SIGHT_METRES=24;
 /** Look only along a straight, unobstructed passage. No information around corners or through fabric. */
 export function viewCorridor(maze:Maze,context:NavigationContext,from:number,to:number,maxDistance=CORRIDOR_SIGHT_METRES):CorridorView {
   if(!maze.passages[from]?.includes(to)) throw new Error('Направление коридора должно быть открытым проходом.');
-  if(maze.version===5){const a=context.centers[from]!,b=openingMidpoint(maze,from,to),angle=Math.atan2(b.z-a.z,b.x-a.x),length=rayDistance(maze,a,angle,maxDistance);return {length,endCell:to,junctions:maze.passages[to]!.length>=3?1:0,end:length<maxDistance?'bend':'limit'};}
+  if((maze.version===5||maze.version===7)){const a=context.centers[from]!,b=openingMidpoint(maze,from,to),angle=Math.atan2(b.z-a.z,b.x-a.x),length=rayDistance(maze,a,angle,maxDistance);return {length,endCell:to,junctions:maze.passages[to]!.length>=3?1:0,end:length<maxDistance?'bend':'limit'};}
   if(maze.navigation){const a=context.centers[from]!,b=openingMidpoint(maze,from,to),angle=Math.atan2(b.z-a.z,b.x-a.x),dx=Math.cos(angle),dz=Math.sin(angle);let limit=Math.min(maxDistance,Math.hypot(maze.width,maze.depth));
     // An unobstructed ray through an external opening still ends at the site
     // boundary; the outdoors is not an infinitely long maze corridor.

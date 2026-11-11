@@ -1,3 +1,4 @@
+import {bridgeGeometry} from '../free/bridges';
 import {storeyView,floorOf,stairAt} from '../core/two-storey';
 import {freeRuntime} from '../free/layout';
 import {corridorSupports} from '../core/corridor-supports';
@@ -108,7 +109,9 @@ export class MapView {
   dispose(): void { this.observer.disconnect(); this.events.abort(); }
 
   heatDetailsAt(x:number,y:number):string|null {
-    const {left,top,scale}=this.layout(),cell=cellAtPoint(this.maze,{x:(x-left)/scale,z:(y-top)/scale,floor:this.floor,...(this.maze.storeys?{stair:stairAt(this.maze,{x:(x-left)/scale,z:(y-top)/scale})?.id}:{})});
+    const {left,top,scale}=this.layout(),point={x:(x-left)/scale,z:(y-top)/scale};
+    if(this.heat&&this.maze.free?.bridges?.length){const i=this.maze.free.bridges.findIndex(b=>bridgeGeometry(this.maze.free!,b).contains(point)),usage=i<0?undefined:this.heat.analysis.bridgeUsage?.[i];if(usage)return `М${i+1}: сверху посещают ${(usage.overProbability*100).toFixed(1)}%, снизу ${(usage.underProbability*100).toFixed(1)}% симуляций. Пересечение без развилки.`;}
+    const cell=cellAtPoint(this.maze,{x:(x-left)/scale,z:(y-top)/scale,floor:this.floor,...(this.maze.storeys?{stair:stairAt(this.maze,{x:(x-left)/scale,z:(y-top)/scale})?.id}:{})});
     if(cell===null) return null;
     const graph=this.maze.version===4?corridorNavigation(this.maze):null,trapCell=graph?graph.navigation!.representatives[graph.navigation!.originalToRegion[cell]!]!:cell;
     const trapText=trapDetailsAt(this.traps,trapCell),critical=criticalWallAt(this.criticalWalls,{x:(x-left)/scale,z:(y-top)/scale},6/scale);
@@ -159,7 +162,7 @@ export class MapView {
     ctx.fillText('С ↑', 24, 90);
     const { scale: s, left, top } = this.layout();
     const px = (x: number) => left+x*s, py = (z: number) => top+z*s;
-    const free=maze.version===5?freeRuntime(maze):null;
+    const free=(maze.version===5||maze.version===7)?freeRuntime(maze):null;
     const polygon=(points:readonly Point[],holes:readonly Point[][]=[])=>{
       ctx.beginPath();for(const ring of [points,...holes]){ring.forEach((p,i)=>i?ctx.lineTo(px(p.x),py(p.z)):ctx.moveTo(px(p.x),py(p.z)));ctx.closePath();}
     };
@@ -185,10 +188,10 @@ export class MapView {
       ctx.fillStyle = '#293023'; ctx.fillRect(-width*s/2,-depth*s/2,width*s,depth*s);
       ctx.strokeStyle = '#576044'; ctx.lineWidth = 1; ctx.strokeRect(-width*s/2,-depth*s/2,width*s,depth*s);ctx.restore();
     }
+    let heatMaximum=1;if(this.heat?.layer==='visits'){for(const c of floorCells)heatMaximum=Math.max(heatMaximum,this.heat.analysis.visits[c]!);for(const b of this.heat.analysis.bridgeUsage??[])heatMaximum=Math.max(heatMaximum,b.overVisits);}
     if(this.heat) {
       const {analysis,layer,coldOnly}=this.heat;
-      let maximum=1;
-      if(layer==='visits') for(const cell of floorCells) maximum=Math.max(maximum,analysis.visits[cell]!);
+      const maximum=heatMaximum;
       for(const cell of floorCells) {
         const p=analysis.probability[cell]!;
         if(coldOnly && p>=analysis.options.threshold) continue;
@@ -226,7 +229,7 @@ export class MapView {
     line(this.trajectory, '#e2ab78', 3);
     ctx.strokeStyle = '#c4ccb7'; ctx.lineWidth = Math.max(1.3, Math.min(3, cell*s*0.065)); ctx.lineCap = 'square';
     ctx.beginPath();
-    for (const wall of this.segments) { if(maze.storeys&&((wall.y??0)>this.floor*maze.storeys.floorHeight+1.7||(wall.y??0)+(wall.height??maze.wallHeight)<this.floor*maze.storeys.floorHeight+1.7))continue; ctx.moveTo(px(wall.x1), py(wall.z1)); ctx.lineTo(px(wall.x2), py(wall.z2)); }
+    for (const wall of this.segments) { if(free&&wall.bridge!==undefined)continue;if(maze.storeys&&((wall.y??0)>this.floor*maze.storeys.floorHeight+1.7||(wall.y??0)+(wall.height??maze.wallHeight)<this.floor*maze.storeys.floorHeight+1.7))continue; ctx.moveTo(px(wall.x1), py(wall.z1)); ctx.lineTo(px(wall.x2), py(wall.z2)); }
     ctx.stroke();
     if(maze.version===4){ctx.fillStyle='#a4aa88';const size=Math.max(2,.12*s);for(const post of corridorSupports(maze))ctx.fillRect(px(post.x)-size/2,py(post.z)-size/2,size,size);}
     if(this.heat?.showDistricts){
@@ -251,6 +254,11 @@ export class MapView {
       ctx.fillStyle='#fff0ff';ctx.font='600 9px "Segoe UI", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(trap.label,x,y);
     }
     ctx.restore();
+    if(free)for(const [i,b]of (maze.free!.bridges??[]).entries()){
+      const g=bridgeGeometry(maze.free!,b);ctx.save();polygon(g.polygon);const usage=this.heat?.analysis.bridgeUsage?.find(v=>v.id===b.id),value=usage&&(!this.heat!.coldOnly||usage.overProbability<this.heat!.analysis.options.threshold)?(this.heat!.layer==='visits'?usage.overVisits/heatMaximum:usage.overProbability):undefined;ctx.fillStyle=value===undefined?'#7766aa44':`rgb(${Math.round(38+207*value)} ${Math.round(97+39*value)} ${Math.round(150-100*value)} / 65%)`;ctx.fill();ctx.strokeStyle='#cfb3ff';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
+      for(const p of [g.path[1]!,g.path[2]!]){ctx.beginPath();ctx.arc(px(p.x),py(p.z),3,0,Math.PI*2);ctx.fillStyle='#cfb3ff';ctx.fill();}
+      const p=g.at(.5);ctx.fillStyle='#efe6ff';ctx.fillText(`М${i+1} · ↑ ${b.rise.toFixed(1)} м`,px(p.x),py(p.z)-8);ctx.restore();
+    }
     if(maze.storeys){ctx.fillStyle='#a4dcff';ctx.font='600 12px sans-serif';for(const st of maze.storeys.stairs){const p=this.floor===0?st.start:st.end;ctx.fillText(`Лестн.${st.id} ${this.floor===0?'↑':'↓'}`,px(p.x),py(p.z)-8);line([st.start,st.end].map(p=>({...p,floor:this.floor})),'#a4dcff',2);}}
     for (const [index, portal] of mazePortals(maze).entries()) {
       if(maze.storeys&&this.floor!==0)continue;

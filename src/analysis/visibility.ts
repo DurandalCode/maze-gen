@@ -18,7 +18,7 @@ const cache = new WeakMap<Maze, LandmarkVisibility>();
 const EYE_HEIGHT = 1.7;
 /** Geometric cue approximation, not a reproduction of shader pixels or human visual thresholds. */
 export function measureLandmarks(maze: Maze, context: NavigationContext): LandmarkVisibility {
-  if(maze.version===5)return freeLandmarks(maze);
+  if((maze.version===5||maze.version===7))return freeLandmarks(maze);
   if(maze.storeys){
     const old=cache.get(maze);if(old)return old;const domain=domainOf(maze),sun=new Float64Array(maze.passages.length),forest=new Float64Array(sun.length),boundary=new Float64Array(sun.length),direction=sunDirection(environmentOf(maze)),targets=forestMapPoints(maze),reach=Math.hypot(maze.width,maze.depth)*2+100;let sa=0,fa=0,ba=0,oa=0;
     for(const c of domain.cells){const n=maze.storeys.nodes[c]!,p={...n.center,y:(n.center.y??0)+1.7},r=n.rect,area=(r.x2-r.x1)*(r.z2-r.z1);if(direction.y>0){sun[c]=spatialRay(maze,p,direction,reach,'sun').strength;for(const t of targets){const dx=t.x-p.x,dz=t.z-p.z,dy=12-p.y,len=Math.hypot(dx,dz,dy);forest[c]=Math.max(forest[c]!,spatialRay(maze,p,{x:dx/len,z:dz/len,y:dy/len},len,'forest').strength*.8*Math.exp(-len/120));}}

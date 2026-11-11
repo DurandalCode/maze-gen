@@ -71,6 +71,7 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
     const worker = new Worker(new URL('../analysis/worker.ts', import.meta.url), { type: 'module' });
     optimizer.current = worker;
     worker.onmessage = event => {
+      if(optimizer.current!==worker)return;
       const data = event.data;
       if (data.kind === 'progress') {
         setProgress(`${data.done} / ${data.total}`);
@@ -102,16 +103,16 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
       else
         setNotice(`Проверено ${result.attempted} вариантов. Улучшения с сохранением ограничений не найдено.`);
     };
-    worker.onerror = () => { worker.terminate(); optimizer.current = null; setOptimizing(false); setError('Не удалось выполнить оптимизацию.'); };
+    worker.onerror = () => { if(optimizer.current!==worker)return;worker.terminate(); optimizer.current = null; setOptimizing(false); setError('Не удалось выполнить оптимизацию.'); };
     worker.postMessage({ kind: 'optimize', maze, options, method:analysis?.potential?.cycles&&!maze.storeys?'walls':method, attempts, objective });
   };
   return <section className="coldspot-controls" aria-label="Анализ колдспотов">
   <div className="section-label"><span>КОЛДСПОТЫ И СЛОЖНОСТЬ</span><span>◈</span></div>
   {!enabled && <button type="button" className="coldspot-action" onClick={() => setEnabled(true)}>Проанализировать лабиринт</button>}
   <details className="analysis-options"><summary>Параметры модели</summary>
-  <p className="field-note">Вероятность попасть в участок до выхода. {maze.version===5?'Локальная модель свободных пространств учитывает направление и реальные длины переходов, помнит исследованные ветки и возвращается к непроверенным развилкам по известным проходам. Её точность требует проверки прохождениями.':maze.storeys?'Модель v11 учитывает два этажа, лестницы и непрозрачные перекрытия; верхние площадки изучаются по мере наблюдения. Требует проверки прохождениями.':maze.version===4?'Модель v10 коридорного типа движется между реальными проёмами, учитывает диагональный обзор и открытые пространства модулей. Она требует проверки прохождениями.':'Модель v9 помнит увиденные соединения и оценивает местные развилки по видимой перспективе, направлению и заметным тупикам.'} Узнаваемый финиш имеет приоритет; скрытые стены заранее неизвестны.</p>
+  <p className="field-note">Вероятность попасть в участок до выхода. {(maze.version===5||maze.version===7)?'Локальная модель свободных пространств учитывает направление и реальные длины переходов, помнит исследованные ветки и возвращается к непроверенным развилкам по известным проходам. Её точность требует проверки прохождениями.':maze.storeys?'Модель v11 учитывает два этажа, лестницы и непрозрачные перекрытия; верхние площадки изучаются по мере наблюдения. Требует проверки прохождениями.':maze.version===4?'Модель v10 коридорного типа движется между реальными проёмами, учитывает диагональный обзор и открытые пространства модулей. Она требует проверки прохождениями.':'Модель v9 помнит увиденные соединения и оценивает местные развилки по видимой перспективе, направлению и заметным тупикам.'} Узнаваемый финиш имеет приоритет; скрытые стены заранее неизвестны.</p>
   <label className="field"><span>Профиль игрока</span><select aria-label="Профиль игрока" value={options.profile} onChange={e => setOptions({ ...options, profile: e.target.value as NavigationProfile })}>{Object.entries(PROFILE_NAMES).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
-  {maze.version!==5&&<>
+  {(maze.version!==5&&maze.version!==7)&&<>
   {options.profile !== 'explorer' && <label className="field"><span>Опора на направление · {options.beta}</span><input aria-label="Опора на направление" type="range" min="0" max="5" step="0.25" value={options.beta} onChange={e => setOptions({ ...options, beta: Number(e.target.value) })}/></label>}
   {options.profile !== 'explorer' && <label className="field"><span>Внутреннее удержание направления · {Math.round((options.internalOrientation ?? 1) * 100)}%</span><input aria-label="Внутреннее удержание направления" type="range" min="0" max="1" step="0.05" value={options.internalOrientation ?? 1} onChange={e => setOptions({ ...options, internalOrientation: Number(e.target.value) })}/><small>Сохраняет курс без внешних ориентиров. Не даёт знания скрытых проходов.</small></label>}
   {options.profile !== 'explorer' && <label className="field"><span>Узнавание исследованных веток · {Math.round((options.routeMemory ?? .9) * 100)}%</span><input aria-label="Узнавание исследованных веток" type="range" min="0" max="1" step="0.05" value={options.routeMemory ?? .9} onChange={e => setOptions({ ...options, routeMemory: Number(e.target.value) })}/><small>После пересмотра стратегии возможна ограниченная перепроверка знакомой ветки. Надёжное узнавание подавляет её.</small></label>}
@@ -125,7 +126,7 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
   {calculating && <div className="coldspot-progress" role="status">Считаем горячесть…<button type="button" onClick={() => setEnabled(false)}>Отменить анализ</button></div>}
   {error && <p className="shape-error" role="alert">{error}</p>}
   {analysis && <>
-  {maze.version!==5&&<details className="analysis-options"><summary>Подробная оценка сложности</summary><PotentialPanel value={analysis.potential} onLimit={(key, value) => setOptions({ ...options, [key]: value })}/></details>}
+  {(maze.version!==5&&maze.version!==7)&&<details className="analysis-options"><summary>Подробная оценка сложности</summary><PotentialPanel value={analysis.potential} onLimit={(key, value) => setOptions({ ...options, [key]: value })}/></details>}
   <label className="coldspot-check"><input aria-label="Горячесть на карте" type="checkbox" checked={show} onChange={e => setShow(e.target.checked)}/> Горячесть на карте</label>
   <label className="field"><span>Тепловой слой</span><select aria-label="Тепловой слой" value={layer} onChange={e => setLayer(e.target.value as HeatLayer)}><option value="probability">Вероятность посещения</option><option value="visits">Среднее число посещений</option></select></label>
   <label className="coldspot-check"><input aria-label="Только холодные участки" type="checkbox" checked={coldOnly} onChange={e => setColdOnly(e.target.checked)}/> Только холодные участки</label>
@@ -143,8 +144,8 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
   {analysis.behavior && <><div><dt>Пересмотров стратегии за прохождение</dt><dd>{fmt(analysis.behavior.meanStrategyChanges, 2)}</dd></div><div><dt>Перепроверок знакомых веток</dt><dd>{fmt(analysis.behavior.meanRechecks, 2)} · {fmt(analysis.behavior.meanRecheckDistance)} м дополнительного пути</dd></div></>}
   <div><dt>Средний путь модели</dt><dd>{fmt(analysis.expectedLength)} м · {fmt(analysis.searchRatio, 2)}× кратчайшего</dd></div>
   </dl>
-  <p className="field-note">{analysis.method === 'exact-tree' ? 'Точный расчёт для модели на дереве.' : `Оценка по ${analysis.samples} воспроизводимым прохождениям; значения около порога могут колебаться.`} {maze.version===5?'Модель предполагает точную память исследованных соединений; она не прогнозирует потерю ориентации и не моделирует видимость внешних ориентиров.':'Видимость солнца, леса и внешней ткани проверяется лучами. Без ориентиров уверенность сохраняется на уровне внутреннего удержания курса. Это приближённая модель, не статистика людей.'}</p>
-  {maze.version===5?<><p className="field-note">Локальный подбор размещения сохраняет модули, связи, проёмы и ограничения. Колдспоты, крупнейшая холодная область и неразведанная площадь сравниваются отдельно по трём стратегиям; ухудшение одного показателя не компенсируется другим. Это модель покрытия, не рейтинг сложности для человека.</p><button className="coldspot-action" disabled={optimizing||calculating} onClick={optimize}>Улучшить размещение</button>{optimizing&&<div role="status">{progress}<button onClick={cancel}>Отмена</button></div>}</>:<>
+  <p className="field-note">{analysis.method === 'exact-tree' ? 'Точный расчёт для модели на дереве.' : `Оценка по ${analysis.samples} воспроизводимым прохождениям; значения около порога могут колебаться.`} {(maze.version===5||maze.version===7)?'Модель предполагает точную память исследованных соединений; она не прогнозирует потерю ориентации и не моделирует видимость внешних ориентиров.':'Видимость солнца, леса и внешней ткани проверяется лучами. Без ориентиров уверенность сохраняется на уровне внутреннего удержания курса. Это приближённая модель, не статистика людей.'}</p>
+  {(maze.version===5||maze.version===7)?<><p className="field-note">Локальный подбор размещения сохраняет модули, связи, проёмы и ограничения. Колдспоты, крупнейшая холодная область и неразведанная площадь сравниваются отдельно по трём стратегиям; ухудшение одного показателя не компенсируется другим. Это модель покрытия, не рейтинг сложности для человека.</p><button className="coldspot-action" disabled={optimizing||calculating} onClick={optimize}>Улучшить размещение</button>{optimizing&&<div role="status">{progress}<button onClick={cancel}>Отмена</button></div>}</>:<>
   <details className="analysis-options"><summary>Улучшение лабиринта</summary>
   <div className="section-label"><span>АВТОПОДБОР ПЛАНИРОВКИ</span></div>
   <label className="field"><span>Цель подбора</span><select aria-label="Цель подбора" value={objective} disabled={optimizing} onChange={e => setObjective(e.target.value as OptimizationObjective)}><option value="exploration">Сложные решения и скрытые проёмы</option><option value="coldspots">Меньше колдспотов</option></select></label>
@@ -156,6 +157,7 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
   </details>
   </>}
   </>}
+  {!!analysis?.bridgeUsage?.length&&<p className="field-note" aria-label="Использование мостов">{analysis.bridgeUsage.map((b,i)=>`М${i+1}: сверху посещают ${fmt(b.overProbability*100)}%, снизу ${fmt(b.underProbability*100)}% симуляций`).join(' · ')}. Оценка локальной модели, не статистика людей.</p>}
   {notice && <p className="field-note" role="status">{notice}</p>}
   </section>;
 }

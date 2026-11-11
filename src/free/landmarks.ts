@@ -1,3 +1,4 @@
+import {freeSpatialRay} from './spatial-visibility';
 import type { Maze, Point } from '../core/maze';
 import { environmentOf, forestMapPoints, sunDirection } from '../core/environment';
 import type { LandmarkVisibility } from '../analysis/visibility';
@@ -6,9 +7,10 @@ import { freeAreaWeights } from './analysis-geometry';
 import { distance, rayWall } from './geometry';
 /** Same cue thresholds as legacy analysis, traced against oriented physical walls. */
 export function freeLandmarks(maze: Maze): LandmarkVisibility {
-  const r = freeRuntime(maze), weights = freeAreaWeights(maze), sun = new Float64Array(r.rooms.length), forest = new Float64Array(r.rooms.length), boundary = new Float64Array(r.rooms.length), direction = sunDirection(environmentOf(maze)), daylight = Math.max(0, Math.min(1, direction.y * 4)), reach = Math.hypot(maze.width, maze.depth) * 2 + 100, forestPoints = forestMapPoints(maze), site = siteGeometry(maze.parameters);
+  const r = freeRuntime(maze), weights = freeAreaWeights(maze,false), sun = new Float64Array(r.rooms.length), forest = new Float64Array(r.rooms.length), boundary = new Float64Array(r.rooms.length), direction = sunDirection(environmentOf(maze)), daylight = Math.max(0, Math.min(1, direction.y * 4)), reach = Math.hypot(maze.width, maze.depth) * 2 + 100, forestPoints = forestMapPoints(maze), site = siteGeometry(maze.parameters);
   const trace = (from: Point, to: Point, height: number, source: 'sun' | 'forest') => {
     const length = distance(from, to), angle = Math.atan2(to.z - from.z, to.x - from.x), dy = height - 1.7;
+    if(maze.free!.bridges?.length){const length3=Math.hypot(length,dy);return freeSpatialRay(maze,{...from,y:1.7},{x:(to.x-from.x)/length3,z:(to.z-from.z)/length3,y:dy/length3},length3,source).strength;}
     let strength = 1;
     if (maze.roof && dy > 0) {
       const t = (maze.wallHeight - 1.7) / dy;
@@ -41,6 +43,6 @@ export function freeLandmarks(maze: Maze): LandmarkVisibility {
       if (!site.contains(outside)) boundary[i] = daylight * .85;
     }
   }
-  const total = weights.reduce((a, b) => a + b, 0), ratio = (test: (i: number) => boolean) => weights.reduce((n, w, i) => n + (test(i) ? w : 0), 0) / total;
+  const total = freeAreaWeights(maze).reduce((a, b) => a + b, 0), ratio = (test: (i: number) => boolean) => weights.reduce((n, w, i) => n + (test(i) ? w : 0), 0) / total;
   return { sun, forest, boundary, sunAreaRatio: ratio(i => sun[i]! >= .2), forestAreaRatio: ratio(i => forest[i]! >= .2), boundaryAreaRatio: ratio(i => boundary[i]! >= .2), orientedAreaRatio: ratio(i => Math.max(sun[i]!, forest[i]!, boundary[i]!) >= .2) };
 }

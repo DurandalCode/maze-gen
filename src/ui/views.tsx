@@ -1,3 +1,4 @@
+import {bridgeInspectionSolids} from '../free/bridges';
 import {floorOf} from '../core/two-storey';
 import type { HeatDisplay } from './coldspot-controls';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -126,7 +127,7 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
       scene = new WalkScene(element); scene.setMaze(maze);
     }
     catch (error) { onError(`3D недоступен: ${error instanceof Error ? error.message : String(error)}`); return; }
-    const player = new Player(maze, new CollisionWorld([...walls(maze), ...supportColliders(maze)], maze.parameters.corridorWidth),inspection?'inspection':'walk');
+    const player = new Player(maze, new CollisionWorld([...walls(maze), ...supportColliders(maze),...(inspection&&maze.free?bridgeInspectionSolids(maze.free):[])], maze.parameters.corridorWidth),inspection?'inspection':'walk');
     playerRef.current = player;
     const keys = new Set<string>();
     const keyDown = (event: KeyboardEvent) => {

@@ -26,7 +26,7 @@ export function spatialPerception(maze: Maze, context: NavigationContext) {
     if (!start || !Number.isFinite(angle) || !Number.isFinite(limit) || limit <= 0)
       throw new Error('Некорректный луч видимости.');
     if(maze.storeys){const ray=spatialVisibleCells(maze,from,angle,limit);return {...ray,blocked:ray.length<limit-1e-7,angle};}
-    if(maze.navigation||maze.version===5){const start=context.centers[from]!,length=rayDistance(maze.navigation?.source??maze,start,angle,limit),point={x:start.x+Math.cos(angle)*length,z:start.z+Math.sin(angle)*length};let firstCell:number|null=null;for(let d=.05;d<length;d+=.1){const c=cellAtPoint(maze,{x:start.x+Math.cos(angle)*d,z:start.z+Math.sin(angle)*d});if(c!==null&&c!==from){firstCell=c;break;}}const endCell=cellAtPoint(maze,{x:start.x+Math.cos(angle)*Math.max(0,length-.01),z:start.z+Math.sin(angle)*Math.max(0,length-.01)})??from;return {length,endCell,point,blocked:length<limit-1e-7,firstCell,angle};}
+    if(maze.navigation||(maze.version===5||maze.version===7)){const start=context.centers[from]!,length=rayDistance(maze.navigation?.source??maze,start,angle,limit),point={x:start.x+Math.cos(angle)*length,z:start.z+Math.sin(angle)*length};let firstCell:number|null=null;for(let d=.05;d<length;d+=.1){const c=cellAtPoint(maze,{x:start.x+Math.cos(angle)*d,z:start.z+Math.sin(angle)*d});if(c!==null&&c!==from){firstCell=c;break;}}const endCell=cellAtPoint(maze,{x:start.x+Math.cos(angle)*Math.max(0,length-.01),z:start.z+Math.sin(angle)*Math.max(0,length-.01)})??from;return {length,endCell,point,blocked:length<limit-1e-7,firstCell,angle};}
     const dx = Math.cos(angle), dz = Math.sin(angle), sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
     let cell = from, firstCell: number | null = null;
     const finish = (length: number, blocked: boolean): SightRay => ({ length, endCell: cell, point: { x: start.x + dx * length, z: start.z + dz * length }, blocked, firstCell, angle });
@@ -58,7 +58,7 @@ export function spatialPerception(maze: Maze, context: NavigationContext) {
     const key = from + ':' + to, previous = cache.get(key);
     if (previous)
       return previous;
-    const a = context.centers[from]!, b = maze.navigation||maze.version===5?openingMidpoint(maze,from,to):context.centers[to]!, heading = Math.atan2(b.z - a.z, b.x - a.x);
+    const a = context.centers[from]!, b = maze.navigation||(maze.version===5||maze.version===7)?openingMidpoint(maze,from,to):context.centers[to]!, heading = Math.atan2(b.z - a.z, b.x - a.x);
     let best = trace(from, heading);
     const depths: number[] = [best.length];
     // Angular sampling, not diagonal graph edges: only rays that first enter this opening count.

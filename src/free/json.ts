@@ -3,21 +3,22 @@ import { freeMaze } from './layout';
 import { validateEnvironment } from '../core/environment';
 import type { FreeDraft } from './model';
 export function mazeDraft(maze: Maze): FreeDraft {
-  return { kind: 'maze-lab-free-draft', version: 1, parameters: structuredClone(maze.parameters), ...(maze.environment ? { environment: structuredClone(maze.environment) } : {}), construction: { wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof }, layout: structuredClone(maze.free!) };
+  return { kind: 'maze-lab-free-draft', version: maze.free!.bridges?.length?2:1, parameters: structuredClone(maze.parameters), ...(maze.environment ? { environment: structuredClone(maze.environment) } : {}), construction: { wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof }, layout: structuredClone(maze.free!) };
 }
 function inspect(d: FreeDraft): void {
-  if (!d || d.kind !== 'maze-lab-free-draft' || d.version !== 1 || d.parameters?.placementMode !== 'free') throw Error('Некорректный свободный черновик.');
+  if (!d || d.kind !== 'maze-lab-free-draft' || ![1,2].includes(d.version) || d.parameters?.placementMode !== 'free') throw Error('Некорректный свободный черновик.');
   validateParameters(d.parameters);
   if (d.environment) validateEnvironment(d.environment);
   validateConstruction(d.construction);
   const l = d.layout;
   if (!l || ![l.modules, l.spaces, l.connections, l.openings, l.walls].every(Array.isArray) || l.modules.length > 2500 || l.spaces.length > 10000 || l.connections.length > 20000 || l.walls.length > 100000 || l.openings.length > 10000 || typeof l.entrance !== 'string' || typeof l.exit !== 'string') throw Error('Некорректная структура размещения.');
+  if(l.bridges!==undefined&&(!Array.isArray(l.bridges)||l.bridges.length>100||l.bridges.length>0&&d.version!==2))throw Error('Некорректный список мостов.');
   if (l.supports !== undefined && (!Array.isArray(l.supports) || l.supports.length > 100000 || l.supports.some(p => !p || ![p.x, p.z].every(Number.isFinite)))) throw Error('Некорректные опоры.');
   if (l.preservedPanels !== undefined && (!Array.isArray(l.preservedPanels) || l.preservedPanels.length > 100000)) throw Error('Некорректные сохранённые панели.');
-  const all = [...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls];
+  const all = [...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]];
   if (all.some(v => !v || typeof v.id !== 'string' || v.id.length > 100) || new Set(all.map(v => v.id)).size !== all.length) throw Error('Некорректные идентификаторы.');
   for (const m of l.modules) if (!['2x2', '2x6', 'custom'].includes(m.type) || ![m.x, m.z, m.angle].every(Number.isFinite) || m.type === 'custom' && (![m.width, m.depth].every(v => typeof v === 'number' && Number.isFinite(v)))) throw Error('Некорректный модуль.');
-  for (const c of l.connections) for (const a of [c.a, c.b]) if (!a || typeof a.room !== 'string' || !Number.isInteger(a.edge) || !Number.isFinite(a.offset) || !Number.isFinite(c.width)) throw Error('Некорректная связь.');
+  for (const c of [...l.connections,...l.bridges??[]]) for (const a of [c.a, c.b]) if (!a || typeof a.room !== 'string' || !Number.isInteger(a.edge) || !Number.isFinite(a.offset) || !Number.isFinite(c.width)) throw Error('Некорректная связь.');
   for (const o of l.openings) if (typeof o.room !== 'string' || !Number.isInteger(o.edge) || ![o.offset, o.width].every(Number.isFinite)) throw Error('Некорректный проём.');
   for (const s of l.spaces) {
     if (!['hall', 'corridor'].includes(s.kind) || !Array.isArray(s.polygon) || s.polygon.length > 10000 || s.holes !== undefined && !Array.isArray(s.holes)) throw Error('Некорректное пространство.');
@@ -37,12 +38,13 @@ export function encodeDraft(d: FreeDraft): string {
 }
 export function freeWire(maze: Maze): Record<string, unknown> {
   const d = mazeDraft(maze);
-  return { version: 5, parameters: d.parameters, layout: d.layout, ...d.construction, ...(maze.environment ? { environment: maze.environment } : {}) };
+  return { version: maze.free!.bridges?.length?7:5, parameters: d.parameters, layout: d.layout, ...d.construction, ...(maze.environment ? { environment: maze.environment } : {}) };
 }
 export function decodeFree(value: Record<string, unknown>): Maze {
-  const d = { kind: 'maze-lab-free-draft', version: 1, parameters: value.parameters, layout: value.layout ?? value.free, construction: { ...DEFAULT_CONSTRUCTION, wallHeight: value.wallHeight, wallColor: value.wallColor, translucentFabric: value.translucentFabric, roof: value.roof } } as FreeDraft;
+  const d = { kind: 'maze-lab-free-draft', version: value.version===7?2:1, parameters: value.parameters, layout: value.layout ?? value.free, construction: { ...DEFAULT_CONSTRUCTION, wallHeight: value.wallHeight, wallColor: value.wallColor, translucentFabric: value.translucentFabric, roof: value.roof } } as FreeDraft;
   inspect(d);
   const maze = freeMaze(d);
+  if(maze.version!==value.version)throw Error('Версия карты не соответствует мостам.');
   if (value.environment !== undefined) {
     validateEnvironment(value.environment as NonNullable<Maze['environment']>);
     maze.environment = value.environment as Maze['environment'];
@@ -55,6 +57,7 @@ export function freeIdentity(maze: Maze): unknown {
   l.spaces.sort((a, b) => a.id.localeCompare(b.id));
   l.connections.sort((a, b) => a.id.localeCompare(b.id));
   l.openings.sort((a, b) => a.id.localeCompare(b.id));
+  l.bridges?.sort((a,b)=>a.id.localeCompare(b.id));
   l.walls.sort((a, b) => a.id.localeCompare(b.id));
-  return { version: 5, width: maze.width, depth: maze.depth, shape: maze.parameters.shape, layout: l };
+  return { version: maze.free!.bridges?.length?7:5, width: maze.width, depth: maze.depth, shape: maze.parameters.shape, layout: l };
 }

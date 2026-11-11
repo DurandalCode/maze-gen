@@ -17,7 +17,7 @@ export function deserialize(json: string): Maze {
   if (json.length > 5_000_000) throw new Error('Файл слишком большой (максимум 5 МБ).');
   const data = object(JSON.parse(json) as unknown);
   if(data.version===6)return decodeStorey(data);
-  if(data.version===5)return decodeFree(data);
+  if((data.version===5||data.version===7))return decodeFree(data);
   if(data.version===4)return decodeCorridor(data);
   if (data.version !== 1 && data.version !== 2 && data.version !== 3) throw new Error('Неподдерживаемая версия формата.');
   const raw = object(data.parameters);
@@ -88,5 +88,5 @@ export function deserialize(json: string): Maze {
 }
 
 export function serialize(maze: Maze): string {
-  return JSON.stringify(maze.storeys?storeyWire(maze):maze.version===5?freeWire(maze):maze.version===4?corridorWire(maze):maze, null, 2);
+  return JSON.stringify(maze.storeys?storeyWire(maze):(maze.version===5||maze.version===7)?freeWire(maze):maze.version===4?corridorWire(maze):maze, null, 2);
 }

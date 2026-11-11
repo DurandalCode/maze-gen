@@ -13,7 +13,7 @@ export async function contentId(value:unknown):Promise<string>{
 }
 export async function browserTopologyId(maze:Maze):Promise<string>{
  if(maze.storeys)return contentId(physicalStoreyIdentity(maze));
- if(maze.version===5)return contentId(freeIdentity(maze));
+ if((maze.version===5||maze.version===7))return contentId(freeIdentity(maze));
  if(maze.version===4)return contentId(corridorPhysicalIdentity(maze));
  const {seed:_,algorithm:__,extraConnections:___,routeTrapCount:____,design:_____,loopTrapCount:______,generationType:_______,...geometry}=maze.parameters;
  return contentId({version:maze.version,geometry,passages:maze.passages,portals:maze.portals??[maze.entrance,maze.exit]});

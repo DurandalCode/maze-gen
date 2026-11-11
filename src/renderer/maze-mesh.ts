@@ -9,7 +9,7 @@ import { fabricMaterial } from './fabric-material';
 
 export function mazeMesh(maze: Maze): THREE.Group {
   if(maze.storeys)return twoStoreyMesh(maze);
-  if(maze.version===5)return freeMesh(maze);
+  if((maze.version===5||maze.version===7))return freeMesh(maze);
   const group = new THREE.Group();
   const segments = walls(maze);
   // Fabric is thinner than the timber: a thick collision envelope must not

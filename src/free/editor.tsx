@@ -1,3 +1,4 @@
+import {bridgeGeometry} from './bridges';
 import { EnvironmentControls } from '../ui/environment-controls';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type PointerEvent } from 'react';
 import type { Maze, Parameters, Point } from '../core/maze';
@@ -26,7 +27,7 @@ export function newFreeDraft(p?: Parameters): FreeDraft {
   return { kind: 'maze-lab-free-draft', version: 1, parameters: { columns: 24, rows: 16, corridorWidth: 2, moduleSize: 2, extraConnections: 0, seed: 'FREE-001', algorithm: 'backtracker', ...p, placementMode: 'free' }, construction: { ...DEFAULT_CONSTRUCTION }, layout: emptyLayout() };
 }
 const points = (poly: Point[]) => poly.map(p => `${p.x},${p.z}`).join(' ');
-type Tool = 'select' | 'module' | 'connection' | 'wall' | 'opening';
+type Tool = 'select' | 'module' | 'bridge' | 'connection' | 'wall' | 'opening';
 export function FreeEditor({ initial, initialResult=null, onClose }: { initial: FreeDraft; initialResult?:WalkResult|null; onClose: (draft:FreeDraft,maze:Maze|null,result:WalkResult|null) => void }) {
   const [state, dispatch] = useReducer(editorReducer, initial, history), d = state.present, l = d.layout;
   const [tool, setTool] = useState<Tool>('select'), [selected, setSelected] = useState(''), [moduleType, setModuleType] = useState<'2x2' | '2x6'>('2x2'), [snap, setSnap] = useState(false), [width, setWidth] = useState(1.4), [pending, setPending] = useState<Anchor | Point | null>(null), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showRoute, setShowRoute] = useState(false), [walk, setWalk] = useState<Maze | null>(null), [result, setResult] = useState<WalkResult | null>(initialResult), [library, setLibrary] = useState(false), [revision, setRevision] = useState(0), [analysis, setAnalysis] = useState<ReturnType<typeof analyzeFree> | null>(null), [profile, setProfile] = useState<'explorer' | 'compass' | 'outline'>('explorer'), [shapeEditing, setShapeEditing] = useState(false), [shapeSelected, setShapeSelected] = useState<number | null>(null), [shapeTool, setShapeTool] = useState<ShapeTool>('select'), [restore, setRestore] = useState<string | null>(null), [storageReady, setStorageReady] = useState(false);
@@ -122,7 +123,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
       setSelected(m.id);
       return;
     }
-    if (tool === 'connection' || tool === 'opening') {
+    if (tool === 'connection' || tool === 'bridge' || tool === 'opening') {
       const a = chooseAnchor(p);
       if (!a) {
         setNotice('Нажмите на сторону модуля или пространства.');
@@ -144,7 +145,8 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
       }
       const cid = id('c');
       const candidate = structuredClone(d);
-      candidate.layout.connections.push({ id: cid, a: pending, b: a, width });
+      if(tool==='bridge'){candidate.version=2;(candidate.layout.bridges??=[]).push({id:cid,a:pending,b:a,width,rise:Math.max(2.2,d.construction.wallHeight+.3),stairRun:Math.max(2.2,d.construction.wallHeight+.3)*2});}
+      else candidate.layout.connections.push({ id: cid, a: pending, b: a, width });
       setConnectionPreview({ draft: candidate, id: cid });
       setSelected('');
       setPending(null);
@@ -185,6 +187,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
     const x = n.layout;
     x.modules = x.modules.filter(m => m.id !== selected);
     x.spaces = x.spaces.filter(m => m.id !== selected);
+    if(x.bridges)x.bridges=x.bridges.filter(c=>c.id!==selected&&c.a.room!==selected&&c.b.room!==selected);
     x.connections = x.connections.filter(c => c.id !== selected && c.a.room !== selected && c.b.room !== selected);
     x.openings = x.openings.filter(o => o.id !== selected && o.room !== selected);
     x.walls = x.walls.filter(w => w.id !== selected);
@@ -268,6 +271,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
     if(!inspection){saveRun(value,value.finished?'finished':'stopped');setResult(value);setShowRoute(true);}
     setWalk(null);
   },[inspection,saveRun]);
+  const bridge=current.layout.bridges?.find(b=>b.id===selected);
   const m = current.layout.modules.find(m => m.id === selected), c = current.layout.connections.find(c => c.id === selected), o = current.layout.openings.find(o => o.id === selected);
   const fit = () => setView({ x: -1, z: -1, width: d.parameters.columns + 2, height: d.parameters.rows + 2 });
   const numberField = (label: string, value: number, onChange: (v: number) => void, step = .1, min?: number, max?: number) => <label className="field"><span>{label}</span><input aria-label={label} type="number" step={step} value={Number.isFinite(value) ? value : ''} min={min} max={max} onChange={e => {
@@ -276,6 +280,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
   const anchorOptions = (value: Anchor, onChange: (a: Anchor) => void) => <><label className="field">Пространство<select aria-label="Пространство" value={value.room} onChange={e => onChange({ ...value, room: e.target.value, edge: 0, offset: 0 })}>{rooms(l).map(r => <option key={r.id} value={r.id}>{r.id}</option>)}</select></label>{numberField('Сторона', value.edge, v => onChange({ ...value, edge: v }), 1, 0, (rooms(l).find(r => r.id === value.room)?.polygon.length ?? 4) - 1)}{numberField('Смещение проёма, м', value.offset, v => onChange({ ...value, offset: v }))}</>;
   if (walk) return <main className="walk-main"><WalkCanvas maze={walk} inspection={inspection} onCancel={onWalkCancel} onError={onWalkError} onCheckpoint={onWalkCheckpoint} onEnd={onWalkEnd}/></main>;
   return <div className="free-app"><header className="topbar"><div className="brand"><strong>MAZE <span>LAB</span></strong></div><label className="route-toggle"><input type="checkbox" role="switch" aria-label="Редактор свободного размещения" checked onChange={()=>onClose(d,ready,result)}/> Редактор свободного размещения</label><span>Черновик сохраняется на устройстве</span></header><aside className="free-sidebar"><h2>Свободное размещение</h2><label className="field">Тип лабиринта<select aria-label="Тип лабиринта" value={d.parameters.generationType ?? 'classical'} onChange={e => mutate(n => n.parameters.generationType = e.target.value as Parameters['generationType'])}><option value="classical">Классический</option><option value="living">Живой</option><option value="corridor">Коридорный</option></select></label><label className="field">Алгоритм<select value={d.parameters.algorithm} onChange={e => mutate(n => n.parameters.algorithm = e.target.value as Parameters['algorithm'])}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
+    {numberField('Крытые мосты',d.parameters.freeBridgeCount??0,v=>mutate(n=>{n.parameters.freeBridgeCount=v;n.parameters.extraConnections=Math.max(n.parameters.extraConnections,v);}),1,0,2)}<p>Мост проходит над нижним маршрутом. Две лестницы занимают отдельное место; каждый мост входит в число дополнительных соединений.</p>
     {numberField('Разброс углов, °', d.parameters.freeAngleSpread ?? 100, v => mutate(n => n.parameters.freeAngleSpread = v), 5, 0, 120)}
     <label className="field">Центральный перекрёсток<select aria-label="Центральный перекрёсток" value={d.parameters.freeJunctionDegree ?? 'auto'} onChange={e => mutate(n => {
       if (e.target.value === 'auto') delete n.parameters.freeJunctionDegree; else n.parameters.freeJunctionDegree = Number(e.target.value) as 3 | 5;
@@ -287,7 +292,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
       setBusy(false);
       setNotice('Отменено. Текущая карта сохранена.');
     }}>Отменить операцию</button>}
-    <h3>Редактор</h3><div className="free-tools">{(['select', 'module', 'connection', 'wall', 'opening'] as Tool[]).map((t, i) => <button key={t} aria-pressed={tool === t} onClick={() => changeTool(t)}>{['Выбрать / двигать', 'Добавить модуль', 'Соединить', 'Стена', 'Проём'][i]}</button>)}</div><p>Модуль: перетаскивание. Связь: две стороны. Стена: две точки. Проём: сторона пространства.</p><label className="field">Новый модуль<select aria-label="Новый модуль" value={moduleType} onChange={e => setModuleType(e.target.value as '2x2' | '2x6')}><option value="2x2">2×2 м</option><option value="2x6">2×6 м</option></select></label>{numberField('Ширина нового проёма, м', width, setWidth, .1, 1, 3)}<label><input type="checkbox" checked={snap} onChange={e => setSnap(e.target.checked)} /> Привязка 0,1 м / 15°</label><div className="free-tools"><button disabled={!state.past.length} onClick={() => {
+    <h3>Редактор</h3><div className="free-tools">{(['select', 'module', 'connection', 'bridge', 'wall', 'opening'] as Tool[]).map((t, i) => <button key={t} aria-pressed={tool === t} onClick={() => changeTool(t)}>{['Выбрать / двигать', 'Добавить модуль', 'Соединить', 'Мост над проходом', 'Стена', 'Проём'][i]}</button>)}</div><p>Модуль: перетаскивание. Связь: две стороны. Стена: две точки. Проём: сторона пространства.</p><label className="field">Новый модуль<select aria-label="Новый модуль" value={moduleType} onChange={e => setModuleType(e.target.value as '2x2' | '2x6')}><option value="2x2">2×2 м</option><option value="2x6">2×6 м</option></select></label>{numberField('Ширина нового проёма, м', width, setWidth, .1, 1, 3)}<label><input type="checkbox" checked={snap} onChange={e => setSnap(e.target.checked)} /> Привязка 0,1 м / 15°</label><div className="free-tools"><button disabled={!state.past.length} onClick={() => {
       dispatch({ type: 'undo' });
       setAnalysis(null);
     }}>Отменить правку</button><button disabled={!state.future.length} onClick={() => {
@@ -302,13 +307,14 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
       n.layout.modules.find(x => x.id === m.id)!.angle = quantize(snap ? Math.round((m.angle + 15) / 15) * 15 : m.angle + 15);
     })}>Повернуть на 15°</button><p>{size(m).join(' × ')} м</p></fieldset>}
     {c && <fieldset><legend>Соединение</legend>{numberField('Ширина связи, м', c.width, v => mutate(n => n.layout.connections.find(x => x.id === c.id)!.width = v), .1, 1, 3)}<p>Первый проём</p>{anchorOptions(c.a, a => mutate(n => n.layout.connections.find(x => x.id === c.id)!.a = a))}<p>Второй проём</p>{anchorOptions(c.b, a => mutate(n => n.layout.connections.find(x => x.id === c.id)!.b = a))}</fieldset>}
+    {bridge&&<fieldset><legend>Крытый мост</legend>{numberField('Высота настила, м',bridge.rise,v=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.rise=v),.1,2.2,12)}{numberField('Длина лестницы, м',bridge.stairRun,v=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.stairRun=v),.1,1,30)}{numberField('Ширина моста, м',bridge.width,v=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.width=v),.1,1,3)}<p>Первый проём</p>{anchorOptions(bridge.a,a=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.a=a))}<p>Второй проём</p>{anchorOptions(bridge.b,a=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.b=a))}</fieldset>}
     {o && <fieldset><legend>Проём</legend>{anchorOptions(o, a => mutate(n => Object.assign(n.layout.openings.find(x => x.id === o.id)!, a)))}{numberField('Ширина проёма, м', o.width, v => mutate(n => n.layout.openings.find(x => x.id === o.id)!.width = v), .1, 1, 3)}<button onClick={() => mutate(n => n.layout.entrance = o.id)}>Сделать входом</button><button onClick={() => mutate(n => n.layout.exit = o.id)}>Сделать выходом</button></fieldset>}
-    <label className="field">Выбрать объект<select aria-label="Выбрать объект" value={selected} onChange={e => setSelected(e.target.value)}><option value="">Нет</option>{[...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls].map(v => <option key={v.id} value={v.id}>{v.id}</option>)}</select></label><button disabled={!selected} onClick={remove}>Удалить выбранное</button>{ready && <EnvironmentControls maze={ready} onChange={environment => mutate(n => n.environment = environment)} />}<ConstructionControls value={d.construction} onChange={p => mutate(n => Object.assign(n.construction, p))} /></aside>
+    <label className="field">Выбрать объект<select aria-label="Выбрать объект" value={selected} onChange={e => setSelected(e.target.value)}><option value="">Нет</option>{[...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]].map(v => <option key={v.id} value={v.id}>{v.id}</option>)}</select></label><button disabled={!selected} onClick={remove}>Удалить выбранное</button>{ready && <EnvironmentControls maze={ready} onChange={environment => mutate(n => n.environment = environment)} />}<ConstructionControls value={d.construction} onChange={p => mutate(n => Object.assign(n.construction, p))} /></aside>
     <main className="free-workspace">{connectionPreview && <div className="free-notice">Предварительное соединение · проверьте пролёты на карте. <button disabled={issues.some(i => i.ids.includes(connectionPreview.id))} onClick={() => {
       const candidate = connectionPreview;
       update(candidate.draft);
       setSelected(candidate.id);
-    }}>Добавить связь</button><button onClick={() => setConnectionPreview(null)}>Отменить связь</button></div>}<div className="free-tools"><button onClick={() => setLibrary(true)}>Библиотека</button><button onClick={() => downloadJson('maze-lab-draft.json', encodeDraft(d))}>Экспорт черновика</button><label className="free-file">Импорт JSON<input aria-label="Импорт JSON" type="file" accept=".json" onChange={e => {
+    }}>{connectionPreview.draft.layout.bridges?.some(b=>b.id===connectionPreview.id)?'Добавить мост':'Добавить связь'}</button><button onClick={() => setConnectionPreview(null)}>Отменить связь</button></div>}<div className="free-tools"><button onClick={() => setLibrary(true)}>Библиотека</button><button onClick={() => downloadJson('maze-lab-draft.json', encodeDraft(d))}>Экспорт черновика</button><label className="free-file">Импорт JSON<input aria-label="Импорт JSON" type="file" accept=".json" onChange={e => {
       const f = e.target.files?.[0];
       if (f) void fileImport(f);
       e.currentTarget.value = '';
@@ -361,6 +367,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
             return null;
           }
         })}
+        {(current.layout.bridges??[]).map((b,i)=>{try{const g=bridgeGeometry(current.layout,b),mid=g.at(.5);return <g key={b.id} onClick={e=>{if(tool==='select'){e.stopPropagation();setSelected(b.id);}}}><polygon points={points(g.polygon)} fill={issueIds.has(b.id)?'#a84a4877':'#8068b333'} stroke={selected===b.id?'#d2eb75':'#cfb3ff'} strokeWidth=".08" strokeDasharray=".3 .15"/><polygon points={points(g.deck)} fill="#c9aaff44"/><text x={mid.x} y={mid.z-.2} fontSize=".35" fill="#e2ccff">М{i+1} · ↑ {b.rise.toFixed(1)} м</text></g>;}catch{return null;}})}
         {current.layout.openings.map(o => {
           try {
             const g = anchorGeometry(current.layout, o, o.width);
@@ -392,6 +399,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
       <section className="free-validation" aria-label="Проверка конструкции"><h3>Проверка конструкции</h3>{issues.length ? <ul>{issues.slice(0, 30).map((i, n) => <li key={n}><button onClick={() => setSelected(i.ids[0] ?? '')}>{i.message}</button></li>)}</ul> : <p>Связность, пролёты, проёмы и физическая проходимость проверены.</p>}</section>
       {stats && <p>Модулей: {l.modules.length} · 2×2: {l.modules.filter(m => m.type === '2x2').length} · 2×6: {l.modules.filter(m => m.type === '2x6').length} · циклов: {stats.cycles} · площадь: {stats.area.toFixed(1)} м² · маршрут: {stats.optimalLength.toFixed(1)} м</p>}{materials && <p>Стоек: {materials.posts} · ткани: {materials.fabricSquareMetres.toFixed(1)} м² · обвязки: {(materials.upperMetres + materials.lowerMetres).toFixed(1)} м. Раскрой и отходы не учитываются.</p>}
       <div className="free-tools"><label>Модель поиска<select value={profile} onChange={e => setProfile(e.target.value as typeof profile)}><option value="explorer">Без направления</option><option value="compass">Знает направление</option><option value="outline">Знает направление и контур</option></select></label><button disabled={!ready || busy} onClick={() => run('analyze')}>Проанализировать</button></div>{analysis && <p>Холодная площадь: {(analysis.coldAreaRatio * 100).toFixed(1)}% · крупнейшая область: {analysis.largestColdArea.toFixed(1)} м² · средний путь поиска: {analysis.expectedLength.toFixed(1)} м · завершено симуляций: {(analysis.finishedRatio * 100).toFixed(1)}% из {analysis.samples}. Тепло показано на пространствах и соединениях.</p>}
+      {!!analysis?.bridgeUsage.length&&<p aria-label="Использование мостов">{analysis.bridgeUsage.map((b,i)=>`М${i+1}: сверху посещают ${(b.overProbability*100).toFixed(1)}%, снизу ${(b.underProbability*100).toFixed(1)}% симуляций`).join(' · ')}</p>}
       <p role="status" className="free-notice">{notice}</p>
     </main></div>;
 }

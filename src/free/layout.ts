@@ -1,3 +1,5 @@
+import {freeSpatialRay} from './spatial-visibility';
+import {bridgeGeometry,bridgeColumns,bridgeIssues,bridgeSurface,bridgeSamples} from './bridges';
 import { validateParameters, validateConstruction } from '../core/maze';
 import type { Maze, Parameters, Point, Wall } from '../core/maze';
 import type { Domain } from '../core/domain';
@@ -50,7 +52,7 @@ function cutWall(w: Wall, cuts: Wall[]): Wall[] {
   return out;
 }
 export function physical(l: FreeLayout) {
-  const rs = rooms(l), polygons = rs.map(r => r.polygon), holes = rs.flatMap(r => r.holes), cuts: Wall[] = [], connections: { id: string; polygon: Point[]; sides: Wall[] }[] = [];
+  const rs = rooms(l), polygons = rs.map(r => r.polygon), holes = rs.flatMap(r => r.holes), cuts: Wall[] = [], connections: { id: string; polygon: Point[]; sides: Wall[] }[] = [],bridges:ReturnType<typeof bridgeGeometry>[]=[];
   for (const c of l.connections) {
     try {
       const g = connectionGeometry(l, c);
@@ -61,6 +63,7 @@ export function physical(l: FreeLayout) {
       /* Invalid draft anchors are reported by validateFree. */
     }
   }
+  for(const bridge of l.bridges??[])try{const g=bridgeGeometry(l,bridge);bridges.push(g);cuts.push(g.a.wall,g.b.wall);}catch{/* Invalid bridge remains editable. */}
   for (const o of l.openings) try {
     cuts.push(anchorGeometry(l, o, o.width).wall);
   } catch {
@@ -70,6 +73,7 @@ export function physical(l: FreeLayout) {
   panels.push(...l.walls);
   const postMap = new Map<string, Point>(), add = (p: Point) => postMap.set(`${quantize(p.x)}:${quantize(p.z)}`, p);
   l.supports?.forEach(add);
+  bridgeColumns(l).forEach(add);
   l.modules.forEach(m => modulePolygon(m).forEach(add));
   panels.forEach(w => ends(w).forEach(add));
   if (!l.preservedPanels) cuts.forEach(w => ends(w).forEach(add));
@@ -78,7 +82,7 @@ export function physical(l: FreeLayout) {
     if (t !== null) add(lerp(...ends(a), t));
   }
   const posts = [...postMap.values()], contains = (p: Point) => polygons.some(poly => pointIn(p, poly)) && !holes.some(h => pointIn(p, h, false)), boundaries = [...polygons.flatMap(edges), ...holes.flatMap(edges)], obstacles = [...panels, ...posts.map(p => ({ ...segment(p, p), thickness: .12 }))];
-  return { rooms: rs, polygons, holes, panels, posts, obstacles, boundaries, contains, connections };
+  return { rooms: rs, polygons, holes, panels, posts, obstacles, boundaries, contains, connections,bridges };
 }
 export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   const l = d.layout, out: FreeIssue[] = [], issue = (code: string, message: string, ...ids: string[]) => out.push({ code, message, ids }), site = siteGeometry(d.parameters), rs = rooms(l);
@@ -90,7 +94,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   }
   if (!l.modules.length) issue('empty', 'Добавьте хотя бы один модуль.');
   const ids = new Set<string>();
-  for (const v of [...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls]) {
+  for (const v of [...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]]) {
     if (!v.id || ids.has(v.id)) issue('id', 'Идентификаторы должны быть уникальными.', v.id);
     ids.add(v.id);
   }
@@ -102,6 +106,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
     if (!r.polygon.every(p => site.contains(p)) || !edges(r.polygon).every(w => segmentInside(...ends(w), site.contains, site.boundaries)) || site.holes.some(h => pointIn(centroid(h), r.polygon, false) && !r.holes.some(v => pointIn(centroid(h), v)))) issue('outside', 'Пространство выходит за площадку или перекрывает отверстие.', r.id);
   }
   for (let i = 0; i < rs.length; i++)for (let j = i + 1; j < rs.length; j++)if (overlap(rs[i]!.polygon, rs[j]!.polygon)) issue('overlap', 'Пространства пересекаются.', rs[i]!.id, rs[j]!.id);
+  if(l.bridges?.length)for(const error of bridgeIssues(l,d.construction.wallHeight,site,[...rs.map(r=>r.polygon),...physical(l).connections.map(c=>c.polygon)]))issue('bridge',error.message,error.id);
   const used: { anchor: Anchor; width: number; id: string }[] = [];
   for (const c of l.connections) try {
     if (c.a.room === c.b.room) throw Error('Связь должна соединять разные пространства.');
@@ -127,6 +132,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   } catch (e) {
     issue('anchor', String((e as Error).message), c.id);
   }
+  for(const bridge of l.bridges??[])try{bridgeGeometry(l,bridge);used.push({anchor:bridge.a,width:bridge.width,id:bridge.id},{anchor:bridge.b,width:bridge.width,id:bridge.id});}catch(e){issue('bridge',(e as Error).message,bridge.id);}
   for (const o of l.openings) try {
     anchorGeometry(l, o, o.width);
     used.push({ anchor: o, width: o.width, id: o.id });
@@ -160,7 +166,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
     for (let i = 0; i < queue.length; i++) {
       const id = queue[i]!;
       seen.add(id);
-      for (const c of l.connections) {
+      for (const c of [...l.connections,...l.bridges??[]]) {
         const n = c.a.room === id ? c.b.room : c.b.room === id ? c.a.room : null;
         if (n && !queue.includes(n)) queue.push(n);
       }
@@ -169,6 +175,10 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
     if (!out.length) {
       const nav = buildNavigation(l);
       if (nav.paths.some(p => p === null)) issue('clearance', 'Нет прохода с учётом радиуса игрока, стен и стоек.');
+      for(const bridge of l.bridges??[]){
+        const columns=bridgeColumns(l),solids=[...nav.panels.map(w=>({...w,y:w.y??0,height:w.height??d.construction.wallHeight})),...nav.posts.map(p=>({...segment(p,p),thickness:.12,y:0,height:columns.some(c=>distance(c,p)<EPS)?Math.max(...l.bridges!.map(b=>b.rise))+d.construction.wallHeight:d.construction.wallHeight}))];
+        if(bridgeSamples(l,bridge,.05).some(p=>solids.some(w=>p.y!+1.7>w.y&&p.y!+.05<w.y+w.height&&wallDistance(p,w)<.25-EPS)))issue('clearance','Мост перекрыт стеной или стойкой.',bridge.id);
+      }
     }
   }
   return out;
@@ -255,6 +265,13 @@ export function buildNavigation(l: FreeLayout) {
   } catch {
     paths.push(null);
   }
+  for(const bridge of l.bridges??[])try{
+    const g=bridgeGeometry(l,bridge),a=rs.findIndex(r=>r.id===bridge.a.room),b=rs.findIndex(r=>r.id===bridge.b.room);
+    const pa={x:g.a.mid.x-g.a.normal.x*.35,z:g.a.mid.z-g.a.normal.z*.35},pb={x:g.b.mid.x-g.b.normal.x*.35,z:g.b.mid.z-g.b.normal.z*.35};
+    const ra=localRoute(centers[a]!,pa,rs[a]!.polygon,rs[a]!.holes,phys.obstacles),rb=localRoute(pb,centers[b]!,rs[b]!.polygon,rs[b]!.holes,phys.obstacles);
+    const route=ra&&rb?[...ra,...g.path,...rb]:null;
+    paths.push(route);if(route){passages[a]!.push(b);passages[b]!.push(a);edgePaths.set(`${a}:${b}`,route);edgePaths.set(`${b}:${a}`,[...route].reverse());}
+  }catch{paths.push(null);}
   const portalPaths = new Map<string, Point[]>();
   for (const o of l.openings) try {
     const g = anchorGeometry(l, o, o.width), i = rs.findIndex(r => r.id === o.room), a = { x: g.mid.x - g.normal.x * .35, z: g.mid.z - g.normal.z * .35 }, approach = localRoute(centers[i]!, a, rs[i]!.polygon, rs[i]!.holes, phys.obstacles), route = approach && phys.obstacles.every(w => movementClearance(a, g.mid, w) >= .25 - EPS) ? approach : null;
@@ -293,7 +310,7 @@ export function freeDomain(maze: Maze): Domain {
   const cached=domainCache.get(maze.free!);if(cached)return cached;
   const r = freeRuntime(maze), cells = r.rooms.map((_, i) => i);
   const result:Domain={
-    active: new Uint8Array(cells.length).fill(1), cells, modules: new Uint8Array(maze.free!.modules.length).fill(1), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: r.rooms.flatMap((s, i) => edges(s.polygon).map(w => ({ wall: w, portal: { cell: i, side: 'north' as const } }))), area: r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: r.contains, constrain(from, to) {
+    active: new Uint8Array(cells.length).fill(1), cells, modules: new Uint8Array(maze.free!.modules.length).fill(1), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: r.rooms.flatMap((s, i) => edges(s.polygon).map(w => ({ wall: w, portal: { cell: i, side: 'north' as const } }))), area: (maze.free!.bridges??[]).reduce((sum,b)=>{const g=bridgeGeometry(maze.free!,b);return sum+b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun);},0)+r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: p => p.bridge!==undefined ? (()=>{const surface=bridgeSurface(maze.free!,p);return !!surface&&Math.abs((p.y??0)-surface.y!)<1e-5;})() : (p.y??0)===0&&r.contains(p), constrain(from, to) {
       if (segmentInside(from, to, r.contains, r.boundaries)) return { ...to };
       let lo = 0, hi = 1;
       for (let i = 0; i < 30; i++) {
@@ -307,12 +324,12 @@ export function freeDomain(maze: Maze): Domain {
 }
 export function freeRay(maze: Maze, start: Point, angle: number, limit = 24) {
   const r = freeRuntime(maze), end = { x: start.x + Math.cos(angle) * limit, z: start.z + Math.sin(angle) * limit };
-  let best = r.obstacles.reduce((n, w) => Math.min(n, rayWall(start, angle, w, n)), limit);
+  let best = maze.free!.bridges?.length?freeSpatialRay(maze,{...start,y:(start.y??0)+1.7},{x:Math.cos(angle),z:Math.sin(angle)},limit).length:r.obstacles.reduce((n, w) => Math.min(n, rayWall(start, angle, w, n)), limit);
   for (const wall of r.boundaries) {
     const t = intersection(start, end, ...ends(wall));
     if (t !== null && t > EPS && t * limit < best) {
       const after = lerp(start, end, Math.min(1, t + .00001));
-      if (!r.contains(after)) best = t * limit;
+      if (!r.contains(after)&&!r.bridges.some(g=>g.contains(after))) best = t * limit;
     }
   }
   return best;
@@ -332,7 +349,7 @@ export function freeRoute(maze: Maze, from = maze.entrance.cell, to = maze.exit.
   const nodes: { point: Point; room: number }[] = [], adjacent = new Map<number, { to: number; path: Point[]; cost: number }[]>(), add = (p: Point, room: number) => {
     nodes.push({ point: p, room });
     return nodes.length - 1;
-  }, cost = (p: Point[]) => p.slice(1).reduce((n, v, i) => n + distance(v, p[i]!), 0), link = (a: number, b: number, path: Point[]) => {
+  }, cost = (p: Point[]) => p.slice(1).reduce((n, v, i) => n + Math.hypot(v.x-p[i]!.x,v.z-p[i]!.z,(v.y??0)-(p[i]!.y??0)), 0), link = (a: number, b: number, path: Point[]) => {
     if (!adjacent.has(a)) adjacent.set(a, []);
     if (!adjacent.has(b)) adjacent.set(b, []);
     adjacent.get(a)!.push({ to: b, path, cost: cost(path) });
@@ -354,6 +371,12 @@ export function freeRoute(maze: Maze, from = maze.entrance.cell, to = maze.exit.
       /* Invalid drafts have no route. */
     }
   }
+  for(const bridge of l.bridges??[])try{
+    const g=bridgeGeometry(l,bridge),a=r.rooms.findIndex(v=>v.id===bridge.a.room),b=r.rooms.findIndex(v=>v.id===bridge.b.room);
+    if(!r.edgePaths.has(`${a}:${b}`))continue;
+    const pa={x:g.a.mid.x-g.a.normal.x*.35,z:g.a.mid.z-g.a.normal.z*.35},pb={x:g.b.mid.x-g.b.normal.x*.35,z:g.b.mid.z-g.b.normal.z*.35};
+    link(add(pa,a),add(pb,b),[pa,...g.path,pb]);
+  }catch{/* Invalid drafts have no bridge route. */}
   for (let i = 0; i < nodes.length; i++)for (let j = i + 1; j < nodes.length; j++)if (nodes[i]!.room === nodes[j]!.room) {
     const room = r.rooms[nodes[i]!.room]!, path = localRoute(nodes[i]!.point, nodes[j]!.point, room.polygon, room.holes, r.obstacles);
     if (path) link(i, j, path);
@@ -395,5 +418,5 @@ export function freeMaze(d: FreeDraft, check = true): Maze {
     return { cell: o ? rs.findIndex(r => r.id === o.room) : 0, side: 'north' as const, width: o?.width, freeId: id };
   };
   runtimeCache.set(layout,nav);
-  return { version: 5, free: layout, parameters: structuredClone(d.parameters), width: d.parameters.columns, depth: d.parameters.rows, passages: nav.passages, entrance: portal(layout.entrance), exit: portal(layout.exit), portals: layout.openings.map(o => portal(o.id)), ...d.construction, ...(d.environment ? { environment: structuredClone(d.environment) } : {}) };
+  return { version: layout.bridges?.length?7:5, free: layout, parameters: structuredClone(d.parameters), width: d.parameters.columns, depth: d.parameters.rows, passages: nav.passages, entrance: portal(layout.entrance), exit: portal(layout.exit), portals: layout.openings.map(o => portal(o.id)), ...d.construction, ...(d.environment ? { environment: structuredClone(d.environment) } : {}) };
 }

@@ -9,7 +9,7 @@ import { corridorNavigation } from '../core/corridor-navigation';
 import { mazeDraft } from './json';
 /** Preserve physical panels and openings; conversion never regenerates a legacy map. */
 export function convertToFree(maze: Maze): FreeDraft {
-  if (maze.version === 5) return mazeDraft(maze);
+  if ((maze.version===5||maze.version===7)) return mazeDraft(maze);
   if (maze.version === 6) throw Error('Свободная копия доступна для одноэтажных модульных карт.');
   if (maze.parameters.moduleSize === undefined) throw Error('Свободная копия доступна для модульных карт.');
   const l = emptyLayout(), d = domainOf(maze), footprints = moduleFootprints(maze);

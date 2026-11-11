@@ -1,9 +1,10 @@
+import {bridgeGeometry} from './bridges';
 import type { Maze, Point } from '../core/maze';
 import { portalPoint } from '../core/maze';
 import { freeRuntime, siteGeometry } from './layout';
 import { area, distance, ends, segmentInside } from './geometry';
 /** Shared weights include connecting passages, without counting a room's subdivision as a cycle. */
-export function freeAreaWeights(maze: Maze): number[] {
+export function freeAreaWeights(maze: Maze,includeBridges=true): number[] {
   const r = freeRuntime(maze), weights = r.rooms.map(s => area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0));
   for (const c of maze.free!.connections) {
     const p = r.connections.find(g => g.id === c.id);
@@ -12,6 +13,7 @@ export function freeAreaWeights(maze: Maze): number[] {
     if (a >= 0) weights[a]! += weight;
     if (b >= 0) weights[b]! += weight;
   }
+  if(includeBridges)for(const b of maze.free!.bridges??[]){const g=bridgeGeometry(maze.free!,b),area=b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun)/2;for(const id of [b.a.room,b.b.room]){const i=r.rooms.findIndex(r=>r.id===id);if(i>=0)weights[i]!+=area;}}
   return weights;
 }
 /** Known plot only: no internal wall, module or generated island is exposed to the policy. */

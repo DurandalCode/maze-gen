@@ -1,3 +1,4 @@
+import {bridgeGeometry} from '../free/bridges';
 import {storeyView} from './two-storey';
 import {freeRuntime,modulePolygon,size} from '../free/layout';
 import {edges,ends,segmentDistance} from '../free/geometry';
@@ -27,7 +28,7 @@ export interface TimberStructure {
 export interface ModuleFootprint { angle?:number; x: number; z: number; size: number; width?:number; depth?:number }
 export function moduleFootprints(maze: Maze): ModuleFootprint[] {
   if(maze.storeys)return moduleFootprints(storeyView(maze,0));
-  if(maze.version===5)return maze.free!.modules.map(m=>{const [width,depth]=size(m);return {x:m.x-width/2,z:m.z-depth/2,width,depth,size:2,angle:m.angle};});
+  if((maze.version===5||maze.version===7))return maze.free!.modules.map(m=>{const [width,depth]=size(m);return {x:m.x-width/2,z:m.z-depth/2,width,depth,size:2,angle:m.angle};});
   if(maze.version===4)return maze.layout!.modules.map(m=>{const r=footprint(m);return {x:m.x,z:m.z,size:2,width:metres(r.x2-r.x1),depth:metres(r.z2-r.z1)};});
   const { moduleSize, columns, rows, corridorWidth: gap } = maze.parameters;
   if (moduleSize === undefined) return [];
@@ -41,7 +42,7 @@ export function moduleFootprints(maze: Maze): ModuleFootprint[] {
 export function timberStructure(maze: Maze): TimberStructure {
   if(maze.shaftRects){const {shaftRects,...plain}=maze,base=timberStructure(plain);const inShaft=(x:number,z:number)=>shaftRects.some(r=>x>=r.x1-.1&&x<=r.x2+.1&&z>=r.z1-.1&&z<=r.z2+.1);return {...base,posts:base.posts.filter(p=>!inShaft(p.x,p.z)),frames:base.frames.filter(w=>!shaftRects.some(r=>Math.max(w.x1,w.x2)>=r.x1-.1&&Math.min(w.x1,w.x2)<=r.x2+.1&&Math.max(w.z1,w.z2)>=r.z1-.1&&Math.min(w.z1,w.z2)<=r.z2+.1))};}
   if(maze.storeys)return timberStructure(storeyView(maze,0));
-  if(maze.version===5){
+  if((maze.version===5||maze.version===7)){
     const r=freeRuntime(maze),frames=maze.free!.modules.flatMap(m=>edges(modulePolygon(m))),lowerFrames:LowerFrame[]=[];
     for(const m of maze.free!.modules.filter(m=>m.type==='2x6')){
       const perimeter=edges(modulePolygon(m));
@@ -135,5 +136,5 @@ export function timberStructure(maze: Maze): TimberStructure {
 /** Uprights occupy a conservative 12 × 12 cm envelope at lattice intersections. */
 export function supportColliders(maze: Maze): Wall[] {
   if(maze.storeys)return [0,1].flatMap(floor=>supportColliders(storeyView(maze,floor)).filter(w=>!maze.storeys!.stairs.some(st=>st.shaft.some(c=>{const r=domainOf(maze.storeys!.floors[0]).rectangles[c]!;return w.x1>=r.x1-.1&&w.x1<=r.x2+.1&&w.z1>=r.z1-.1&&w.z1<=r.z2+.1;}))).map(w=>({...w,y:floor*maze.storeys!.floorHeight,height:maze.wallHeight,floor})));
-  return timberStructure(maze).posts.map(p => ({ x1: p.x, z1: p.z, x2: p.x, z2: p.z, thickness: FRAME_POST_SIZE }));
+  return timberStructure(maze).posts.map(p => {const bridge=maze.free?.bridges?.find(b=>bridgeGeometry(maze.free!,b).deck.some(q=>Math.hypot(p.x-q.x,p.z-q.z)<1e-7));return {x1:p.x,z1:p.z,x2:p.x,z2:p.z,thickness:FRAME_POST_SIZE,...(maze.free?.bridges?.length?{y:0,height:bridge?bridge.rise+maze.wallHeight:maze.wallHeight}:{})};});
 }

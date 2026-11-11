@@ -32,6 +32,7 @@ export interface ColdRegion {
   area: number;
 }
 export interface ColdspotAnalysis {
+  bridgeUsage?:import('../free/quality').FreeBridgeUsage[];
   completionRatio?:number;
   modelVersion?:number;
   sideDistricts?:SideDistricts;

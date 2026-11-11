@@ -11,7 +11,7 @@ export function PortalControls({ maze, edit, onEdit, onChange }: {
   const portals = mazePortals(maze), size = routingSize(maze);
   const sideNames = { north: 'Север', east: 'Восток', south: 'Юг', west: 'Запад' };
   const pair=(entrance:Portal,exit:Portal)=>{
-    if(maze.version===5){const draft=mazeDraft(maze);draft.layout.entrance=entrance.freeId!;draft.layout.exit=exit.freeId!;onChange(freeMaze(draft,false));}
+    if((maze.version===5||maze.version===7)){const draft=mazeDraft(maze);draft.layout.entrance=entrance.freeId!;draft.layout.exit=exit.freeId!;onChange(freeMaze(draft,false));}
     else onChange({...maze,portals:[...portals],entrance,exit});
   };
   const select = (key: 'entrance' | 'exit', index: number) => {
@@ -20,7 +20,7 @@ export function PortalControls({ maze, edit, onEdit, onChange }: {
     pair(key==='entrance'?selected:counterpart,key==='exit'?selected:counterpart);
   };
   const label = (p: Portal, i: number) => {
-    if(maze.version===4||maze.version===5){const q=portalPoint(maze,p);return `${i+1} · ${maze.version===5?'':sideNames[p.side]+' · '}X ${q.x.toFixed(1)}, Z ${q.z.toFixed(1)} м`;}
+    if(maze.version===4||(maze.version===5||maze.version===7)){const q=portalPoint(maze,p);return `${i+1} · ${(maze.version===5||maze.version===7)?'':sideNames[p.side]+' · '}X ${q.x.toFixed(1)}, Z ${q.z.toFixed(1)} м`;}
     const position = p.side === 'north' || p.side === 'south' ? p.cell%size.columns : Math.floor(p.cell/size.columns);
     return `${i+1} · ${sideNames[p.side]} · ${position+1}`;
   };
@@ -37,12 +37,12 @@ export function PortalControls({ maze, edit, onEdit, onChange }: {
     <button type="button" className="portal-add" onClick={() => pair(maze.exit,maze.entrance)}>⇄ Поменять местами</button>
     <ol>{portals.map((p, i) => <li key={`${p.cell}:${p.side}`}>
       <span>{label(p, i)}</span>
-      {maze.version!==5&&<><button type="button" aria-label={`Переместить проём ${i+1}`} aria-pressed={edit === i} onClick={() => onEdit(edit === i ? null : i)}>↗</button>
+      {(maze.version!==5&&maze.version!==7)&&<><button type="button" aria-label={`Переместить проём ${i+1}`} aria-pressed={edit === i} onClick={() => onEdit(edit === i ? null : i)}>↗</button>
       <button type="button" aria-label={`Удалить проём ${i+1}`} disabled={portals.length <= 2}
         onClick={() => { onChange(withPortals(maze, portals.filter((_, index) => index !== i))); onEdit(null); }}>×</button>
       </>}
     </li>)}</ol>
-    {maze.version===5?<p>Расположение проёмов меняется в редакторе свободного размещения.</p>:<button type="button" className="portal-add" aria-pressed={edit === 'add'} onClick={() => onEdit(edit === 'add' ? null : 'add')}>+ Добавить вход-выход</button>}
+    {(maze.version===5||maze.version===7)?<p>Расположение проёмов меняется в редакторе свободного размещения.</p>:<button type="button" className="portal-add" aria-pressed={edit === 'add'} onClick={() => onEdit(edit === 'add' ? null : 'add')}>+ Добавить вход-выход</button>}
     {edit !== null && <div className="portal-edit-notice" role="status">
       {edit === 'add' ? 'Нажмите на границу области, чтобы добавить проём.' : `Нажмите на границу области: новое место проёма ${edit+1}.`}
       <button type="button" onClick={() => onEdit(null)}>Отмена</button>

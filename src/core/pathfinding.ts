@@ -6,7 +6,7 @@ import { cellCenter, portalPoint, type Maze, type Point } from './maze';
 
 export function shortestPath(maze: Maze, from = maze.entrance.cell, to = maze.exit.cell): number[] {
   if(maze.storeys)return spatialShortestPath(maze,from,to);
-  if(maze.version===5)return freeRoute(maze,from,to).regions;
+  if((maze.version===5||maze.version===7))return freeRoute(maze,from,to).regions;
   if(maze.navigation&&from===maze.entrance.cell&&to===maze.exit.cell)return corridorRoute(maze).regions;
   if((maze.version===4&&!maze.navigation)||maze.storeys)return weightedPath(maze,from,to);
   if (!domainOf(maze).active[from] || !domainOf(maze).active[to]) return [];
@@ -27,7 +27,7 @@ export function shortestPath(maze: Maze, from = maze.entrance.cell, to = maze.ex
 
 /** Same boundary-to-boundary convention as a recorded traversal. */
 export function routePoints(maze: Maze): Point[] {
-  if(maze.version===5)return freeRoute(maze).points;
+  if((maze.version===5||maze.version===7))return freeRoute(maze).points;
   if(maze.version===4)return corridorRoute(maze).points;
   const path = shortestPath(maze);
   if(maze.storeys&&path.length)return [portalPoint(maze,maze.entrance),cellCenter(maze,path[0]!),...path.slice(1).flatMap((c,i)=>spatialEdgePoints(maze,path[i]!,c).slice(1)),portalPoint(maze,maze.exit)];

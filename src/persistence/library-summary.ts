@@ -15,14 +15,14 @@ type StoredMaze=Omit<Maze,'layout'|'width'|'depth'>&{
 export function storedModuleCount(maze:Maze):number|null{
  const m=maze as StoredMaze,p=m.parameters;
  if(p.moduleSize===undefined)return null;
- if(m.version===4||m.version===5)return (m.free??m.layout)!.modules.length;
+ if(m.version===4||(m.version===5||m.version===7))return (m.free??m.layout)!.modules.length;
  const count=(shape=p.shape)=>shapeMask({...p,shape}).reduce((a,b)=>a+b,0);
  return count()+(m.version===6?count(p.upperShape??p.shape):0);
 }
 /** Same identity as the runtime map; free navigation never needs to be rebuilt. */
 export function storedTopologyPayload(maze:Maze):unknown{
  const m=maze as StoredMaze;
- if(m.version===5)return freeIdentity({...m,width:m.width??m.parameters.columns,depth:m.depth??m.parameters.rows,free:m.free??m.layout} as Maze);
+ if((m.version===5||m.version===7))return freeIdentity({...m,width:m.width??m.parameters.columns,depth:m.depth??m.parameters.rows,free:m.free??m.layout} as Maze);
  if(m.version===4&&m.panels&&m.openings&&m.supports){
   const l=m.layout as CorridorLayout,shell=corridorShell(m.parameters,l.modules,l.spaces,l.networkVersion);
   return {boundary:mergeWalls(domainOf(shell).boundary.map(e=>e.wall)),...(l.spaces?{halls:l.spaces.filter(r=>r.kind==='hall').map(r=>({...r})).sort((a,b)=>a.x-b.x||a.z-b.z)}:{}),

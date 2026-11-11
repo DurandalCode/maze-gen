@@ -16,7 +16,7 @@ export function sideDistricts(input:Maze,probability?:ArrayLike<number>,threshol
  const maze=input.version===4&&!input.navigation?corridorNavigation(input):input,d=domainOf(maze),g=maze.navigation,source=g?.source??maze,sourceDomain=domainOf(source),area=d.area,largeAreaThreshold=Math.max(36,area*.08),goal=portalPoint(maze,maze.exit);
  const weights=new Float64Array(maze.passages.length),cold=new Float64Array(weights.length),visits=new Float64Array(weights.length);
  // Source heat has fine-cell indices; semantic assessment already has room indices.
- if(input===maze){const freeWeights=maze.version===5?freeAreaWeights(maze):null;for(const c of d.cells){const r=d.rectangles[c]!,a=freeWeights?.[c]??((r.x2-r.x1)*(r.z2-r.z1)),p=probability?.[c]??0;weights[c]=a;visits[c]=a*p;if(probability&&p<threshold)cold[c]=a;}}
+ if(input===maze){const freeWeights=(maze.version===5||maze.version===7)?freeAreaWeights(maze):null;for(const c of d.cells){const r=d.rectangles[c]!,a=freeWeights?.[c]??((r.x2-r.x1)*(r.z2-r.z1)),p=probability?.[c]??0;weights[c]=a;visits[c]=a*p;if(probability&&p<threshold)cold[c]=a;}}
  else for(const c of sourceDomain.cells){const room=g!.originalToRegion[c]!,r=sourceDomain.rectangles[c]!,a=(r.x2-r.x1)*(r.z2-r.z1),p=probability?.[c]??0;weights[room]!+=a;visits[room]!+=a*p;if(probability&&p<threshold)cold[room]!+=a;}
  const route=shortestPath(maze),routeDistances=new Map<number,number>();let length=0;
  for(let i=0;i<route.length;i++){if(i){const a=cellCenter(maze,route[i-1]!),b=cellCenter(maze,route[i]!);length+=maze.storeys?spatialEdgeLength(maze,route[i-1]!,route[i]!):Math.hypot(a.x-b.x,a.z-b.z);}routeDistances.set(route[i]!,length);}

@@ -15,7 +15,7 @@ export class Recorder {
     this.distance += spatialDistance(point,this.last);
     this.last = { ...point }; this.elapsed = elapsed;
     const prev = this.samples[this.samples.length-1]!;
-    if (force || (spatialDistance(point,prev) >= 0.08 || point.floor!==prev.floor || point.stair!==prev.stair))
+    if (force || (spatialDistance(point,prev) >= 0.08 || point.floor!==prev.floor || point.stair!==prev.stair || point.bridge!==prev.bridge))
       this.samples.push({ ...point, time: elapsed });
   }
 }

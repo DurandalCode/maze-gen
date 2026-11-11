@@ -1,9 +1,10 @@
+import {bridgeGeometry} from './bridges';
 import { freeAreaWeights, outlineDistances } from './analysis-geometry';
 import { sideDistricts } from '../analysis/side-districts';
 import { shortestPath } from '../core/pathfinding';
 import type { Maze, Point } from '../core/maze';
 import { freeRuntime, freeRay } from './layout';
-import { distance } from './geometry';
+import { distance,intersection } from './geometry';
 import { random } from '../core/random';
 import { routeTraps } from '../analysis/route-traps';
 import { loopTraps } from '../analysis/loop-traps';
@@ -13,27 +14,44 @@ import type {AnalysisOptions,ColdspotAnalysis} from '../analysis/coldspots';
 import {LearnedGraph} from '../analysis/learned-graph';
 /** Present completed free-space searches in the common heat-map interface. */
 export function freeHeatDisplay(maze:Maze,options:AnalysisOptions):ColdspotAnalysis {
-  const result=analyzeFree(maze,options.samples,options.profile),weights=freeAreaWeights(maze),seen=new Set<number>(),regions:{cells:number[];area:number}[]=[];
-  for(let cell=0;cell<maze.passages.length;cell++){
-    if(seen.has(cell)||result.probability[cell]!>=options.threshold)continue;
-    const cells=[cell];seen.add(cell);
-    for(const c of cells)for(const n of maze.passages[c]!)if(!seen.has(n)&&result.probability[n]!<options.threshold){seen.add(n);cells.push(n);}
-    regions.push({cells,area:cells.reduce((sum,c)=>sum+weights[c]!,0)});
-  }
+  const result=analyzeFree(maze,options.samples,options.profile),weights=freeAreaWeights(maze),regions=freeColdRegions(maze,result.probability,result.bridgeUsage.map(b=>b.overProbability),options.threshold);
   if(result.finishedRatio<1)throw Error('Не все симуляции дошли до выхода. Тепловой прогноз не показан.');
   const coldArea=regions.reduce((sum,r)=>sum+r.area,0),area=weights.reduce((a,b)=>a+b,0);
-  return {completionRatio:result.finishedRatio,options:{...options},probability:result.probability,visits:result.visits,regions,coldArea,coldAreaRatio:area?coldArea/area:0,largestColdArea:Math.max(0,...regions.map(r=>r.area)),expectedLength:result.expectedLength,optimalLength:result.optimalLength,searchRatio:result.optimalLength?result.expectedLength/result.optimalLength:0,method:'sampled',samples:result.samples};
+  return {bridgeUsage:result.bridgeUsage,completionRatio:result.finishedRatio,options:{...options},probability:result.probability,visits:result.visits,regions,coldArea,coldAreaRatio:area?coldArea/area:0,largestColdArea:Math.max(0,...regions.map(r=>r.area)),expectedLength:result.expectedLength,optimalLength:result.optimalLength,searchRatio:result.optimalLength?result.expectedLength/result.optimalLength:0,method:'sampled',samples:result.samples};
+}
+export interface FreeBridgeUsage {id:string;overProbability:number;underProbability:number;overVisits:number;underVisits:number}
+/** Use a separate area node for the upper surface. Visiting its end rooms via
+ * the ground detour must never count as having explored the bridge itself. */
+export function freeColdRegions(maze:Maze,probability:ArrayLike<number>,bridgeProbability:number[],threshold:number){
+ const r=freeRuntime(maze),n=r.rooms.length,weights=freeAreaWeights(maze,false),probs=Array.from(probability),adjacent=r.passages.map(p=>[...p]);
+ for(const [i,b]of (maze.free!.bridges??[]).entries()){
+  const g=bridgeGeometry(maze.free!,b),a=r.rooms.findIndex(r=>r.id===b.a.room),z=r.rooms.findIndex(r=>r.id===b.b.room),node=n+i;
+  adjacent[a]=adjacent[a]!.filter(v=>v!==z);adjacent[z]=adjacent[z]!.filter(v=>v!==a);adjacent[a]!.push(node);adjacent[z]!.push(node);adjacent.push([a,z]);
+  weights.push(b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun));probs.push(bridgeProbability[i]??0);
+ }
+ const seen=new Set<number>(),regions:{cells:number[];bridgeIds:string[];area:number}[]=[];
+ for(let i=0;i<weights.length;i++)if(!seen.has(i)&&probs[i]!<threshold){const queue=[i];seen.add(i);for(const c of queue)for(const z of adjacent[c]!)if(!seen.has(z)&&probs[z]!<threshold){seen.add(z);queue.push(z);}regions.push({cells:queue.filter(c=>c<n),bridgeIds:queue.filter(c=>c>=n).map(c=>maze.free!.bridges![c-n]!.id),area:queue.reduce((sum,c)=>sum+weights[c]!,0)});}
+ return regions;
 }
 /** Policy sees only current neighbours, geometric heading and its visit history. */
 export function analyzeFree(maze: Maze, samples = 256, profile: 'explorer' | 'compass' | 'outline' = 'explorer') {
-  const r = freeRuntime(maze), outline = outlineDistances(maze, r.centers), rng = random(maze.parameters.seed + profile), visits = new Float64Array(r.rooms.length), probability = new Float64Array(r.rooms.length), goal = r.centers[maze.exit.cell]!, length = (p: Point[]) => p.slice(1).reduce((n, v, i) => n + distance(v, p[i]!), 0);
+  const r = freeRuntime(maze), outline = outlineDistances(maze, r.centers), rng = random(maze.parameters.seed + profile), visits = new Float64Array(r.rooms.length), probability = new Float64Array(r.rooms.length), goal = r.centers[maze.exit.cell]!, length = (p: Point[]) => p.slice(1).reduce((n, v, i) => n + Math.hypot(v.x-p[i]!.x,v.z-p[i]!.z,(v.y??0)-(p[i]!.y??0)), 0);
   const cells=r.rooms.map((_,i)=>i),edgeLengths=new Map<string,number>();
   for(const [key,points]of r.edgePaths)edgeLengths.set(key,length(points));
   const edge=(a:number,b:number)=>edgeLengths.get(`${a}:${b}`)!;
+  const bridges=(maze.free!.bridges??[]).map(b=>bridgeGeometry(maze.free!,b)),bridgeUsage:FreeBridgeUsage[]=bridges.map(g=>({id:g.bridge.id,overProbability:0,underProbability:0,overVisits:0,underVisits:0})),edgeUsage=new Map<string,{over:number[];under:number[]}>();
+  for(const [key,path]of r.edgePaths){const [a,b]=key.split(':').map(Number),over:number[]=[],under:number[]=[];
+    for(const [i,g]of bridges.entries()){
+      const from=r.rooms[a!]!.id,to=r.rooms[b!]!.id;if(from===g.bridge.a.room&&to===g.bridge.b.room||to===g.bridge.a.room&&from===g.bridge.b.room)over.push(i);
+      if(path.slice(1).some((q,j)=>(q.y??0)<.01&&(path[j]!.y??0)<.01&&intersection(path[j]!,q,g.path[1]!,g.path[2]!)!==null))under.push(i);
+    }edgeUsage.set(key,{over,under});
+  }
   const endpoints=length(r.portalPaths.get(maze.free!.entrance)!)+length(r.portalPaths.get(maze.free!.exit)!);
   let expectedLength = 0, finished = 0;
   for (let sample = 0; sample < samples; sample++) {
     const seen = new Set<number>(),learned=new LearnedGraph(r.rooms.length,cells,edge);
+    const above=new Set<number>(),below=new Set<number>();
+    const travel=(a:number,b:number)=>{const usage=edgeUsage.get(`${a}:${b}`)!;for(const i of usage.over){above.add(i);bridgeUsage[i]!.overVisits++;}for(const i of usage.under){below.add(i);bridgeUsage[i]!.underVisits++;}return edge(a,b);};
     let at=maze.entrance.cell,total=endpoints;
     const enter=(cell:number)=>{at=cell;visits[cell]!++;seen.add(cell);learned.observe(cell,r.passages[cell]!);};
     enter(at);
@@ -49,7 +67,7 @@ export function analyzeFree(maze: Maze, samples = 256, profile: 'explorer' | 'co
         });
         let pick=rng()*weights.reduce((a,b)=>a+b,0),index=0;
         for(;index<weights.length-1;index++){pick-=weights[index]!;if(pick<=0)break;}
-        const next=choices[index]!;total+=edge(at,next);enter(next);continue;
+        const next=choices[index]!;total+=travel(at,next);enter(next);continue;
       }
       // Find another remembered junction with a still-unexplored door. No hidden
       // adjacency is queried, and learned loops are available as return shortcuts.
@@ -57,32 +75,20 @@ export function analyzeFree(maze: Maze, samples = 256, profile: 'explorer' | 'co
       for(const cell of seen)if(learned.neighbors(cell).some(n=>!seen.has(n))){const d=known.distanceTo(cell);if(d<best){best=d;target=cell;}}
       if(target<0)break;
       const back=known.routeTo(target);if(!back||back.cells.length<2)break;
-      for(const next of back.cells.slice(1)){total+=edge(at,next);enter(next);}
+      for(const next of back.cells.slice(1)){total+=travel(at,next);enter(next);}
     }
     for (const c of seen) probability[c]!++;
+    for(const i of above)bridgeUsage[i]!.overProbability++;for(const i of below)bridgeUsage[i]!.underProbability++;
     expectedLength += total;
   }
   for (let i = 0; i < visits.length; i++) {
     visits[i]! /= samples;
     probability[i]! /= samples;
   }
-  const areas = freeAreaWeights(maze), totalArea = areas.reduce((a, b) => a + b, 0), cold = areas.reduce((n, a, i) => n + (probability[i]! < .2 ? a : 0), 0), coldSeen = new Set<number>(), coldRegions: number[] = [];
-  for (let i = 0; i < areas.length; i++) {
-    if (coldSeen.has(i) || probability[i]! >= .2) continue;
-    const q = [i];
-    coldSeen.add(i);
-    let a = 0;
-    for (let j = 0; j < q.length; j++) {
-      const c = q[j]!;
-      a += areas[c]!;
-      for (const n of r.passages[c]!) if (probability[n]! < .2 && !coldSeen.has(n)) {
-        coldSeen.add(n);
-        q.push(n);
-      }
-    }
-    coldRegions.push(a);
-  }
-  return { probability, visits, expectedLength: expectedLength / samples, finishedRatio: finished / samples, coldAreaRatio: totalArea ? cold / totalArea : 0, largestColdArea: Math.max(0, ...coldRegions), optimalLength: pathLength(routePoints(maze)), samples, profile };
+  for(const b of bridgeUsage)for(const key of ['overProbability','underProbability','overVisits','underVisits'] as const)b[key]/=samples;
+  const areas=freeAreaWeights(maze,false),bridgeAreas=bridges.map(g=>g.bridge.width*(2*Math.hypot(g.bridge.stairRun,g.bridge.rise)+g.length-2*g.bridge.stairRun)),totalArea=areas.reduce((a,b)=>a+b,0)+bridgeAreas.reduce((a,b)=>a+b,0),regions=freeColdRegions(maze,probability,bridgeUsage.map(b=>b.overProbability),.2),cold=regions.reduce((sum,r)=>sum+r.area,0);
+  const unseen=areas.reduce((sum,w,i)=>sum+w*(1-probability[i]!),0)+bridgeAreas.reduce((sum,w,i)=>sum+w*(1-bridgeUsage[i]!.overProbability),0);
+  return {bridgeUsage,unseenAreaRatio:totalArea?unseen/totalArea:0,probability, visits, expectedLength: expectedLength / samples, finishedRatio: finished / samples, coldAreaRatio: totalArea ? cold / totalArea : 0, largestColdArea: Math.max(0, ...regions.map(r=>r.area)), optimalLength: pathLength(routePoints(maze)), samples, profile };
 }
 export function checkFreeQuality(maze: Maze): string[] {
   const errors: string[] = [], p = maze.parameters;

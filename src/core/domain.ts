@@ -78,7 +78,7 @@ const cache = new WeakMap<Parameters, Map<number, Domain>>();
 const corridorCache=new WeakMap<object,Domain>();
 /** Grid placement adapter. Consumers use world geometry rather than editor rectangles. */
 export function domainOf(maze: Maze): Domain {
-  if(maze.version===5)return freeDomain(maze);
+  if((maze.version===5||maze.version===7))return freeDomain(maze);
   if(maze.storeys)return storeyDomain(maze);
   if(maze.navigation)return maze.navigation.domain;
   if(maze.version===4&&corridorCache.has(maze.layout!))return corridorCache.get(maze.layout!)!;

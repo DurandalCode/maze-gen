@@ -1,3 +1,4 @@
+import {freeSpatialRay} from '../free/spatial-visibility';
 import {domainOf} from './domain';
 import {walls,type Maze,type Point} from './maze';
 import {supportColliders} from './structure';
@@ -23,6 +24,7 @@ function intersection(from:Point,direction:Point,b:Box,limit:number):number|null
   return hi>1e-6?Math.max(0,lo):null;
 }
 export function spatialRay(maze:Maze,from:Point,direction:Point,limit:number,cue?:'sun'|'forest'):{length:number;strength:number}{
+  if(maze.free?.bridges?.length)return freeSpatialRay(maze,from,direction,limit,cue);
   const hits:{t:number;fabric?:boolean;roof?:boolean}[]=[];
   for(const b of boxes(maze)){const t=intersection(from,direction,b,limit);if(t!==null)hits.push({t,fabric:b.fabric,roof:b.roof});}
   // Closed staircase volume beneath the walking surface. Solve ray/ramp intersection inside its shaft.

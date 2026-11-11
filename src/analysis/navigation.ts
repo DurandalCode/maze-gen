@@ -1,3 +1,4 @@
+import {bridgeSurface,bridgeGeometry} from '../free/bridges';
 import {outlineDistances} from '../free/analysis-geometry';
 import {spatialCellAt,spatialDistance,spatialEdgeLength,storeyView} from '../core/two-storey';
 import {freeRuntime,connectionGeometry} from '../free/layout';
@@ -30,7 +31,7 @@ export function prepareNavigation(maze: Maze): NavigationContext {
 /** Footprint-only distances and visible waypoints: no internal maze passages are consulted. */
 export function prepareOutline(maze: Maze, context: NavigationContext): void {
   if(maze.storeys){if(context.outlineTargets)return;const lower=storeyView(maze,0),known=prepareNavigation(lower);prepareOutline(lower,known);context.outlineTargets=[];context.outlineDistances=new Float64Array(maze.passages.length);for(const c of context.cells){const n=maze.storeys.nodes[c]!,p=n.center;context.outlineTargets[c]=n.local===undefined?context.goal:known.outlineTargets![n.local]??context.goal;context.outlineDistances[c]=n.local===undefined?Math.hypot(p.x-context.goal.x,p.z-context.goal.z):known.outlineDistances![n.local]!;}return;}
-  if(maze.version===5){context.outlineTargets=context.centers.map(()=>context.goal);context.outlineDistances=Float64Array.from(outlineDistances(maze,context.centers));return;}
+  if((maze.version===5||maze.version===7)){context.outlineTargets=context.centers.map(()=>context.goal);context.outlineDistances=Float64Array.from(outlineDistances(maze,context.centers));return;}
   if(maze.navigation){if(context.outlineTargets)return;const original=prepareNavigation(maze.navigation.source);prepareOutline(maze.navigation.source,original);context.outlineDistances=Float64Array.from(maze.navigation.representatives,c=>original.outlineDistances![c]!);context.outlineTargets=maze.navigation.representatives.map(c=>original.outlineTargets![c]!);return;}
   if(maze.layout?.spaces){
     if(context.outlineTargets)return;
@@ -143,7 +144,7 @@ export function edgeLength(context: NavigationContext, a: number, b: number): nu
 }
 export function cellAtPoint(maze: Maze, point: Point): number | null {
   if(maze.storeys)return spatialCellAt(maze,point);
-  if(maze.version===5){const r=freeRuntime(maze),i=r.rooms.findIndex(s=>pointIn(point,s.polygon)&&!s.holes.some(h=>pointIn(point,h,false)));if(i>=0)return i;const c=maze.free!.connections.find(c=>{try{return pointIn(point,connectionGeometry(maze.free!,c).polygon);}catch{return false;}});return c?r.rooms.findIndex(s=>s.id===c.a.room):null;}
+  if((maze.version===5||maze.version===7)){const r=freeRuntime(maze);if(point.bridge!==undefined){const surface=bridgeSurface(maze.free!,point);if(!surface)return null;const bridge=maze.free!.bridges!.find(b=>b.id===point.bridge)!,g=bridgeGeometry(maze.free!,bridge);return r.rooms.findIndex(r=>r.id===(g.progress(point)<.5?bridge.a.room:bridge.b.room));}const i=r.rooms.findIndex(s=>pointIn(point,s.polygon)&&!s.holes.some(h=>pointIn(point,h,false)));if(i>=0)return i;const c=maze.free!.connections.find(c=>{try{return pointIn(point,connectionGeometry(maze.free!,c).polygon);}catch{return false;}});return c?r.rooms.findIndex(s=>s.id===c.a.room):null;}
   if(maze.navigation){const c=cellAtPoint(maze.navigation.source,point);return c===null?null:maze.navigation.originalToRegion[c]!;}
   const xs = axisBounds(maze, 'x'), zs = axisBounds(maze, 'z');
   const x = xs.findIndex((v, i) => i > 0 && point.x < v) - 1;
