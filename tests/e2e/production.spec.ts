@@ -81,11 +81,11 @@ test('production assets run offline at the embedded HTTPS origin with CSP, worke
   await expect(page.getByRole('heading', { name: 'Библиотека лабиринтов' })).toBeVisible();
   await page.getByRole('button', { name: 'Создать две комнаты' }).click();
   await page.getByRole('button', { name: 'Подготовить попытку' }).waitFor();
-  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
-  await page.getByRole('button', { name: 'Посмотреть', exact: true }).click();
+  await page.getByRole('button', { name: '← Библиотека', exact: true }).click();
+  await page.getByRole('button', { name: 'Открыть карточку', exact: true }).click();
   await page.getByRole('button', { name: 'Сцена 3D' }).click();
   await expect(page.getByLabel('Трёхмерный лабиринт', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.getByRole('button', { name: '← Библиотека', exact: true }).click();
   await page.getByRole('button', { name: 'Экспорт карты' }).click();
   await page.getByRole('button', { name: 'Поделиться пакетом 1' }).click();
   await expect(page.getByText('Все пакеты записаны и переданы в меню отправки.')).toBeVisible();

@@ -3,7 +3,7 @@ async function templateEditor(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Создать две комнаты' }).click();
   await page.getByRole('button', { name: 'Подготовить попытку' }).waitFor();
-  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.getByRole('button', { name: '← Библиотека', exact: true }).click();
   await page.getByRole('button', { name: 'Редактировать', exact: true }).click();
   await expect(page.getByLabel('План редактора', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Сохранить карту', exact: true })).toBeEnabled();

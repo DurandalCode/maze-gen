@@ -116,6 +116,7 @@ export function createStorageDispatcher(
             string(input, 'hash'),
           );
         if (input.kind === 'map') return repo.getMap(string(input, 'hash'));
+        if (input.kind === 'map-summary') return repo.getMapSummary(string(input, 'hash'));
         if (input.kind === 'map-if-present') {
           try {
             return await repo.getMap(string(input, 'hash'));

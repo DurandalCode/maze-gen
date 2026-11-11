@@ -210,6 +210,15 @@ export class MazeRepository {
       );
     }
   }
+  async getMapSummary(hash: string): Promise<MapSummary | null> {
+    return transaction(
+      this.database,
+      ['mapSummaries'],
+      'readonly',
+      async (tx) =>
+        (await request(tx.objectStore('mapSummaries').get(hash))) as MapSummary | undefined,
+    ).then((value) => value ?? null);
+  }
   async listMaps(query: ListQuery = {}): Promise<Page<MapSummary>> {
     return this.list('mapSummaries', 'revisionHash', query);
   }

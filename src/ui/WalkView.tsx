@@ -13,10 +13,12 @@ export function WalkView({
   world,
   session,
   onClose,
+  autoStart = false,
 }: {
   world: PreparedWorld;
   session: Session;
   onClose: () => void;
+  autoStart?: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const engine = useRef<{
@@ -225,6 +227,21 @@ export function WalkView({
         setClock({ elapsedMs: s.elapsedMs, distanceM: s.distanceM });
       }
     }, 250);
+    if (autoStart && session.state !== 'finished' && session.state !== 'stopped') {
+      setBusy(true);
+      void recorder
+        .start()
+        .then(() => {
+          if (!mounted) return;
+          e.keys.clear();
+          movement.setPaused(recorder.status().state !== 'running');
+          canvas.current?.focus({ preventScroll: true });
+        })
+        .catch(reportError)
+        .finally(() => {
+          if (mounted) setBusy(false);
+        });
+    }
     return () => {
       mounted = false;
       pauseMovement();
@@ -239,7 +256,7 @@ export function WalkView({
       scene.dispose();
       engine.current = null;
     };
-  }, [world, session]);
+  }, [world, session, autoStart]);
   const action = async (run: (e: NonNullable<typeof engine.current>) => Promise<void>) => {
     if (busy || !engine.current) return;
     setBusy(true);

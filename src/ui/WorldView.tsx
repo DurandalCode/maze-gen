@@ -2,14 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import type { PreparedWorld } from '../jobs/compute';
 import { WorldScene } from '../renderer/scene';
 import { PlanRenderer } from '../renderer/plan';
+import { bounds } from '../geometry/predicates';
 import { message } from './services';
 
 export function WorldView({
   world,
   initialMode = '2d',
+  fitContent = false,
+  showMetrics = true,
 }: {
   world: PreparedWorld;
   initialMode?: '2d' | '3d';
+  fitContent?: boolean;
+  showMetrics?: boolean;
 }) {
   const [mode, setMode] = useState<'2d' | '3d'>(initialMode);
   const [error, setError] = useState('');
@@ -24,7 +29,11 @@ export function WorldView({
       if (mode === '2d') {
         const plan = new PlanRenderer(canvas.current!);
         dispose = () => plan.dispose();
-        plan.setWorld(world.physical);
+        plan.setWorld(
+          fitContent
+            ? { ...world.physical, bounds: bounds(world.physical.floor.flat(2)) }
+            : world.physical,
+        );
       } else {
         const view = new WorldScene(canvas.current!, (state) => {
           setLost(state === 'lost');
@@ -43,7 +52,7 @@ export function WorldView({
       setError(message(e));
     }
     return dispose;
-  }, [world, mode]);
+  }, [world, mode, fitContent]);
   return (
     <>
       <div className="toolbar" role="group" aria-label="Вид карты">
@@ -67,24 +76,26 @@ export function WorldView({
         className="world-canvas"
         aria-label={mode === '2d' ? 'План лабиринта' : 'Трёхмерный лабиринт'}
       />
-      <dl className="metrics">
-        <div>
-          <dt>Площадь пола</dt>
-          <dd>{world.metrics.floorM2.toFixed(1)} м²</dd>
-        </div>
-        <div>
-          <dt>Опорный маршрут</dt>
-          <dd>{world.metrics.routeLengthM.toFixed(1)} м</dd>
-        </div>
-        <div>
-          <dt>Циклы</dt>
-          <dd>{world.metrics.cycles}</dd>
-        </div>
-        <div>
-          <dt>Развилки</dt>
-          <dd>{world.metrics.decisionCount}</dd>
-        </div>
-      </dl>
+      {showMetrics && (
+        <dl className="metrics">
+          <div>
+            <dt>Площадь пола</dt>
+            <dd>{world.metrics.floorM2.toFixed(1)} м²</dd>
+          </div>
+          <div>
+            <dt>Опорный маршрут</dt>
+            <dd>{world.metrics.routeLengthM.toFixed(1)} м</dd>
+          </div>
+          <div>
+            <dt>Циклы</dt>
+            <dd>{world.metrics.cycles}</dd>
+          </div>
+          <div>
+            <dt>Развилки</dt>
+            <dd>{world.metrics.decisionCount}</dd>
+          </div>
+        </dl>
+      )}
     </>
   );
 }

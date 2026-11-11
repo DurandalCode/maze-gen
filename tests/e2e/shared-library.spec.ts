@@ -9,9 +9,10 @@ test('maps and recorded attempts are shared across independent browser profiles 
 }) => {
   test.setTimeout(45000);
   await page.goto('/?route=first-route');
-  await expect(page.getByRole('button', { name: 'Начать', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Начать', exact: true }).click();
+  await expect(page.getByRole('main', { name: 'Карточка лабиринта' })).toBeVisible();
+  await page.getByRole('button', { name: 'Начать прохождение →', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Управление прохождением' })).toHaveCount(0);
+  await expect(page.getByRole('banner').getByText('Прохождение', { exact: true })).toBeVisible();
   await page.keyboard.down('KeyW');
   await page.waitForTimeout(1300);
   await page.keyboard.up('KeyW');

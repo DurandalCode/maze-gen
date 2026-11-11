@@ -29,6 +29,7 @@ import { ImportPanel } from './ImportPanel';
 import { ExportPanel } from './ExportPanel';
 import type { ExportSelection } from '../exchange/export-repository';
 import { stateLabels } from './session-labels';
+import { MapDetailsPage } from './MapDetailsPage';
 import { ServerRoutes } from './ServerRoutes';
 const ServerRouteView = lazy(() =>
   import('./ServerRouteView').then((m) => ({ default: m.ServerRouteView })),
@@ -82,7 +83,13 @@ function useListing<T>(
   }, [kind, search, sort, status, refresh, mapHash]);
   return { ...list, more: () => load(list.cursor), retry: () => load() };
 }
-type Selection = { world: PreparedWorld; title: string; preview: boolean; mapHash: string };
+type Selection = {
+  world: PreparedWorld;
+  title: string;
+  preview: boolean;
+  mapHash: string;
+  origin?: GenerationOrigin;
+};
 function App() {
   const [serverRoute, setServerRoute] = useState(() =>
     new URLSearchParams(window.location.search).get('route'),
@@ -90,6 +97,8 @@ function App() {
   const closeServerRoute = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete('route');
+    url.searchParams.delete('map');
+    url.searchParams.delete('blind');
     window.history.replaceState(null, '', url);
     setServerRoute(null);
   };
@@ -117,7 +126,11 @@ function App() {
   const maps = useListing<MapSummary>('maps', search, sort, '', refresh, '');
   const walks = useListing<WalkSummary>('walks', search, sort, status, refresh, mapFilter);
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [active, setActive] = useState<{ world: PreparedWorld; session: Session } | null>(null);
+  const [active, setActive] = useState<{
+    world: PreparedWorld;
+    session: Session;
+    autoStart?: boolean;
+  } | null>(null);
   const [loading, setLoading] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -203,7 +216,7 @@ function App() {
     setLoading(label);
     return { id, signal: abort.signal, fresh: () => generation.current === id };
   };
-  const openMap = async (row: MapSummary, preview: boolean) => {
+  const openMap = async (row: MapSummary, preview: boolean, navigate = true) => {
     const job = begin('Загружаем и проверяем карту…');
     try {
       const saved = await store<MapRevision>('get', { kind: 'map', hash: row.revisionHash });
@@ -211,7 +224,20 @@ function App() {
       const world = await prepare(saved.document, job.signal);
       if (!job.fresh()) return;
       if (preview) localStorage.setItem(`maze-preview:${row.revisionHash}`, '1');
-      setSelection({ world, title: row.title, preview, mapHash: row.revisionHash });
+      setSelection({
+        world,
+        title: row.title,
+        preview,
+        mapHash: row.revisionHash,
+        origin: saved.generationOrigin,
+      });
+      if (navigate) {
+        const url = new URL(window.location.href);
+        url.search = '';
+        url.searchParams.set('map', row.revisionHash);
+        if (!preview) url.searchParams.set('blind', '1');
+        window.history.pushState(null, '', url);
+      }
       setLoading('');
     } catch (e) {
       if (job.fresh()) {
@@ -220,8 +246,40 @@ function App() {
       }
     }
   };
+  const openHash = async (hash: string, preview: boolean) => {
+    try {
+      if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('Неверная ссылка на лабиринт.');
+      const row = await store<MapSummary | null>('get', { kind: 'map-summary', hash });
+      if (!row) throw new Error('Лабиринт не найден в этой библиотеке.');
+      await openMap(row, preview, false);
+    } catch (e) {
+      setError(message(e));
+    }
+  };
+  useEffect(() => {
+    const url = new URL(window.location.href),
+      hash = url.searchParams.get('map');
+    if (hash && !url.searchParams.has('route'))
+      void openHash(hash, url.searchParams.get('blind') !== '1');
+  }, []);
+  useEffect(() => {
+    const back = () => {
+      if (active || editor) return;
+      const url = new URL(window.location.href),
+        hash = url.searchParams.get('map');
+      if (hash) void openHash(hash, url.searchParams.get('blind') !== '1');
+      else {
+        cancel();
+        setServerRoute(url.searchParams.get('route'));
+      }
+    };
+    window.addEventListener('popstate', back);
+    return () => window.removeEventListener('popstate', back);
+  }, [active, editor]);
   const openEditor = async (row: MapSummary) => {
+    const previous = selection;
     const job = begin('Открываем редактор…');
+    if (previous) setSelection(previous);
     try {
       const [saved, project] = await Promise.all([
         store<MapRevision>('get', { kind: 'map', hash: row.revisionHash }),
@@ -229,6 +287,7 @@ function App() {
       ]);
       if (!job.fresh()) return;
       const current = project?.currentRevisionHash === row.revisionHash;
+      setSelection(null);
       setEditor({
         document: {
           ...saved.document,
@@ -325,7 +384,7 @@ function App() {
       setPendingWrite(false);
     }
   };
-  const start = async () => {
+  const start = async (autoStart = false) => {
     if (!selection || pendingWrite) return;
     setPendingWrite(true);
     setError('');
@@ -345,7 +404,7 @@ function App() {
         mapHash: selection.mapHash,
         condition,
       });
-      setActive({ world: selection.world, session });
+      setActive({ world: selection.world, session, autoStart });
       setSelection(null);
     } catch (e) {
       setError(message(e));
@@ -353,8 +412,10 @@ function App() {
       setPendingWrite(false);
     }
   };
-  const openWalk = async (row: WalkSummary) => {
+  const openWalk = async (row: WalkSummary, autoStart = false) => {
+    const previous = selection;
     const job = begin('Восстанавливаем подтверждённую запись…');
+    if (previous) setSelection(previous);
     try {
       const session = await store<Session>('get', { kind: 'session', sessionId: row.sessionId });
       if (!job.fresh()) return;
@@ -362,7 +423,8 @@ function App() {
       if (!job.fresh()) return;
       const world = await prepare(saved.document, job.signal);
       if (!job.fresh()) return;
-      setActive({ world, session });
+      setSelection(null);
+      setActive({ world, session, autoStart });
       setLoading('');
     } catch (e) {
       if (job.fresh()) {
@@ -413,7 +475,18 @@ function App() {
           onClose={closeServerRoute}
           onReady={(value) => {
             setServerRoute(null);
-            setActive(value);
+            const { world, map } = value;
+            setSelection({
+              world,
+              title: value.summary?.title ?? map.document.metadata.title,
+              preview: true,
+              mapHash: map.revisionHash,
+              origin: map.generationOrigin,
+            });
+            const url = new URL(window.location.href);
+            url.search = '';
+            url.searchParams.set('map', map.revisionHash);
+            window.history.replaceState(null, '', url);
             setRefresh((n) => n + 1);
           }}
         />
@@ -459,8 +532,9 @@ function App() {
             setSelection({
               world,
               title: world.physical.document.metadata.title,
-              preview: false,
+              preview: true,
               mapHash: world.revisionHash,
+              origin: editor.generationOrigin,
             });
             setRefresh((n) => n + 1);
           }}
@@ -484,6 +558,7 @@ function App() {
         <WalkView
           world={active.world}
           session={active.session}
+          autoStart={active.autoStart}
           onClose={() => {
             setActive(null);
             closeServerRoute();
@@ -491,6 +566,42 @@ function App() {
           }}
         />
       </Suspense>
+    );
+  if (selection)
+    return (
+      <MapDetailsPage
+        key={selection.mapHash}
+        world={selection.world}
+        title={selection.title}
+        preview={selection.preview}
+        origin={selection.origin}
+        shared={sharedMode}
+        speed={speed}
+        inputMode={inputMode}
+        busy={pendingWrite || !!loading}
+        error={error}
+        canEdit={desktopEditing}
+        onSpeed={setSpeed}
+        onInput={setInputMode}
+        onClose={() => {
+          cancel();
+          closeServerRoute();
+        }}
+        onStart={(immediate) => void start(immediate)}
+        onReveal={() => setSelection({ ...selection, preview: true })}
+        onAttempt={(row) =>
+          void openWalk(row, row.status !== 'finished' && row.status !== 'stopped')
+        }
+        onEdit={() => {
+          void store<MapSummary | null>('get', { kind: 'map-summary', hash: selection.mapHash })
+            .then((row) =>
+              row
+                ? openEditor(row)
+                : newEditor(selection.world.physical.document, selection.origin),
+            )
+            .catch((e) => setError(message(e)));
+        }}
+      />
     );
   const list = tab === 'maps' ? maps : walks;
   return (
@@ -664,7 +775,7 @@ function App() {
                   <button className="primary" onClick={() => void openMap(row, false)}>
                     Пройти вслепую
                   </button>
-                  <button onClick={() => void openMap(row, true)}>Посмотреть</button>
+                  <button onClick={() => void openMap(row, true)}>Открыть карточку</button>
                   <button
                     onClick={() => {
                       setTab('walks');
@@ -744,60 +855,12 @@ function App() {
           </button>
         )}
       </section>
-      {(loading || selection || error) && (
-        <div className={selection ? 'modal-backdrop' : 'load-panel'}>
-          <section
-            className="modal"
-            role={selection ? 'dialog' : 'region'}
-            aria-modal={selection ? true : undefined}
-            aria-label="Выбранная карта"
-          >
-            <header className="toolbar">
-              <h2>{selection?.preview ? selection.title : 'Подготовка маршрута'}</h2>
-              <button disabled={pendingWrite} onClick={cancel}>
-                Закрыть
-              </button>
-            </header>
-            {loading && <p role="status">{loading}</p>}
-            {error && <p role="alert">{error}</p>}
-            {selection && (
-              <>
-                {selection.preview && (
-                  <Suspense fallback={<p role="status">Открываем сцену…</p>}>
-                    <WorldView world={selection.world} />
-                  </Suspense>
-                )}
-                <p>
-                  {localStorage.getItem(`maze-preview:${selection.mapHash}`) === '1'
-                    ? 'Карта уже просмотрена. Это будет записано в условиях попытки.'
-                    : 'План и название скрыты. Можно начать без предварительного просмотра.'}
-                </p>
-                <div className="filters">
-                  <label>
-                    Скорость
-                    <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
-                      <option value={1.4}>Шаг · 1,4 м/с</option>
-                      <option value={2.8}>Бег · 2,8 м/с</option>
-                    </select>
-                  </label>
-                  <label>
-                    Управление
-                    <select
-                      value={inputMode}
-                      onChange={(e) => setInputMode(e.target.value as typeof inputMode)}
-                    >
-                      <option value="keyboard">Клавиатура и мышь</option>
-                      <option value="touch">Сенсорное</option>
-                    </select>
-                  </label>
-                </div>
-                <button className="primary" disabled={pendingWrite} onClick={() => void start()}>
-                  Подготовить попытку
-                </button>
-              </>
-            )}
-          </section>
-        </div>
+      {(loading || error) && (
+        <section className="load-panel" aria-label="Loading map">
+          <button onClick={cancel}>Закрыть</button>
+          {loading && <p role="status">{loading}</p>}
+          {error && <p role="alert">{error}</p>}
+        </section>
       )}
       {exportSelection && (
         <ExportPanel

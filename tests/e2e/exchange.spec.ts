@@ -120,10 +120,10 @@ test('selection exports a self-contained Blob download and another browser libra
     await expect(
       target.getByRole('region', { name: 'Список карт' }).getByRole('article'),
     ).toHaveCount(1);
-    await target.getByRole('button', { name: 'Посмотреть', exact: true }).click();
+    await target.getByRole('button', { name: 'Открыть карточку', exact: true }).click();
     await expect(
       target
-        .getByRole('dialog', { name: 'Выбранная карта' })
+        .getByRole('main', { name: 'Карточка лабиринта' })
         .getByRole('heading', { name: 'Смешанные формы', exact: true }),
     ).toBeVisible();
     await expect(target.getByLabel('План лабиринта', { exact: true })).toBeVisible();

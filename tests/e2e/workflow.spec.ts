@@ -8,7 +8,7 @@ test('blind attempt records physical movement and resumes committed state after 
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
   await page.getByRole('button', { name: 'Создать две комнаты' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Выбранная карта' });
+  const dialog = page.getByRole('main', { name: 'Карточка лабиринта' });
   await expect(dialog.getByText('План и название скрыты.', { exact: false })).toBeVisible();
   await expect(dialog.locator('canvas')).toHaveCount(0);
   await expect(dialog.getByText('Две комнаты', { exact: true })).toHaveCount(0);
@@ -63,17 +63,17 @@ test('explicit preview persists knowledge and touch uses the same recorder', asy
   await page.goto('/');
   await page.getByRole('button', { name: 'Создать две комнаты' }).click();
   await page.getByRole('button', { name: 'Подготовить попытку' }).waitFor();
-  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
-  await page.getByRole('button', { name: 'Посмотреть', exact: true }).click();
+  await page.getByRole('button', { name: '← Библиотека', exact: true }).click();
+  await page.getByRole('button', { name: 'Открыть карточку', exact: true }).click();
   await expect(
     page
-      .getByRole('dialog', { name: 'Выбранная карта' })
+      .getByRole('main', { name: 'Карточка лабиринта' })
       .getByRole('heading', { name: 'Две комнаты', exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel('План лабиринта', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Сцена 3D' }).click();
   await expect(page.getByLabel('Трёхмерный лабиринт', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.getByRole('button', { name: '← Библиотека', exact: true }).click();
   await page.getByRole('button', { name: 'Пройти вслепую', exact: true }).click();
   await expect(page.getByText('Карта уже просмотрена.', { exact: false })).toBeVisible();
   await page.getByRole('combobox', { name: 'Управление', exact: true }).selectOption('touch');
