@@ -5,6 +5,7 @@ export const COMPUTE_OPERATIONS = [
   'navigation',
   'generate',
   'metrics',
+  'identity',
 ] as const;
 export const STORAGE_OPERATIONS = [
   'list',

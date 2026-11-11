@@ -1,17 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { MapRevision } from '../domain';
+import { emptyDocument } from '../domain';
+import type { Document, MapRevision } from '../domain';
 import type { PreparedWorld } from '../jobs/compute';
-import type { ListCursor, MapSummary, Page, WalkSummary } from '../repository/types';
+import type {
+  Draft,
+  DraftSummary,
+  ListCursor,
+  MapSummary,
+  Page,
+  WalkSummary,
+  Project,
+} from '../repository/types';
 import type { Session } from '../session/types';
 import { makeCondition } from '../session/format';
 import { store, prepare, revision, message } from './services';
 import { starterDocument } from './starter';
-import { WorldView } from './WorldView';
+const WorldView = lazy(() => import('./WorldView').then((m) => ({ default: m.WorldView })));
+const WalkView = lazy(() => import('./WalkView').then((m) => ({ default: m.WalkView })));
+const EditorView = lazy(() => import('./EditorView').then((m) => ({ default: m.EditorView })));
+import type { EditorInput } from './EditorView';
+import { nativeExportAvailable } from '../platform/native-export';
 import { ImportPanel } from './ImportPanel';
 import { ExportPanel } from './ExportPanel';
 import type { ExportSelection } from '../exchange/export-repository';
-import { WalkView, stateLabels } from './WalkView';
+import { stateLabels } from './session-labels';
 import './styles.css';
 
 interface Listing<T> {
@@ -63,6 +76,9 @@ function useListing<T>(
 }
 type Selection = { world: PreparedWorld; title: string; preview: boolean; mapHash: string };
 function App() {
+  const [editor, setEditor] = useState<EditorInput | null>(null);
+  const [drafts, setDrafts] = useState<DraftSummary[]>([]);
+  const desktopEditing = !nativeExportAvailable() && !/Android/i.test(navigator.userAgent);
   const [exportSelection, setExportSelection] = useState<ExportSelection | null>(null);
   const [markedMaps, setMarkedMaps] = useState<string[]>([]);
   const [markedWalks, setMarkedWalks] = useState<string[]>([]);
@@ -97,9 +113,10 @@ function App() {
   } | null>(null);
   useEffect(() => {
     let live = true;
-    void store<{ sessions: Session[] }>('recover', {})
+    void store<{ sessions: Session[]; drafts: DraftSummary[] }>('recover', {})
       .then((r) => {
         if (live) {
+          setDrafts(r.drafts);
           if (r.sessions.length)
             setNotice(
               `Незавершённых попыток: ${r.sessions.length}. Откройте вкладку «Прохождения», чтобы продолжить с последней записи.`,
@@ -114,6 +131,17 @@ function App() {
       live = false;
     };
   }, []);
+  useEffect(() => {
+    let live = true;
+    void store<DraftSummary[]>('list', { kind: 'drafts' })
+      .then((rows) => {
+        if (live) setDrafts(rows);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [refresh]);
   const cancel = () => {
     generation.current++;
     controller.current?.abort();
@@ -159,6 +187,79 @@ function App() {
         setLoading('');
       }
     }
+  };
+  const openEditor = async (row: MapSummary) => {
+    const job = begin('Открываем редактор…');
+    try {
+      const [saved, project] = await Promise.all([
+        store<MapRevision>('get', { kind: 'map', hash: row.revisionHash }),
+        store<Project | null>('get', { kind: 'project', projectId: row.projectId }),
+      ]);
+      if (!job.fresh()) return;
+      const current = project?.currentRevisionHash === row.revisionHash;
+      setEditor({
+        document: {
+          ...saved.document,
+          metadata: {
+            ...saved.document.metadata,
+            title: current ? row.title : `${row.title.slice(0, 240)} (копия)`,
+          },
+        },
+        projectId: current ? row.projectId : crypto.randomUUID(),
+        baseRevisionHash: current ? row.revisionHash : null,
+        notice: current ? '' : 'Предыдущая ревизия открыта как черновик нового проекта.',
+      });
+      setLoading('');
+    } catch (e) {
+      if (job.fresh()) {
+        setError(message(e));
+        setLoading('');
+      }
+    }
+  };
+  const openDraft = async (row: DraftSummary) => {
+    const job = begin('Открываем черновик…');
+    try {
+      const [draft, project] = await Promise.all([
+        store<Draft>('get', { kind: 'draft', projectId: row.projectId }),
+        store<Project | null>('get', { kind: 'project', projectId: row.projectId }),
+      ]);
+      if (!job.fresh()) return;
+      const fork = (project?.currentRevisionHash ?? null) !== draft.baseRevisionHash;
+      setEditor({
+        document: fork
+          ? {
+              ...draft.document,
+              metadata: {
+                ...draft.document.metadata,
+                title: `${draft.document.metadata.title.slice(0, 240)} (копия)`,
+              },
+            }
+          : draft.document,
+        projectId: fork ? crypto.randomUUID() : row.projectId,
+        baseRevisionHash: fork ? null : draft.baseRevisionHash,
+        commandRevision: draft.commandRevision,
+        recovered: !fork,
+        notice: fork
+          ? 'Проект изменился. Черновик открыт отдельной копией.'
+          : 'Восстановлен сохранённый черновик.',
+      });
+      setLoading('');
+    } catch (e) {
+      if (job.fresh()) {
+        setError(message(e));
+        setLoading('');
+      }
+    }
+  };
+  const newEditor = (document?: Document) => {
+    cancel();
+    const doc = document ?? emptyDocument(crypto.randomUUID());
+    if (!document) {
+      const now = new Date().toISOString();
+      doc.metadata = { ...doc.metadata, createdAt: now, updatedAt: now };
+    }
+    setEditor({ document: doc, projectId: crypto.randomUUID(), baseRevisionHash: null });
   };
   const create = async () => {
     const job = begin('Подготавливаем две комнаты…');
@@ -259,16 +360,54 @@ function App() {
       setPendingWrite(false);
     }
   };
+  if (editor)
+    return (
+      <Suspense
+        fallback={
+          <main>
+            <p role="status">Открываем редактор…</p>
+          </main>
+        }
+      >
+        <EditorView
+          key={editor.projectId}
+          {...editor}
+          onClose={() => {
+            setEditor(null);
+            setRefresh((n) => n + 1);
+          }}
+          onPlay={(world) => {
+            setEditor(null);
+            setSelection({
+              world,
+              title: world.physical.document.metadata.title,
+              preview: false,
+              mapHash: world.revisionHash,
+            });
+            setRefresh((n) => n + 1);
+          }}
+          onImport={newEditor}
+        />
+      </Suspense>
+    );
   if (active)
     return (
-      <WalkView
-        world={active.world}
-        session={active.session}
-        onClose={() => {
-          setActive(null);
-          setRefresh((n) => n + 1);
-        }}
-      />
+      <Suspense
+        fallback={
+          <main>
+            <p role="status">Открываем прохождение…</p>
+          </main>
+        }
+      >
+        <WalkView
+          world={active.world}
+          session={active.session}
+          onClose={() => {
+            setActive(null);
+            setRefresh((n) => n + 1);
+          }}
+        />
+      </Suspense>
     );
   const list = tab === 'maps' ? maps : walks;
   return (
@@ -286,6 +425,7 @@ function App() {
         >
           Создать две комнаты
         </button>
+        {desktopEditing && <button onClick={() => newEditor()}>Новый проект</button>}
       </header>
       {notice && (
         <aside className="notice" role="status">
@@ -301,6 +441,20 @@ function App() {
           setRefresh((n) => n + 1);
         }}
       />
+      {desktopEditing && drafts.length > 0 && (
+        <section aria-label="Черновики" className="draft-list">
+          <h2>Черновики</h2>
+          {drafts.map((d) => (
+            <article className="card" key={d.projectId}>
+              <div>
+                <h3>{d.title}</h3>
+                <p>Модулей: {d.modules}</p>
+              </div>
+              <button onClick={() => void openDraft(d)}>Продолжить редактирование</button>
+            </article>
+          ))}
+        </section>
+      )}
       <nav className="tabs" aria-label="Библиотека">
         <button aria-current={tab === 'maps' ? 'page' : undefined} onClick={() => setTab('maps')}>
           Карты
@@ -435,6 +589,9 @@ function App() {
                   >
                     Экспорт карты
                   </button>
+                  {desktopEditing && (
+                    <button onClick={() => void openEditor(row)}>Редактировать</button>
+                  )}
                   <button onClick={() => void removeMap(row)}>Удалить</button>
                 </div>
               </article>
@@ -506,7 +663,11 @@ function App() {
             {error && <p role="alert">{error}</p>}
             {selection && (
               <>
-                {selection.preview && <WorldView world={selection.world} />}
+                {selection.preview && (
+                  <Suspense fallback={<p role="status">Открываем сцену…</p>}>
+                    <WorldView world={selection.world} />
+                  </Suspense>
+                )}
                 <p>
                   {localStorage.getItem(`maze-preview:${selection.mapHash}`) === '1'
                     ? 'Карта уже просмотрена. Это будет записано в условиях попытки.'

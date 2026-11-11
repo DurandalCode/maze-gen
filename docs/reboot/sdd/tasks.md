@@ -62,12 +62,12 @@ G-03 — ограниченная проверка выбранного kernel: 
 
 | ID | Задача и результат | Зависит от | Критерий готовности |
 |---|---|---|---|
-| E-01 | Command store, revision domains, patches undo/redo | G-01, J-01, DB-03 | 100 команд; drag одна команда; цвет/имя не инвалидируют navmesh; hashes после undo/redo |
-| E-02 | План/selection/hit-test/transform preview/числовые свойства | E-01, R-01, B-03 | Круг/треугольник выбираются по форме; локальный preview, rotate/snap; PERF-03 |
-| E-03 | Проёмы/соединения/стены и ошибки | E-02, G-04, J-02 | Привязки после поворота/параметров устойчивы; invalid draft доступен; stale validation не включает Play |
-| E-04 | Autosave draft, commit ready map, переход к прохождению | E-03, DB-03, UX-02, QA-01 | Recovery без потери commit; Play только проверенной revision; повторное открытие не портит библиотеку |
+| E-01 | **Выполнено на ПК, [отчёт](../../../reports/editor-foundation.md).** Command store, revision domains, patches undo/redo | G-01, J-01, DB-03 | 100 команд; drag одна команда; цвет/имя не инвалидируют navmesh; hashes после undo/redo |
+| E-02 | **Выполнено на ПК, [отчёт](../../../reports/editor-foundation.md).** План/selection/hit-test/transform preview/числовые свойства | E-01, R-01, B-03 | Круг/треугольник выбираются по форме; локальный preview, rotate/snap; PERF-03 |
+| E-03 | **Выполнено на ПК, [отчёт](../../../reports/editor-foundation.md).** Проёмы/соединения/стены и ошибки | E-02, G-04, J-02 | Привязки после поворота/параметров устойчивы; invalid draft доступен; stale validation не включает Play |
+| E-04 | **Веб-интеграция выполнена, [отчёт](../../../reports/editor-foundation.md); физический Android пользователь отложил.** Autosave draft, commit ready map, переход к прохождению | E-03, DB-03, UX-02, QA-01 | Recovery без потери commit; Play только проверенной revision; повторное открытие не портит библиотеку |
 
-E-01…03 можно выполнять до QA-01. E-04 завершает интеграцию после мобильного gate. Отсутствие телефона не блокирует независимые задачи.
+E-01…03 можно выполнять до QA-01. Физический Android gate пользователь явно отложил 2026-11-11 в пользу веб-версии. E-04/GN-05/QA-web продолжаются без телефона; APK-03 и мобильные части QA остаются deferred/not-run.
 
 ## Генератор и сравнение
 

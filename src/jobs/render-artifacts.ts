@@ -66,7 +66,9 @@ function roofSurface(polygons: MultiPolygon, bottom: number, thickness: number):
   }
   return { positions: new Float32Array(positions), indices: new Uint32Array(indices) };
 }
-export function renderArtifacts(physical: PhysicalSnapshot): {
+export function renderArtifacts(
+  physical: Pick<PhysicalSnapshot, 'bounds' | 'document' | 'rooms' | 'floor'>,
+): {
   floorMesh: MeshArtifact;
   roofMesh: MeshArtifact;
   groundMesh: MeshArtifact;

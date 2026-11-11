@@ -336,3 +336,224 @@ summary {
   border-radius: 6px;
   margin: 12px 0;
 }
+
+.editor-app {
+  max-width: 1800px;
+  padding: 24px;
+}
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+.editor-header label {
+  min-width: 240px;
+}
+.editor-status {
+  color: #c9dda2;
+  font-size: 13px;
+  margin: 12px 0 20px;
+}
+.editor-layout {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 270px;
+  gap: 20px;
+  align-items: start;
+}
+.editor-catalog,
+.editor-properties {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #425d4d;
+  border-radius: 8px;
+}
+.editor-catalog h2,
+.editor-properties h2 {
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+.editor-catalog h2:not(:first-child) {
+  margin-top: 24px;
+}
+.editor-catalog > button {
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: left;
+}
+.editor-catalog input[type='file'] {
+  width: 100%;
+  padding: 8px;
+  font-size: 11px;
+}
+.editor-stage {
+  min-width: 0;
+}
+.editor-stage .toolbar {
+  gap: 8px;
+}
+.editor-stage .actions {
+  max-width: none;
+  gap: 6px;
+}
+.editor-stage .actions button {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.editor-canvas {
+  display: block;
+  width: 100%;
+  height: min(68dvh, 760px);
+  min-height: 400px;
+  border-radius: 8px;
+  background: #e9ece1;
+  touch-action: none;
+}
+.editor-busy {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.editor-hint {
+  font-size: 12px;
+  color: #b7c7ba;
+}
+.editor-properties fieldset {
+  padding: 0;
+  border: 0;
+  margin: 0;
+  min-width: 0;
+}
+.property-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.property-fields h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.property-fields p {
+  font-size: 12px;
+  margin: 0;
+  color: #b7c7ba;
+}
+.property-fields input,
+.property-fields select,
+.property-fields textarea {
+  width: 100%;
+  min-width: 0;
+}
+.property-fields textarea {
+  font: 12px/1.5 monospace;
+  color: #e7ece3;
+  background: #213b30;
+  padding: 10px;
+  border: 1px solid #657c6c;
+  border-radius: 6px;
+  resize: vertical;
+}
+.property-fields input[type='color'] {
+  padding: 4px;
+}
+.property-fields .checkbox input {
+  width: 24px;
+}
+.connection-properties {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid #425d4d;
+}
+.editor-diagnostics {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #926137;
+  border-radius: 8px;
+}
+.editor-diagnostics h2 {
+  font-size: 18px;
+}
+.editor-diagnostics p {
+  font-size: 12px;
+  margin: 4px 0 16px;
+}
+.draft-list {
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid #425d4d;
+  border-radius: 8px;
+}
+.draft-list h2 {
+  font-size: 20px;
+}
+.draft-list .card {
+  padding: 12px 0;
+}
+@media (max-width: 1100px) {
+  .editor-layout {
+    grid-template-columns: 150px minmax(0, 1fr) 230px;
+    gap: 12px;
+  }
+  .editor-app {
+    padding: 16px;
+  }
+}
+@media (max-width: 850px) {
+  .editor-layout {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+  .editor-properties {
+    grid-column: 1 / -1;
+  }
+  .editor-properties .property-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .editor-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .editor-canvas {
+    min-height: 420px;
+  }
+}
+@media (max-width: 520px) {
+  .editor-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .editor-catalog {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .editor-catalog > button {
+    width: auto;
+    flex: 1 1 auto;
+  }
+  .editor-catalog h2 {
+    width: 100%;
+    margin: 12px 0 0;
+  }
+  .editor-stage,
+  .editor-properties {
+    width: 100%;
+  }
+  .editor-properties .property-fields {
+    display: flex;
+  }
+  .editor-canvas {
+    height: 55dvh;
+  }
+}
+.editor-notice {
+  min-height: 84px;
+}
+.editor-notice .notice {
+  padding: 8px 12px;
+  margin: 8px 0;
+  min-height: 64px;
+}

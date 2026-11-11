@@ -132,3 +132,39 @@ test('deleting a project retains map referenced by another project and never tou
   const names = await factory.databases();
   expect(names.map((n) => n.name)).toEqual(['maze-reboot-v1']);
 });
+
+test('editor commit guards the project base revision and preserves immutable maps and origins', async () => {
+  const repo = await open(),
+    a = revision(),
+    b = revision(0.01),
+    stale = revision(0.02);
+  await repo.saveMap(a, 'project', 'Initial', 100, null);
+  await repo.saveMap(b, 'project', 'Current', 200, a.revisionHash);
+  await expect(
+    repo.saveMap(stale, 'project', 'Stale editor', 300, a.revisionHash),
+  ).rejects.toMatchObject({ code: 'PROJECT_CONFLICT' });
+  expect((await repo.getProject('project'))!.currentRevisionHash).toBe(b.revisionHash);
+  expect((await repo.getMap(a.revisionHash)).revisionHash).toBe(a.revisionHash);
+  await expect(repo.getMap(stale.revisionHash)).rejects.toThrow();
+  expect((await repo.listMaps()).items).toHaveLength(2);
+  await repo.saveMap(stale, 'copy', 'Saved copy', 300, null);
+  expect((await repo.getProject('project'))!.currentRevisionHash).toBe(b.revisionHash);
+  expect((await repo.getProject('copy'))!.currentRevisionHash).toBe(stale.revisionHash);
+  repo.close();
+});
+
+test('ready editor commit does not delete another tab draft with different content', async () => {
+  const repo = await open(),
+    a = revision(),
+    b = revision(0.01),
+    other = revision(0.02);
+  await repo.saveMap(a, 'project', 'Initial', 100, null);
+  other.document.revision = 2;
+  await repo.saveDraft('project', other.document, a.revisionHash, 2, 200);
+  await expect(repo.saveMap(b, 'project', 'My edit', 300, a.revisionHash)).rejects.toMatchObject({
+    code: 'DRAFT_CONFLICT',
+  });
+  expect((await repo.getDraft('project'))!.document.instances).toEqual(other.document.instances);
+  expect((await repo.getProject('project'))!.currentRevisionHash).toBe(a.revisionHash);
+  repo.close();
+});

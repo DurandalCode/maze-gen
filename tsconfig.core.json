@@ -20,6 +20,7 @@
     "src/generation/**/*.ts",
     "src/observation/**/*.ts",
     "src/analysis/**/*.ts",
-    "src/session/**/*.ts"
+    "src/session/**/*.ts",
+    "src/editor/**/*.ts"
   ]
 }

@@ -8,14 +8,7 @@ import { attachSessionLifecycle } from '../platform/session-lifecycle';
 import { WorldScene } from '../renderer/scene';
 import { store, message } from './services';
 
-export const stateLabels: Record<Session['state'], string> = {
-  prepared: 'Готово к старту',
-  running: 'Прохождение',
-  paused: 'Пауза',
-  interrupted: 'Прервано',
-  finished: 'Финиш',
-  stopped: 'Остановлено',
-};
+import { stateLabels } from './session-labels';
 export function WalkView({
   world,
   session,
@@ -391,7 +384,7 @@ export function WalkView({
                   await e.recorder.start();
                   e.keys.clear();
                   e.movement.setPaused(e.recorder.status().state !== 'running');
-                  canvas.current?.focus();
+                  canvas.current?.focus({ preventScroll: true });
                 })
               }
             >

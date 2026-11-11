@@ -1,4 +1,4 @@
-import { DomainError } from '../domain';
+import { DomainError, normalizeDocument } from '../domain';
 import { isJobRequest, response, STORAGE_OPERATIONS } from '../jobs/protocol';
 import { MazeRepository } from './repository';
 import { StorageError } from './schema';
@@ -43,13 +43,45 @@ function string(input: Record<string, unknown>, key: string): string {
 async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unknown> {
   if (!STORAGE_OPERATIONS.includes(request.operation as (typeof STORAGE_OPERATIONS)[number]))
     throw new StorageError('UNSUPPORTED_OPERATION', 'Unsupported storage operation');
-  const input = payload(request.input),
-    repo = await getRepository();
+  const input = payload(request.input);
+  // Emergency draft backup/restore must also work when IndexedDB cannot be opened.
+  if (request.operation === 'export' && input.kind === 'draft') {
+    const document = normalizeDocument(input.document),
+      blob = new Blob([JSON.stringify({ kind: 'maze-reboot-draft', schemaVersion: 1, document })], {
+        type: 'application/json',
+      });
+    if (blob.size > PACKAGE_LIMITS.bytes)
+      throw new StorageError('FILE_TOO_LARGE', 'Черновик не помещается в 32 MiB');
+    return { blob, filename: 'maze-reboot-draft.json' };
+  }
+  if (request.operation === 'get' && input.kind === 'draft-file') {
+    const file = input.file;
+    if (!(file instanceof Blob) || file.size > PACKAGE_LIMITS.bytes)
+      throw new StorageError('FILE_TOO_LARGE', 'Выберите JSON-черновик до 32 MiB');
+    const source = await file.text();
+    let value: Record<string, unknown>;
+    try {
+      value = JSON.parse(source);
+    } catch {
+      throw new StorageError('INVALID_JSON', 'Не удалось прочитать JSON');
+    }
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      Array.isArray(value) ||
+      value.kind !== 'maze-reboot-draft' ||
+      value.schemaVersion !== 1 ||
+      Object.keys(value).some((key) => !['kind', 'schemaVersion', 'document'].includes(key))
+    )
+      throw new StorageError('UNSUPPORTED_FORMAT', 'Нужен файл maze-reboot-draft версии 1');
+    return normalizeDocument(value.document);
+  }
+  const repo = await getRepository();
   switch (request.operation) {
     case 'list':
       if (input.kind === 'maps') return repo.listMaps((input.query ?? {}) as ListQuery);
       if (input.kind === 'walks') return repo.listWalks((input.query ?? {}) as ListQuery);
-      if (input.kind === 'drafts') return repo.listDrafts();
+      if (input.kind === 'drafts') return repo.listDraftSummaries();
       break;
     case 'get':
       if (input.kind === 'import-map')
@@ -75,6 +107,8 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
         input.revision as MapRevision,
         string(input, 'projectId'),
         string(input, 'title'),
+        Date.now(),
+        input.expectedBaseRevisionHash as string | null | undefined,
       );
     case 'append':
       return repo.sessions.append(input.chunk as ChunkInput);
@@ -114,7 +148,7 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
     }
     case 'recover':
       await repo.cleanupStaging();
-      return { drafts: await repo.listDrafts(), sessions: await repo.sessions.recover() };
+      return { drafts: await repo.listDraftSummaries(), sessions: await repo.sessions.recover() };
     case 'validate-import': {
       const imports = new ImportRepository(repo);
       if (input.kind === 'cancel') {

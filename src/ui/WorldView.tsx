@@ -4,8 +4,14 @@ import { WorldScene } from '../renderer/scene';
 import { PlanRenderer } from '../renderer/plan';
 import { message } from './services';
 
-export function WorldView({ world }: { world: PreparedWorld }) {
-  const [mode, setMode] = useState<'2d' | '3d'>('2d');
+export function WorldView({
+  world,
+  initialMode = '2d',
+}: {
+  world: PreparedWorld;
+  initialMode?: '2d' | '3d';
+}) {
+  const [mode, setMode] = useState<'2d' | '3d'>(initialMode);
   const [error, setError] = useState('');
   const [lost, setLost] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);

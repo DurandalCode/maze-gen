@@ -7,6 +7,7 @@ import { DATABASE_NAME, openDatabase, request, StorageError, transaction } from 
 import type { Store } from './schema';
 import type {
   Draft,
+  DraftSummary,
   ListQuery,
   ListCursor,
   MapSummary,
@@ -56,8 +57,16 @@ export class MazeRepository {
     projectId: string,
     projectTitle: string,
     now = Date.now(),
+    expectedBaseRevisionHash?: string | null,
   ): Promise<MapSummary> {
     timestamp(now);
+    if (
+      expectedBaseRevisionHash !== undefined &&
+      expectedBaseRevisionHash !== null &&
+      (typeof expectedBaseRevisionHash !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(expectedBaseRevisionHash))
+    )
+      throw new StorageError('INVALID_BASE', 'Неверная базовая ревизия проекта');
     const normalized = normalizeDocument(revision.document),
       hash = documentHashes(normalized, revision.versions).revisionHash;
     if (hash !== revision.revisionHash)
@@ -81,6 +90,8 @@ export class MazeRepository {
       validationSummary: { ready: true, diagnostics: [] },
     };
     const b = bounds(contourPolygon(normalized.site.boundaryLoops)[0]!);
+    const commitDraftContent =
+      expectedBaseRevisionHash === undefined ? null : canonical({ ...normalized, revision: 0 });
     return transaction(
       this.database,
       ['projects', 'maps', 'definitions', 'mapSummaries', 'drafts'],
@@ -89,6 +100,24 @@ export class MazeRepository {
         const oldProject = (await request(tx.objectStore('projects').get(projectId))) as
           | Project
           | undefined;
+        if (
+          expectedBaseRevisionHash !== undefined &&
+          (oldProject?.currentRevisionHash ?? null) !== expectedBaseRevisionHash
+        )
+          throw new StorageError(
+            'PROJECT_CONFLICT',
+            'Проект уже изменён в другом редакторе. Сохраните текущую работу отдельной копией.',
+          );
+        if (commitDraftContent !== null) {
+          const draft = (await request(tx.objectStore('drafts').get(projectId))) as
+            | Draft
+            | undefined;
+          if (draft && canonical({ ...draft.document, revision: 0 }) !== commitDraftContent)
+            throw new StorageError(
+              'DRAFT_CONFLICT',
+              'Черновик проекта изменён в другом редакторе. Сохраните свою работу отдельной копией.',
+            );
+        }
         for (const definition of definitions) {
           const existing = await request(tx.objectStore('definitions').get(definition.contentHash));
           if (existing && canonical(existing) !== canonical(definition))
@@ -124,6 +153,7 @@ export class MazeRepository {
           currentRevisionHash: hash,
           createdAt: oldProject?.createdAt ?? now,
           updatedAt: now,
+          ...(oldProject?.originId ? { originId: oldProject.originId } : {}),
         } satisfies Project);
         tx.objectStore('drafts').delete(projectId);
         return summary;
@@ -290,6 +320,45 @@ export class MazeRepository {
       ['drafts'],
       'readonly',
       async (tx) => (await request(tx.objectStore('drafts').getAll())) as Draft[],
+    );
+  }
+  async listDraftSummaries(): Promise<DraftSummary[]> {
+    return transaction(
+      this.database,
+      ['drafts'],
+      'readonly',
+      async (tx) =>
+        new Promise<DraftSummary[]>((resolve, reject) => {
+          const result: DraftSummary[] = [],
+            cursor = tx.objectStore('drafts').openCursor();
+          cursor.onerror = () => reject(cursor.error);
+          cursor.onsuccess = () => {
+            const current = cursor.result;
+            if (!current) {
+              resolve(
+                result.sort(
+                  (a, b) => b.updatedAt - a.updatedAt || (a.projectId < b.projectId ? -1 : 1),
+                ),
+              );
+              return;
+            }
+            const draft = current.value as Draft;
+            result.push({
+              projectId: draft.projectId,
+              title:
+                typeof draft.document?.metadata?.title === 'string'
+                  ? draft.document.metadata.title
+                  : 'Повреждённый черновик',
+              commandRevision: draft.commandRevision,
+              baseRevisionHash: draft.baseRevisionHash,
+              updatedAt: draft.updatedAt,
+              modules: Array.isArray(draft.document?.instances)
+                ? draft.document.instances.length
+                : 0,
+            });
+            current.continue();
+          };
+        }),
     );
   }
   async getProject(projectId: string): Promise<Project | null> {

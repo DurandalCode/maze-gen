@@ -1,4 +1,4 @@
-import { VERSIONS, documentHashes } from '../domain';
+import { VERSIONS, documentHashes, normalizeDocument } from '../domain';
 import type { Diagnostic } from '../domain';
 import { compileGeometry } from '../geometry/compile/compile';
 import type { PhysicalSnapshot } from '../geometry/compile/types';
@@ -62,7 +62,10 @@ export function compute(
     };
   if (!request.input || typeof request.input !== 'object' || !('document' in request.input))
     return { message: response(request, 'error', { code: 'INVALID_REQUEST' }), transfer: [] };
-  const input = request.input as { document: unknown };
+  const input = request.input as {
+    document: unknown;
+    renderSource?: Pick<PhysicalSnapshot, 'bounds' | 'rooms' | 'floor' | 'layoutHash'>;
+  };
   if (
     !input.document ||
     typeof input.document !== 'object' ||
@@ -70,6 +73,25 @@ export function compute(
     input.document.revision !== request.sourceRevision
   )
     return { message: response(request, 'error', { code: 'SOURCE_REVISION' }), transfer: [] };
+  if (request.operation === 'identity') {
+    const document = normalizeDocument(input.document),
+      hashes = documentHashes(document);
+    let visual: ReturnType<typeof renderArtifacts> | null = null;
+    if (input.renderSource) {
+      if (input.renderSource.layoutHash !== hashes.layoutHash)
+        return { message: response(request, 'error', { code: 'STALE_LAYOUT' }), transfer: [] };
+      visual = renderArtifacts({ ...input.renderSource, document });
+    }
+    return {
+      message: response(request, 'result', { ok: true, ...hashes, versions: VERSIONS, visual }),
+      transfer: visual
+        ? [visual.floorMesh, visual.roofMesh, visual.groundMesh].flatMap((mesh) => [
+            mesh.positions.buffer,
+            mesh.indices.buffer,
+          ])
+        : [],
+    };
+  }
   progress(response(request, 'progress', { stage: 'preparing', workDone: 0 }));
   const prepared = prepareWorld(input.document);
   if (!prepared.ok) return { message: response(request, 'result', prepared), transfer: [] };

@@ -56,6 +56,14 @@ export interface Draft {
   baseRevisionHash: string | null;
   updatedAt: number;
 }
+export interface DraftSummary {
+  projectId: string;
+  title: string;
+  commandRevision: number;
+  baseRevisionHash: string | null;
+  updatedAt: number;
+  modules: number;
+}
 export interface ListQuery {
   limit?: number;
   cursor?: ListCursor | null;

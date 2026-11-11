@@ -11,6 +11,7 @@ const core = new Set([
   'observation',
   'analysis',
   'session',
+  'editor',
 ]);
 const kernelPackages = new Set(['clipper2-ts', 'earcut']);
 
