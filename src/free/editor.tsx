@@ -304,6 +304,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
     {l.preservedPanels && <p>Свободная копия сохраняет исходные стены. Для изменения размещения сначала нажмите «Перестроить стены»: рисунок стен будет построен по проёмам и связям.</p>}{l.preservedPanels && <button onClick={() => mutate(n => {
       delete n.layout.preservedPanels;
       delete n.layout.supports;
+      delete n.layout.preservedSupports;
     })}>Перестроить стены</button>}
     {m && <fieldset><legend>Выбранный модуль</legend>{numberField('X, м', m.x, v => mutate(n => n.layout.modules.find(x => x.id === m.id)!.x = v), .001)}{numberField('Z, м', m.z, v => mutate(n => n.layout.modules.find(x => x.id === m.id)!.z = v), .001)}{numberField('Угол, °', m.angle, v => mutate(n => n.layout.modules.find(x => x.id === m.id)!.angle = v), .1)}<button onClick={() => mutate(n => {
       n.layout.modules.find(x => x.id === m.id)!.angle = quantize(snap ? Math.round((m.angle + 15) / 15) * 15 : m.angle + 15);

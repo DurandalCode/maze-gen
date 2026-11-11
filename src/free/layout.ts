@@ -12,14 +12,14 @@ export function modulePolygon(m: FreeModule): Point[] {
   return [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].map(([x, z]) => ({ x: m.x + x! * c - z! * s, z: m.z + x! * s + z! * c }));
 }
 export function rooms(layout: FreeLayout): { id: string; polygon: Point[]; holes: Point[][] }[] {
-  return [...layout.modules.map(m => ({ id: m.id, polygon: modulePolygon(m), holes: [] })), ...layout.spaces.map(s => ({ ...s, holes: s.holes ?? [] }))];
+  return [...layout.modules.filter(m=>!m.frameOnly).map(m => ({ id: m.id, polygon: modulePolygon(m), holes: [] })), ...layout.spaces.map(s => ({ ...s, holes: s.holes ?? [] }))];
 }
 export function anchorGeometry(l: FreeLayout, a: Anchor, width: number) {
   const r = rooms(l).find(r => r.id === a.room);
   if (!r || !Number.isInteger(a.edge) || a.edge < 0 || a.edge >= r.polygon.length) throw Error('Проём ссылается на отсутствующую сторону.');
   const p = r.polygon[a.edge]!, q = r.polygon[(a.edge + 1) % r.polygon.length]!, length = distance(p, q);
-  if (!Number.isFinite(a.offset) || width < 1 - EPS || width > 3 + EPS || Math.abs(a.offset) + width / 2 > length / 2 + EPS) throw Error('Проём должен иметь ширину 1–3 м и помещаться на стороне.');
   const mid = lerp(p, q, .5 + a.offset / length), from = lerp(p, q, .5 + (a.offset - width / 2) / length), to = lerp(p, q, .5 + (a.offset + width / 2) / length), normal = { x: (q.z - p.z) / length, z: -(q.x - p.x) / length };
+  if (!Number.isFinite(a.offset) || !Number.isFinite(width) || width < 1 - EPS || width > 3 + EPS || Math.abs(a.offset) + width / 2 > length / 2 + EPS) throw Error('Проём должен иметь ширину 1–3 м и помещаться на стороне.');
   return { mid, from, to, normal, wall: segment(from, to), room: r };
 }
 export function connectionGeometry(l: FreeLayout, c: FreeLayout['connections'][number]) {
@@ -73,12 +73,14 @@ export function physical(l: FreeLayout) {
   const panels = l.preservedPanels ? [...l.preservedPanels] : [...rs.flatMap(r => [...edges(r.polygon).flatMap(w => cutWall(w, cuts)), ...r.holes.flatMap(edges)]), ...connections.flatMap(c => c.sides)];
   panels.push(...l.walls);
   const postMap = new Map<string, Point>(), add = (p: Point) => postMap.set(`${quantize(p.x)}:${quantize(p.z)}`, p);
+  l.preservedSupports?.forEach(add);
   l.supports?.forEach(add);
   bridgeColumns(l).forEach(add);
   l.modules.forEach(m => modulePolygon(m).forEach(add));
-  panels.forEach(w => ends(w).forEach(add));
+  (l.preservedSupports!==undefined?l.walls:panels).forEach(w => ends(w).forEach(add));
   if (!l.preservedPanels) cuts.forEach(w => ends(w).forEach(add));
   for (let i = 0; i < panels.length; i++)for (let j = i + 1; j < panels.length; j++) {
+    if(l.preservedSupports!==undefined&&i<(l.preservedPanels?.length??0)&&j<(l.preservedPanels?.length??0))continue;
     const a = panels[i]!, b = panels[j]!, t = intersection(...ends(a), ...ends(b));
     if (t !== null) add(lerp(...ends(a), t));
   }
@@ -104,6 +106,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   }
   for (const m of l.modules) {
     if (![m.x, m.z, m.angle, ...size(m)].every(Number.isFinite) || size(m).some(v => v < .8 || v > 10)) issue('module', 'Некорректные размеры или положение модуля.', m.id);
+    if(m.frameOnly&&!l.spaces.some(s=>s.kind==='hall'&&modulePolygon(m).every(p=>pointIn(p,s.polygon)&&!(s.holes??[]).some(h=>pointIn(p,h,false)))&&edges(modulePolygon(m)).every(w=>segmentInside(...ends(w),p=>pointIn(p,s.polygon)&&!(s.holes??[]).some(h=>pointIn(p,h,false)),[...edges(s.polygon),...(s.holes??[]).flatMap(edges)]))))issue('frame','Каркас должен оставаться внутри зала.',m.id);
   }
   for (const r of rs) {
     if (!simple(r.polygon) || r.holes.some(h => !simple(h) || h.some(p => !pointIn(p, r.polygon)))) issue('polygon', 'Некорректный полигон пространства.', r.id);
@@ -112,9 +115,14 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   for (let i = 0; i < rs.length; i++)for (let j = i + 1; j < rs.length; j++)if (overlap(rs[i]!.polygon, rs[j]!.polygon)) issue('overlap', 'Пространства пересекаются.', rs[i]!.id, rs[j]!.id);
   if(l.bridges?.length)for(const error of bridgeIssues(l,d.construction.wallHeight,site,[...rs.map(r=>r.polygon),...physical(l).connections.map(c=>c.polygon)]))issue('bridge',error.message,error.id);
   const used: { anchor: Anchor; width: number; id: string }[] = [];
+  // Pairwise overlap checks reuse one geometry per connection, rather than
+  // rebuilding every room polygon for each pair. Lifetime is this call only:
+  // edits of the same draft objects must be observed by the next validation.
+  const shapes=new Map<FreeLayout['connections'][number],ReturnType<typeof connectionGeometry>>();
+  const shape=(c:FreeLayout['connections'][number])=>{let g=shapes.get(c);if(!g){g=connectionGeometry(l,c);shapes.set(c,g);}return g;};
   for (const c of l.connections) try {
     if (c.a.room === c.b.room) throw Error('Связь должна соединять разные пространства.');
-    const g = connectionGeometry(l, c);
+    const g = shape(c);
     used.push({ anchor: c.a, width: c.width, id: c.id }, { anchor: c.b, width: c.width, id: c.id });
     const spans = g.sides.map(w => distance(...ends(w)));
     if (Math.max(...spans) > 3 + EPS) issue('span', 'Свободный пролёт превышает 3 м.', c.id);
@@ -126,7 +134,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
     for (const other of l.connections) {
       if (other.id >= c.id) continue;
       try {
-        if (overlap(g.polygon, connectionGeometry(l, other).polygon)) issue('overlap', 'Соединения пересекаются.', c.id, other.id);
+        if (overlap(g.polygon, shape(other).polygon)) issue('overlap', 'Соединения пересекаются.', c.id, other.id);
       } catch {
         /* already reported */
       }
@@ -317,7 +325,7 @@ export function freeDomain(maze: Maze): Domain {
   const cached=domainCache.get(maze.free!);if(cached)return cached;
   const r = freeRuntime(maze), cells = r.rooms.map((_, i) => i);
   const result:Domain={
-    active: new Uint8Array(cells.length).fill(1), cells, modules: new Uint8Array(maze.free!.modules.length).fill(1), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: maze.free!.openings.map(o=>({wall:anchorGeometry(maze.free!,o,o.width).wall,portal:{freeId:o.id,cell:r.rooms.findIndex(s=>s.id===o.room),side:'north' as const,width:o.width}})), area: (maze.free!.bridges??[]).reduce((sum,b)=>{const g=bridgeGeometry(maze.free!,b);return sum+b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun);},0)+r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: p => p.bridge!==undefined ? (()=>{const surface=bridgeSurface(maze.free!,p);return !!surface&&Math.abs((p.y??0)-surface.y!)<1e-5;})() : (p.y??0)===0&&r.contains(p), constrain(from, to) {
+    active: new Uint8Array(cells.length).fill(1), cells, modules: Uint8Array.from(r.rooms.map(room=>maze.free!.modules.some(m=>!m.frameOnly&&m.id===room.id)?1:0)), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: maze.free!.openings.map(o=>({wall:anchorGeometry(maze.free!,o,o.width).wall,portal:{freeId:o.id,cell:r.rooms.findIndex(s=>s.id===o.room),side:'north' as const,width:o.width}})), area: (maze.free!.bridges??[]).reduce((sum,b)=>{const g=bridgeGeometry(maze.free!,b);return sum+b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun);},0)+r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: p => p.bridge!==undefined ? (()=>{const surface=bridgeSurface(maze.free!,p);return !!surface&&Math.abs((p.y??0)-surface.y!)<1e-5;})() : (p.y??0)===0&&r.contains(p), constrain(from, to) {
       if (segmentInside(from, to, r.contains, r.boundaries)) return { ...to };
       // Clip to the real boundary, not the EPS-wide outside band accepted by
       // polygon predicates. This also stops at the first hole on a long step.

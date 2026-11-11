@@ -15,11 +15,11 @@ function inspect(d: FreeDraft): void {
   if(l.zones!==undefined&&(!Array.isArray(l.zones)||l.zones.length>100||l.zones.some(z=>!z||typeof z.id!=='string'||typeof z.title!=='string'||z.title.length>200||!['branching','braided','winding'].includes(z.style))||new Set(l.zones.map(z=>z.id)).size!==l.zones.length))throw Error('Некорректные зоны.');
   if([...l.modules,...l.spaces].some(m=>m.zone!==undefined&&(!l.zones?.some(z=>z.id===m.zone))))throw Error('Неизвестная зона пространства.');
   if(l.bridges!==undefined&&(!Array.isArray(l.bridges)||l.bridges.length>100||l.bridges.length>0&&d.version!==2))throw Error('Некорректный список мостов.');
-  if (l.supports !== undefined && (!Array.isArray(l.supports) || l.supports.length > 100000 || l.supports.some(p => !p || ![p.x, p.z].every(Number.isFinite)))) throw Error('Некорректные опоры.');
+  for(const supports of [l.supports,l.preservedSupports])if (supports !== undefined && (!Array.isArray(supports) || supports.length > 100000 || supports.some(p => !p || ![p.x, p.z].every(Number.isFinite)))) throw Error('Некорректные опоры.');
   if (l.preservedPanels !== undefined && (!Array.isArray(l.preservedPanels) || l.preservedPanels.length > 100000)) throw Error('Некорректные сохранённые панели.');
   const all = [...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]];
   if (all.some(v => !v || typeof v.id !== 'string' || v.id.length > 100) || new Set(all.map(v => v.id)).size !== all.length) throw Error('Некорректные идентификаторы.');
-  for (const m of l.modules) if (!['2x2', '2x6', 'custom'].includes(m.type) || ![m.x, m.z, m.angle].every(Number.isFinite) || m.type === 'custom' && (![m.width, m.depth].every(v => typeof v === 'number' && Number.isFinite(v)))) throw Error('Некорректный модуль.');
+  for (const m of l.modules) if (m.frameOnly!==undefined&&typeof m.frameOnly!=='boolean'||!['2x2', '2x6', 'custom'].includes(m.type) || ![m.x, m.z, m.angle].every(Number.isFinite) || m.type === 'custom' && (![m.width, m.depth].every(v => typeof v === 'number' && Number.isFinite(v)))) throw Error('Некорректный модуль.');
   for (const c of [...l.connections,...l.bridges??[]]) for (const a of [c.a, c.b]) if (!a || typeof a.room !== 'string' || !Number.isInteger(a.edge) || !Number.isFinite(a.offset) || !Number.isFinite(c.width)) throw Error('Некорректная связь.');
   for (const o of l.openings) if (typeof o.room !== 'string' || !Number.isInteger(o.edge) || ![o.offset, o.width].every(Number.isFinite)) throw Error('Некорректный проём.');
   for (const s of l.spaces) {

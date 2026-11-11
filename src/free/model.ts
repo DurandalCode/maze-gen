@@ -1,6 +1,6 @@
 import type { Environment } from '../core/environment';
 import type { Construction, Parameters, Point, Wall } from '../core/maze';
-export interface FreeModule { zone?:string; id: string; type: '2x2' | '2x6' | 'custom'; x: number; z: number; angle: number; width?: number; depth?: number }
+export interface FreeModule { frameOnly?:boolean; zone?:string; id: string; type: '2x2' | '2x6' | 'custom'; x: number; z: number; angle: number; width?: number; depth?: number }
 export interface FreeSpace { zone?:string; id: string; kind: 'hall' | 'corridor'; polygon: Point[]; holes?: Point[][] }
 /** edge is clockwise from the local north edge; offset is metres from its midpoint. */
 export interface Anchor { room: string; edge: number; offset: number }
@@ -17,6 +17,8 @@ export interface FreeLayout {
   /** Preserved physical panels when converting a legacy map. */
   preservedPanels?: Wall[];
   supports?: Point[];
+  /** Authoritative imported uprights; panel segmentation must not add posts. */
+  preservedSupports?: Point[];
 }
 export interface FreeDraft { environment?: Environment; kind: 'maze-lab-free-draft'; version: 1|2; parameters: Parameters; construction: Construction; layout: FreeLayout }
 export interface FreeIssue { code: string; message: string; ids: string[] }

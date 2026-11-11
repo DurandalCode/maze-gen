@@ -83,7 +83,7 @@ function App() {
   const analysis = useMemo(() => metrics(maze), [maze]);
   const livingInfo=useMemo(()=>maze.parameters.generationType==='living'?contourQuality(maze):null,[maze]);
   const supportCount=useMemo(()=>maze.version===4?corridorSupports(maze).length:0,[maze]);
-  const moduleCount=useMemo(()=>domainOf(maze).modules.reduce((sum,active)=>sum+active,0),[maze]);
+  const moduleCount=useMemo(()=>maze.free?.modules.length??domainOf(maze).modules.reduce((sum,active)=>sum+active,0),[maze]);
   const walkAssessment=useMemo(()=>result?assessWalk(maze,result.recorder.samples,result.recorder.distance,result.finished):null,[maze,result]);
   useEffect(()=> {
     const retry=()=>void flushPendingWalks(()=>modeRef.current==='map'&&!document.querySelector('.walk-view'));retry();
