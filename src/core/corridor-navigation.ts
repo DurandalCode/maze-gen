@@ -1,4 +1,4 @@
-import {freeRay,freeRuntime,anchorGeometry} from '../free/layout';
+import {freeRay,freeEdgeOpening} from '../free/layout';
 import {corridorSupports} from './corridor-supports';
 import {domainOf,type Domain} from './domain';
 import {regionOwners} from './corridor-geometry';
@@ -34,7 +34,7 @@ export function rayDistance(source:Maze,start:Point,angle:number,limit=24):numbe
  return best;
 }
 export function openingMidpoint(maze:Maze,a:number,b:number):Point{
- if((maze.version===5||maze.version===7)){const r=freeRuntime(maze),c=[...maze.free!.connections,...maze.free!.bridges??[]].find(c=>c.a.room===r.rooms[a]!.id&&c.b.room===r.rooms[b]!.id||c.b.room===r.rooms[a]!.id&&c.a.room===r.rooms[b]!.id)!;const anchor=c.a.room===r.rooms[a]!.id?c.a:c.b;return anchorGeometry(maze.free!,anchor,c.width).mid;}
+ if(maze.free)return freeEdgeOpening(maze,a,b);
  const g=maze.navigation!,key=a<b?`${a}:${b}`:`${b}:${a}`;let cached=openingCache.get(maze);if(!cached){cached=new Map();openingCache.set(maze,cached);}const known=cached.get(key);if(known)return known;let x=0,z=0,n=0;
  for(const c of domainOf(g.source).cells)if(g.originalToRegion[c]===a)for(const d of g.source.passages[c]!)if(g.originalToRegion[d]===b){const r=domainOf(g.source).rectangles[c]!,s=domainOf(g.source).rectangles[d]!,vertical=r.x2===s.x1||s.x2===r.x1,lo=vertical?Math.max(r.z1,s.z1):Math.max(r.x1,s.x1),hi=vertical?Math.min(r.z2,s.z2):Math.min(r.x2,s.x2),length=hi-lo;x+=(vertical?Math.max(r.x1,s.x1):(lo+hi)/2)*length;z+=(vertical?(lo+hi)/2:Math.max(r.z1,s.z1))*length;n+=length;}
  const result=n?{x:x/n,z:z/n}:g.centers[b]!;cached.set(key,result);return result;

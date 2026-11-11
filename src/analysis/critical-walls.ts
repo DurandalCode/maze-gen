@@ -1,3 +1,4 @@
+import {removeFreePanel} from '../free/wall-removal';
 import {segmentDistance} from '../free/geometry';
 import {freePortalPrivacy} from '../free/portal-privacy';
 import {freeRuntime} from '../free/layout';
@@ -20,16 +21,24 @@ function overlaps(a:Wall,b:Wall){
 /** Critical means deleting this wall ALONE invalidates a currently recognized element.
  * These are derived protections, not user pins. Combined edits still require revalidation.
  */
-export function criticalWalls(maze:Maze):CriticalWall[]{
+export function criticalWalls(maze:Maze,onProgress?:(done:number,total:number)=>void):CriticalWall[]{
  if(maze.free){
   const r=freeRuntime(maze),result:CriticalWall[]=[],portals=[['входа',maze.entrance],['выхода',maze.exit]] as const;
   const before=portals.map(([,p])=>freePortalPrivacy(maze,p,3,false));
+  const routeOrder=new Map(shortestPath(maze).map((c,i)=>[c,i])),traps=routeTraps(maze).candidates.filter(t=>t.qualifies),loops=loopTraps(maze).candidates.filter(t=>t.qualifies).sort((a,b)=>routeOrder.get(a.fork)!-routeOrder.get(b.fork)!);
+  const forks=[...new Set(traps.map(t=>t.fork))].sort((a,b)=>routeOrder.get(a)!-routeOrder.get(b)!);
+  const loopKey=(loop:number[])=>[...new Set(loop.filter(c=>c<r.rooms.length))].sort((a,b)=>a-b).join(',');
+  if(!traps.length&&!loops.length&&!before.some(p=>p.certified))return result;
   for(const [index,wall]of r.panels.entries()){
-   const protections:WallProtection[]=[];
-   for(const [i,[name,portal]]of portals.entries())if(before[i]!.certified&&before[i]!.blockers.includes(wall)&&!freePortalPrivacy(maze,portal,3,false,index).certified)protections.push({kind:'portal',element:name,reason:`Экранирование ${name}`});
+   onProgress?.(index,r.panels.length);
+   const after=removeFreePanel(maze,index),protections:WallProtection[]=[];
+   for(const [i,[name,portal]]of portals.entries())if(before[i]!.certified&&!freePortalPrivacy(after,portal,3,false).certified)protections.push({kind:'portal',element:name,reason:`Экранирование ${name}`});
+   const afterTraps=traps.length?routeTraps(after).candidates.filter(t=>t.qualifies):[],afterLoops=loops.length?loopTraps(after).candidates.filter(t=>t.qualifies):[];
+   for(const t of traps)if(!afterTraps.some(a=>a.fork===t.fork&&a.deadEnd===t.deadEnd))protections.push({kind:'trap',element:`trap:${t.fork}:${t.deadEnd}`,reason:`Ловушка Л${forks.indexOf(t.fork)+1}: тупиковая ветка или необходимый обход`});
+   for(const [i,t]of loops.entries())if(!afterLoops.some(a=>a.fork===t.fork&&loopKey(a.loop)===loopKey(t.loop)))protections.push({kind:'loop',element:`loop:${t.fork}:${loopKey(t.loop)}`,reason:`Кольцевая ловушка К${i+1}: возврат на ту же развилку`});
    if(protections.length)result.push({a:-1,b:-1,wall,protections});
   }
-  return result;
+  onProgress?.(r.panels.length,r.panels.length);return result;
  }
  const domain=domainOf(maze),privacy=mazePortalPrivacy(maze,false),traps=detailedCriticalWallsAvailable(maze)?routeTraps(maze):null,order=new Map(shortestPath(maze).map((c,i)=>[c,i]));
  const forks=[...new Set((traps?.candidates??[]).filter(t=>t.qualifies).map(t=>t.fork))].sort((a,b)=>order.get(a)!-order.get(b)!);

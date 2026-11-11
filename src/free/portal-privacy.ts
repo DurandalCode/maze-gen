@@ -1,7 +1,6 @@
 import type {Maze,Point,Portal,Wall} from '../core/maze';
 import type {PortalPrivacy} from '../analysis/portal-privacy';
-import {freePortal,freeRuntime,connectionGeometry} from './layout';
-import {bridgeGeometry} from './bridges';
+import {freePortal,freeRuntime} from './layout';
 import {freeSpatialRay} from './spatial-visibility';
 /** Sufficient continuous certificate: every endpoint ray crosses the same
  * oriented physical panel. Never substitute its axis-aligned bounding box. */
@@ -16,10 +15,7 @@ export function freePortalPrivacy(maze:Maze,portal:Portal,maxPocketCells:number,
  if(start!==portal.cell)throw Error('Проём не соответствует пространству.');
  const pocket=[start];while(pocket.length<maxPocketCells){const next=maze.passages[pocket.at(-1)!]!.filter(n=>!pocket.includes(n));if(next.length!==1)break;pocket.push(next[0]!);}
  const inside=new Set(pocket),roomIds=new Set(pocket.map(i=>r.rooms[i]!.id)),gates:Wall[]=[];
- for(const c of [...maze.free!.connections,...maze.free!.bridges??[]])if(roomIds.has(c.a.room)!==roomIds.has(c.b.room)){
-  const bridge=maze.free!.bridges?.find(b=>b===c),g=bridge?bridgeGeometry(maze.free!,bridge):connectionGeometry(maze.free!,c);
-  gates.push(roomIds.has(c.a.room)?g.a.wall:g.b.wall);
- }
+ for(const e of r.links)if(inside.has(e.a)!==inside.has(e.b))gates.push(inside.has(e.a)?e.gateA:e.gateB);
  const source=[opening.from,opening.to],panels=r.panels.filter((w,i)=>i!==excludedPanel&&(w.y??0)<=1.7&&(w.y??0)+(w.height??maze.wallHeight)>=1.7),blockers=gates.map(g=>panels.find(w=>separatesApertures(source,[{x:g.x1,z:g.z1},{x:g.x2,z:g.z2}],w))).filter((w):w is Wall=>!!w);
  const inward=r.polygons.every(poly=>poly.every(p=>(p.x-opening.mid.x)*opening.normal.x+(p.z-opening.mid.z)*opening.normal.z<=1e-7));
  // A ground-plane certificate cannot certify an open view from an upper bridge.

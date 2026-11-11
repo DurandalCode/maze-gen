@@ -188,7 +188,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   return out;
 }
 /** Visibility graph inside each physical room, using wall-end clearance candidates. */
-function localRoute(a: Point, b: Point, poly: Point[], holes: Point[][], obstacles: Wall[]): Point[] | null {
+export function localRoute(a: Point, b: Point, poly: Point[], holes: Point[][], obstacles: Wall[]): Point[] | null {
   const contains = (p: Point) => pointIn(p, poly) && !holes.some(h => pointIn(p, h, false)), boundary = [...edges(poly), ...holes.flatMap(edges)], clear = (p: Point) => contains(p) && obstacles.every(w => wallDistance(p, w) >= .25 - EPS), visible = (p: Point, q: Point) => {
     if (!segmentInside(p, q, contains, boundary)) return false;
     return obstacles.every(w => movementClearance(p, q, w) >= .25 - EPS);
@@ -247,7 +247,9 @@ function navigationCenter(room: ReturnType<typeof rooms>[number], obstacles: Wal
   // No safe anchor means navigation remains invalid and validation reports it.
   return candidates.find(clear) ?? center;
 }
+export interface FreeNavigationLink {a:number;b:number;from:Point;to:Point;points:Point[];openingA:Point;openingB:Point;connection?:string;gateA:Wall;gateB:Wall}
 export function buildNavigation(l: FreeLayout) {
+  const links:FreeNavigationLink[]=[];
   const phys = physical(l), rs = phys.rooms, centers = rs.map(r => navigationCenter(r, phys.obstacles)), passages = rs.map(() => [] as number[]), paths: (Point[] | null)[] = [], edgePaths = new Map<string, Point[]>();
   for (const c of l.connections) try {
     const g = connectionGeometry(l, c), a = rs.findIndex(r => r.id === c.a.room), b = rs.findIndex(r => r.id === c.b.room), inward = (p: typeof g.a) => ({ x: p.mid.x - p.normal.x * .35, z: p.mid.z - p.normal.z * .35 }), pa = inward(g.a), pb = inward(g.b), ra = localRoute(centers[a]!, pa, rs[a]!.polygon, rs[a]!.holes, phys.obstacles), rb = localRoute(pb, centers[b]!, rs[b]!.polygon, rs[b]!.holes, phys.obstacles);
@@ -261,6 +263,7 @@ export function buildNavigation(l: FreeLayout) {
     }
     paths.push(route);
     if (route) {
+      links.push({a,b,from:pa,to:pb,points:[pa,g.a.mid,g.b.mid,pb],openingA:g.a.mid,openingB:g.b.mid,connection:c.id,gateA:g.a.wall,gateB:g.b.wall});
       passages[a]!.push(b);
       passages[b]!.push(a);
       edgePaths.set(`${a}:${b}`, route);
@@ -274,7 +277,7 @@ export function buildNavigation(l: FreeLayout) {
     const pa={x:g.a.mid.x-g.a.normal.x*.35,z:g.a.mid.z-g.a.normal.z*.35},pb={x:g.b.mid.x-g.b.normal.x*.35,z:g.b.mid.z-g.b.normal.z*.35};
     const ra=localRoute(centers[a]!,pa,rs[a]!.polygon,rs[a]!.holes,phys.obstacles),rb=localRoute(pb,centers[b]!,rs[b]!.polygon,rs[b]!.holes,phys.obstacles);
     const route=ra&&rb?[...ra,...g.path,...rb]:null;
-    paths.push(route);if(route){passages[a]!.push(b);passages[b]!.push(a);edgePaths.set(`${a}:${b}`,route);edgePaths.set(`${b}:${a}`,[...route].reverse());}
+    paths.push(route);if(route){links.push({a,b,from:pa,to:pb,points:[pa,...g.path,pb],openingA:g.a.mid,openingB:g.b.mid,gateA:g.a.wall,gateB:g.b.wall});passages[a]!.push(b);passages[b]!.push(a);edgePaths.set(`${a}:${b}`,route);edgePaths.set(`${b}:${a}`,[...route].reverse());}
   }catch{paths.push(null);}
   const portalPaths = new Map<string, Point[]>();
   for (const o of l.openings) try {
@@ -295,7 +298,7 @@ export function buildNavigation(l: FreeLayout) {
     }
     for (const sample of samples) if (pointIn(sample, room.polygon) && !room.holes.some(h => pointIn(sample, h)) && phys.obstacles.every(w => wallDistance(sample, w) >= .25 - EPS)) paths.push(localRoute(centers[i]!, sample, room.polygon, room.holes, phys.obstacles));
   }
-  return { ...phys, centers, passages, paths, edgePaths, portalPaths };
+  return { ...phys, centers, passages, paths, edgePaths, portalPaths,links,analysisStart:rs.length };
 }
 const runtimeCache = new WeakMap<FreeLayout, ReturnType<typeof buildNavigation>>();
 const domainCache = new WeakMap<FreeLayout,Domain>();
@@ -366,21 +369,7 @@ export function freeRoute(maze: Maze, from = maze.entrance.cell, to = maze.exit.
     }
     return { index: add(r.centers[fallback]!, fallback), boundary: null };
   }, start = endpoint(from === maze.entrance.cell ? l.entrance : '', from), goal = endpoint(to === maze.exit.cell ? l.exit : '', to);
-  for (const c of l.connections) {
-    try {
-      const g = connectionGeometry(l, c), a = r.rooms.findIndex(v => v.id === c.a.room), b = r.rooms.findIndex(v => v.id === c.b.room), pa = { x: g.a.mid.x - g.a.normal.x * .35, z: g.a.mid.z - g.a.normal.z * .35 }, pb = { x: g.b.mid.x - g.b.normal.x * .35, z: g.b.mid.z - g.b.normal.z * .35 };
-      if (!r.edgePaths.has(`${a}:${b}`)) continue;
-      link(add(pa, a), add(pb, b), [pa, g.a.mid, g.b.mid, pb]);
-    } catch {
-      /* Invalid drafts have no route. */
-    }
-  }
-  for(const bridge of l.bridges??[])try{
-    const g=bridgeGeometry(l,bridge),a=r.rooms.findIndex(v=>v.id===bridge.a.room),b=r.rooms.findIndex(v=>v.id===bridge.b.room);
-    if(!r.edgePaths.has(`${a}:${b}`))continue;
-    const pa={x:g.a.mid.x-g.a.normal.x*.35,z:g.a.mid.z-g.a.normal.z*.35},pb={x:g.b.mid.x-g.b.normal.x*.35,z:g.b.mid.z-g.b.normal.z*.35};
-    link(add(pa,a),add(pb,b),[pa,...g.path,pb]);
-  }catch{/* Invalid drafts have no bridge route. */}
+  for(const edge of r.links)link(add(edge.from,edge.a),add(edge.to,edge.b),edge.points);
   for (let i = 0; i < nodes.length; i++)for (let j = i + 1; j < nodes.length; j++)if (nodes[i]!.room === nodes[j]!.room) {
     const room = r.rooms[nodes[i]!.room]!, path = localRoute(nodes[i]!.point, nodes[j]!.point, room.polygon, room.holes, r.obstacles);
     if (path) link(i, j, path);
@@ -432,4 +421,13 @@ export function freeIslands(layout:FreeLayout):FreeIsland[]{const p=physical(lay
 export function freeGraphPath(maze:Maze,regions:readonly number[]):Point[]{
  const r=freeRuntime(maze);if(!regions.length)return [];const points:Point[]=[r.centers[regions[0]!]!];
  for(let i=1;i<regions.length;i++){const path=r.edgePaths.get(`${regions[i-1]}:${regions[i]}`);if(!path)throw Error('Несвязный маршрут свободной планировки.');points.push(...path.slice(1));}return points;
+}
+
+/** Transient physical counterfactual; never changes the source layout or save format. */
+export function freeAnalysisMaze(source:Maze,layout:FreeLayout,runtime:ReturnType<typeof buildNavigation>,sameRoutes=false):Maze{
+ runtimeCache.set(layout,runtime);const result={...source,free:layout,passages:runtime.passages};if(sameRoutes&&referenceRoutes.has(source))referenceRoutes.set(result,new Map(referenceRoutes.get(source)!));return result;
+}
+export function freeEdgeOpening(maze:Maze,a:number,b:number):Point{
+ const edge=freeRuntime(maze).links.find(e=>e.a===a&&e.b===b||e.a===b&&e.b===a);
+ if(!edge)throw Error('Свободный переход не найден.');return edge.a===a?edge.openingA:edge.openingB;
 }
