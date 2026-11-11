@@ -1,0 +1,15 @@
+{
+  "builtAt": "2026-11-11T08:39:26.666Z",
+  "applicationId": "lab.maze.reboot",
+  "versionCode": 1,
+  "versionName": "0.1.0-reboot",
+  "compileSdk": 35,
+  "minSdk": 26,
+  "apk": "android-reboot/app/build/outputs/apk/debug/app-debug.apk",
+  "sha256": "10cbda19eef75cf3e0c3a0ae01cec580bacc5b5995a4b017e568c7ed283aa0a9",
+  "bytes": 410920,
+  "gradle": "8.11.1",
+  "agp": "8.9.2",
+  "assets": "production dist, offline trusted HTTPS origin",
+  "deviceTest": "not-run"
+}

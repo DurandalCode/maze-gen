@@ -185,6 +185,7 @@ export function WalkView({
     };
     const keyDown = (event: KeyboardEvent) => {
       if (event.code === 'Escape') {
+        event.preventDefault();
         pause();
         return;
       }

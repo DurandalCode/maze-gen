@@ -11,3 +11,9 @@ work/
 
 .vite/
 playwright-report/
+
+android-reboot/.gradle/
+android-reboot/build/
+android-reboot/app/build/
+android-reboot/app/src/main/assets/
+android-reboot/local.properties

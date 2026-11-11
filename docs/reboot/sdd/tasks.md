@@ -53,8 +53,8 @@ G-03 — ограниченная проверка выбранного kernel: 
 | UX-01 | **В работе: функциональный сценарий проверен в браузере; L-1000/PERF открыт.** Библиотека/карточка/просмотр, независимые loading/error | DB-02, DB-03, R-02 | UX-01 оракул; 30 строк первой страницы; поиск/вкладки доступны при ошибке; touch ≥44px |
 | UX-02 | **В работе: browser E2E pass; зависимые gates открыты.** Слепой старт, пауза и результат | UX-01, REC-03 | План/раскрывающее имя не показаны; previewed записан; saving/saved/error различимы |
 | UX-03 | **В работе: browser file→preflight→commit/cancel→export pass; Android открыт.** Импорт/экспорт/конфликты | UX-01, IO-02, IO-03 | Выбор→проверка→итог→commit/cancel; дубликаты и несовместимость понятны; несколько экспортных пакетов |
-| APK-01 | Отдельная Java/WebView оболочка и APK build script | B-01 | applicationId lab.maze.reboot, встроенные assets; debug APK устанавливается, старое приложение доступно |
-| APK-02 | File picker, chunked export/sharesheet, background hooks | APK-01, UX-03, REC-03 | Нет одного блокирующего многомегабайтного bridge-вызова; cancel чистит только свой временный файл; JSON читается на ПК |
+| APK-01 | **В работе: build/signature/assets pass, установка not-run без устройства; [отчёт](../../../reports/android/README.md).** Отдельная Java/WebView оболочка и APK build script | B-01 | applicationId lab.maze.reboot, встроенные assets; debug APK устанавливается, старое приложение доступно |
+| APK-02 | **В работе: bridge/JVM/production-origin pass; native SAF/sharesheet not-run.** File picker, chunked export/sharesheet, background hooks | APK-01, UX-03, REC-03 | Нет одного блокирующего многомегабайтного bridge-вызова; cancel чистит только свой временный файл; JSON читается на ПК |
 | APK-03 | Физическое устройство: обмен, lifecycle, обновление и графический gate | APK-02, UX-02, R-03 | IO-01, FAIL-04/05, PERF-02/08, VIS-01; APK без сервера; обновление сохраняет библиотеку; устройство/WebView в отчёте |
 | QA-01 | Gate сквозного прототипа | UX-02, UX-03, APK-03 | ПК JSON→APK play→restart→JSON→ПК; pass/fail/not-run без скрытых невыполненных проверок |
 

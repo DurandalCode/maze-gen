@@ -1,0 +1,41 @@
+{
+  "verifiedAt": "2026-11-11T08:39:26.861Z",
+  "applicationId": "lab.maze.reboot",
+  "apkSha256": "10cbda19eef75cf3e0c3a0ae01cec580bacc5b5995a4b017e568c7ed283aa0a9",
+  "signature": "v2/debug",
+  "certificateSha256": "f0663fa6c94ae7212dac8e742a48ea3222158048a3a0ad017e0274f4d9e5b58a",
+  "assets": [
+    {
+      "name": "index.html",
+      "sha256": "0a11167be823f55d124d218cd1147fb9a4809ee7c152101e496a8f5115a3e131",
+      "bytes": 509
+    },
+    {
+      "name": "assets/storage-worker-24RhqIXH.js",
+      "sha256": "bc64bbf80bfb146abd9bb520ea61d02e0af30c08949d54caee1bd5d2a1f1de0a",
+      "bytes": 68489
+    },
+    {
+      "name": "assets/index-DEvW5gep.css",
+      "sha256": "3bbb850287d2cbee912979323b4f5554b60e4d260938f8359642d6eda8914d77",
+      "bytes": 4180
+    },
+    {
+      "name": "assets/index-CJRrBBIQ.js",
+      "sha256": "b594ead0957f2c719e83b8122fbdc67a2c076b0386fbba8ae482779c2f832a80",
+      "bytes": 821844
+    },
+    {
+      "name": "assets/compute-worker-BeMuUIsx.js",
+      "sha256": "20086df44ca57a5ae1ebf5a66067ad6b27851d9de9461f60360998e74e35312d",
+      "bytes": 129421
+    },
+    {
+      "name": "favicon.svg",
+      "sha256": "d2e97a0ce3dbf18892c4297f799bb00ae7e5135efd8fecf99483f24a5aea4f9e",
+      "bytes": 234
+    }
+  ],
+  "deviceTest": "not-run",
+  "physicalReason": "This verification script checks the archive and assets; it does not run a device"
+}

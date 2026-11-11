@@ -1,0 +1,8 @@
+{
+  "checkedAt": "2026-11-11T08:39:35.080644+00:00",
+  "command": "titan device list --platform android -o json",
+  "result": null,
+  "devices": [],
+  "physicalTests": "not-run",
+  "reason": "No attached Android device was returned by titan/adb"
+}

@@ -11,8 +11,13 @@ import type { GeometryProof } from '../exchange/import-repository';
 import { parsePackage, PACKAGE_LIMITS } from '../exchange/package';
 import { ExportRepository } from '../exchange/export-repository';
 import type { ExportSelection, ExportPacket } from '../exchange/export-repository';
-let activeExport: { id: string; packets: AsyncGenerator<ExportPacket>; touchedAt: number } | null =
-  null;
+let activeExport: {
+  id: string;
+  packets: AsyncGenerator<ExportPacket>;
+  touchedAt: number;
+  native: boolean;
+  current: ExportPacket | null;
+} | null = null;
 const scope = globalThis as unknown as {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
   postMessage: (message: unknown) => void;
@@ -148,10 +153,50 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
           id: crypto.randomUUID(),
           packets: new ExportRepository(repo).packets(input.selection as ExportSelection),
           touchedAt: Date.now(),
+          native: input.native === true,
+          current: null,
         };
       } else if (!activeExport || activeExport.id !== input.exportId)
         throw new StorageError('EXPORT_NOT_FOUND', 'Экспорт закрыт. Повторите выбор.');
       const current = activeExport!;
+      if (input.kind === 'chunk') {
+        const packet = current.current,
+          sequence = input.sequence;
+        if (
+          !current.native ||
+          !packet ||
+          !Number.isSafeInteger(sequence) ||
+          (sequence as number) < 0
+        )
+          throw new StorageError('INVALID_CHUNK', 'Неверная часть экспорта');
+        const offset = (sequence as number) * 192 * 1024;
+        if (offset >= packet.bytes.length)
+          throw new StorageError('INVALID_CHUNK', 'Часть за границей пакета');
+        const bytes = packet.bytes.subarray(offset, offset + 192 * 1024);
+        const pieces: string[] = [];
+        for (let i = 0; i < bytes.length; i += 8192)
+          pieces.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
+        current.touchedAt = Date.now();
+        return {
+          sequence,
+          base64: btoa(pieces.join('')),
+          bytes: bytes.length,
+          last: offset + bytes.length === packet.bytes.length,
+        };
+      }
+      if (input.kind === 'part-complete') {
+        if (!current.native || !current.current || input.number !== current.current.number)
+          throw new StorageError('INVALID_CHUNK', 'Неверный номер пакета');
+        const last = current.current.last;
+        current.current = null;
+        if (last) {
+          await current.packets.return(undefined);
+          activeExport = null;
+          return { exportId: current.id, done: true };
+        }
+        return { exportId: current.id, done: false, completed: input.number };
+      } else if (current.native && current.current)
+        throw new StorageError('EXPORT_PENDING', 'Сначала завершите передачу текущего пакета');
       try {
         const next = await current.packets.next();
         current.touchedAt = Date.now();
@@ -160,8 +205,11 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
           return { exportId: current.id, done: true };
         }
         const packet = next.value;
-        const blob = new Blob([packet.bytes.buffer as ArrayBuffer], { type: 'application/json' });
-        if (packet.last) {
+        const blob = current.native
+          ? undefined
+          : new Blob([packet.bytes.buffer as ArrayBuffer], { type: 'application/json' });
+        if (current.native) current.current = packet;
+        if (packet.last && !current.native) {
           await current.packets.return(undefined);
           activeExport = null;
         }
@@ -169,8 +217,8 @@ async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unkno
           exportId: current.id,
           done: false,
           packet: {
-            blob,
-            bytes: blob.size,
+            ...(blob ? { blob } : { native: true }),
+            bytes: packet.bytes.byteLength,
             number: packet.number,
             last: packet.last,
             counts: packet.counts,

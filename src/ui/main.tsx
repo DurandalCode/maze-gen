@@ -122,6 +122,19 @@ function App() {
     setError('');
     setSelection(null);
   };
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (event.code !== 'Escape' || event.defaultPrevented || pendingWrite) return;
+      if (exportSelection) setExportSelection(null);
+      else if (rename) setRename(null);
+      else if (deletion) setDeletion(null);
+      else if (selection || loading || error) cancel();
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [exportSelection, rename, deletion, selection, loading, error, pendingWrite]);
   const begin = (label: string) => {
     cancel();
     const id = ++generation.current;

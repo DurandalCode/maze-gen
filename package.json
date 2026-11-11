@@ -12,7 +12,9 @@
     "test": "bun test tests/unit",
     "test:e2e": "playwright test",
     "format": "prettier --write src scripts tests public index.html *.json *.ts",
-    "format:check": "prettier --check src scripts tests public index.html *.json *.ts"
+    "format:check": "prettier --check src scripts tests public index.html *.json *.ts",
+    "build:apk": "bun scripts/build-apk.ts",
+    "verify:apk": "bun scripts/verify-apk.ts"
   },
   "dependencies": {
     "clipper2-ts": "2.0.1-19",
