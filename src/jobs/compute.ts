@@ -1,4 +1,4 @@
-import { VERSIONS } from '../domain';
+import { VERSIONS, documentHashes } from '../domain';
 import type { Diagnostic } from '../domain';
 import { compileGeometry } from '../geometry/compile/compile';
 import type { PhysicalSnapshot } from '../geometry/compile/types';
@@ -11,6 +11,7 @@ import { COMPUTE_OPERATIONS, response } from './protocol';
 import type { JobRequest, JobResponse } from './protocol';
 
 export interface PreparedWorld {
+  revisionHash: string;
   physical: PhysicalSnapshot;
   navigation: NavigationSnapshot;
   floorMesh: MeshArtifact;
@@ -30,6 +31,7 @@ export function prepareWorld(value: unknown): Preparation {
   return {
     ok: true,
     world: {
+      revisionHash: documentHashes(compiled.snapshot.document).revisionHash,
       physical: compiled.snapshot,
       navigation: navigation.snapshot,
       ...renderArtifacts(compiled.snapshot),

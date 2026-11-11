@@ -249,3 +249,55 @@ test('REC-03: recovery resumes only confirmed checkpoint; project deletion retai
   await expect(repo.getMap(hash)).rejects.toThrow('не найдена');
   repo.close();
 });
+
+test('lifecycle pause preserves prepared state and wins a pending start acknowledgement', async () => {
+  const b = backend();
+  const recorder = new Recorder(session(), b.backend, pose);
+  await recorder.pause();
+  expect(recorder.status().state).toBe('prepared');
+  expect(b.states).toEqual([]);
+  let release!: () => void;
+  b.backend.transition = async (state) => {
+    b.states.push(state);
+    if (state === 'running')
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+  };
+  const first = recorder.start();
+  const same = recorder.start();
+  await recorder.pause();
+  release();
+  await Promise.all([first, same]);
+  expect(recorder.status().state).toBe('paused');
+  expect(b.states).toEqual(['running', 'paused', 'paused']);
+  const before = recorder.status().elapsedMs;
+  recorder.step(1000 / 60, pose, 1);
+  expect(recorder.status().elapsedMs).toBe(before);
+});
+
+test('fixed-step event and chunk times use the same grid at every step boundary', () => {
+  let elapsedMs = 0;
+  for (let step = 0; step < 600; step++) {
+    elapsedMs += 1000 / 60;
+    const chunk = makeChunk({
+      sessionId: 'walk',
+      sequence: step,
+      elapsedMs,
+      distanceM: 0,
+      samples: [{ ...pose, activeTimeMs: elapsedMs }],
+      events: [{ activeTimeMs: elapsedMs, kind: 'pause', sampleIndex: 0 }],
+    });
+    expect(chunk.events[0]!.activeTimeMs).toBe(chunk.elapsedMs);
+  }
+  expect(() =>
+    makeChunk({
+      sessionId: 'walk',
+      sequence: 0,
+      elapsedMs: 1,
+      distanceM: 0,
+      samples: [{ ...pose, activeTimeMs: 0 }],
+      events: [{ activeTimeMs: 1, kind: 'pause', sampleIndex: 0 }],
+    }),
+  ).toThrow('Event time');
+});

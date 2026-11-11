@@ -41,6 +41,7 @@ export class WorldScene {
   private lastCamera = new THREE.Vector3(Infinity, Infinity, Infinity);
   private lastQuaternion = new THREE.Quaternion();
   private shadowCenter = new THREE.Vector2(Infinity, Infinity);
+  private contextRecovery: WEBGL_lose_context | null;
   private onLost = (event: Event) => {
     event.preventDefault();
     this.lost = true;
@@ -50,6 +51,8 @@ export class WorldScene {
   };
   private onRestored = () => {
     this.lost = false;
+    this.contextRecovery = this.renderer.getContext().getExtension('WEBGL_lose_context');
+    this.renderer.shadowMap.needsUpdate = true;
     this.contextChanged?.('restored');
     this.render();
   };
@@ -62,6 +65,9 @@ export class WorldScene {
       antialias: true,
       powerPreference: 'high-performance',
     });
+    // Extensions cannot be acquired from a lost context. Keep the recovery handle
+    // before loss instead of asking Three's lazy extension cache for it afterwards.
+    this.contextRecovery = this.renderer.getContext().getExtension('WEBGL_lose_context');
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, VISUAL_V1.renderer.maxDpr));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -220,7 +226,7 @@ export class WorldScene {
     this.frame = 0;
   }
   restore(): void {
-    if (this.lost) this.renderer.forceContextRestore();
+    if (this.lost) this.contextRecovery?.restoreContext();
     else {
       this.renderer.shadowMap.needsUpdate = true;
       this.render();

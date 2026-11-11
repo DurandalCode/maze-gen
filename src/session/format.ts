@@ -116,8 +116,13 @@ export function makeChunk(value: ChunkInput): WalkChunk {
       (e.sampleIndex as number) >= samples.length
     )
       fail('RANGE', 'event.sampleIndex', 'Event must refer to a sample in this chunk');
+    // Apply the same time grid before comparing with the normalized chunk limit.
+    // A fixed-step clock can produce 550.0000000000001 for a 550 ms event.
+    const activeTimeMs = number(e.activeTimeMs, 'event.activeTimeMs', 0, 1e12, 1e3);
+    if (activeTimeMs > elapsedMs || activeTimeMs !== samples[e.sampleIndex as number]!.activeTimeMs)
+      fail('TIME_ORDER', 'event', 'Event time must match its referenced sample inside the chunk');
     return {
-      activeTimeMs: number(e.activeTimeMs, 'event.activeTimeMs', 0, elapsedMs, 1e3),
+      activeTimeMs,
       kind: e.kind as WalkEvent['kind'],
       sampleIndex: e.sampleIndex as number,
     };

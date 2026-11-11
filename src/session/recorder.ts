@@ -34,6 +34,8 @@ export class Recorder {
   private error: string | null = null;
   private waiters: { resolve: () => void; reject: (error: Error) => void }[] = [];
   private terminal: 'finished' | 'stopped' | null = null;
+  private starting: Promise<void> | null = null;
+  private pauseRequested = false;
   constructor(
     readonly session: Session,
     private readonly backend: RecordingBackend,
@@ -77,7 +79,15 @@ export class Recorder {
   private notify() {
     this.changed(this.status());
   }
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    if (this.starting) return this.starting;
+    this.pauseRequested = false;
+    this.starting = this.startImpl().finally(() => {
+      this.starting = null;
+    });
+    return this.starting;
+  }
+  private async startImpl(): Promise<void> {
     if (this.terminal || this.state === 'finished' || this.state === 'stopped')
       throw new Error('Attempt already completed');
     if (this.state === 'running') return;
@@ -88,6 +98,7 @@ export class Recorder {
     this.state = 'running';
     this.event(kind);
     this.notify();
+    if (this.pauseRequested) await this.pause();
   }
   /** Called once per physical step; distance is accumulated independently of sample frequency. */
   step(deltaMs: number, pose: Pose, distanceM: number): void {
@@ -199,7 +210,14 @@ export class Recorder {
     await this.idle();
   }
   async pause(): Promise<void> {
+    this.pauseRequested = true;
     if (this.state === 'finished' || this.state === 'stopped') return;
+    // Prepared/interrupted attempts have no running clock to pause. Preserve their
+    // resumable repository state when closing a view or receiving a lifecycle event.
+    if (this.state === 'prepared' || this.state === 'interrupted') {
+      await this.checkpoint();
+      return;
+    }
     if (this.state === 'running') {
       this.state = 'paused';
       this.event('pause');

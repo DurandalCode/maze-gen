@@ -29,7 +29,7 @@ G-03 — ограниченная проверка выбранного kernel: 
 | J-01 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** Jobs state machine, protocol, bounded queue/cancel; src/jobs/ | G-01 | RUN-01 на медленном/падающем worker; stale revision отбрасывается, terminal event один, очередь ограничена |
 | J-02 | **В работе.** Compile/navigation/metrics в compute-worker | J-01, N-01 | Snapshot передаётся один раз; transfer не detatch активный буфер; PERF-06; recovery после terminate |
 | R-01 | **В работе.** 2D/3D из PhysicalSnapshot, материалы и disposal; src/renderer/ | G-04, B-02 | F-02: те же проёмы/стены/опоры, отверстия крыши; VIS-01; dispose проверен |
-| R-02 | **В работе.** Камера, окружение, прозрачность, resize/context-loss | R-01, N-02, J-02 | Полный вид; FAIL-04; пауза/восстановление; нет лишних RAF/listeners после открытия/закрытия |
+| R-02 | **Выполнено на ПК, [отчёт](../../../reports/ui-runtime.md).** Камера, окружение, прозрачность, resize/context-loss | R-01, N-02, J-02 | Полный вид; FAIL-04; пауза/восстановление; нет лишних RAF/listeners после открытия/закрытия |
 | R-03 | CPU/GPU-профиль и оптимизация без потери вида | R-02, B-03 | VIS-01+PERF-01/08 на ПК, PERF-09 отчёт; конкретные bottlenecks закрыты; Android проверяется APK-03 |
 
 ## Хранение, запись и обмен
@@ -41,8 +41,8 @@ G-03 — ограниченная проверка выбранного kernel: 
 | DB-03 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** Draft/revisions, rename/delete, повреждения и сбор неиспользуемых данных | DB-01 | Draft восстанавливается; rename сохраняет hash; удаление учитывает ссылки; одна плохая запись не блокирует библиотеку |
 | REC-01 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** Session/condition, fixed-step distance, chunks 10 Гц | N-02, DB-01 | REC-01 оракул; дистанция независима от частоты записи; paused не добавляет activeTime; prepared требует сохранённой карты |
 | REC-02 | **В работе.** Idempotent flush/finalize, backpressure и ошибки | REC-01 | Повтор sequence no-op, конфликт явный, finish не откатывается; FAIL-01/05, W-60/PERF-07; очередь ограничена |
-| REC-03 | **В работе.** Interrupted recovery и lifecycle hooks | REC-02, R-02 | Перезапуск с последнего commit/sequence, без скачка; неподтверждённый интервал обозначен; listeners освобождены |
-| IO-01 | Package schema, dependency closure, hashes и preflight | G-02, DB-01, REC-01 | IO-01/02; F-02 восстанавливается без каталога; limits до allocation; старые форматы отклоняются |
+| REC-03 | **Выполнено на ПК, [отчёт](../../../reports/ui-runtime.md).** Interrupted recovery и lifecycle hooks | REC-02, R-02 | Перезапуск с последнего commit/sequence, без скачка; неподтверждённый интервал обозначен; listeners освобождены |
+| IO-01 | **В работе: строгий parser/dependency/hash preflight и 4 оракула.** Package schema, dependency closure, hashes и preflight | G-02, DB-01, REC-01 | IO-01/02; F-02 восстанавливается без каталога; limits до allocation; старые форматы отклоняются |
 | IO-02 | Staging, conflict preview и atomic import | IO-01, DB-03, J-02 | DB-02/IO-02/FAIL-02; duplicate no-op; конфликт не затирает; отмена до commit не меняет библиотеку |
 | IO-03 | Экспорт выбора и разбиение на пакеты 32 MiB | IO-01, REC-02 | Каждый пакет самодостаточен; dependencies полны; сериализация в worker, полного JSON в React нет |
 
@@ -50,8 +50,8 @@ G-03 — ограниченная проверка выбранного kernel: 
 
 | ID | Задача и результат | Зависит от | Критерий готовности |
 |---|---|---|---|
-| UX-01 | Библиотека/карточка/просмотр, независимые loading/error | DB-02, DB-03, R-02 | UX-01 оракул; 30 строк первой страницы; поиск/вкладки доступны при ошибке; touch ≥44px |
-| UX-02 | Слепой старт, пауза и результат | UX-01, REC-03 | План/раскрывающее имя не показаны; previewed записан; saving/saved/error различимы |
+| UX-01 | **В работе: функциональный сценарий проверен в браузере; L-1000/PERF открыт.** Библиотека/карточка/просмотр, независимые loading/error | DB-02, DB-03, R-02 | UX-01 оракул; 30 строк первой страницы; поиск/вкладки доступны при ошибке; touch ≥44px |
+| UX-02 | **В работе: browser E2E pass; зависимые gates открыты.** Слепой старт, пауза и результат | UX-01, REC-03 | План/раскрывающее имя не показаны; previewed записан; saving/saved/error различимы |
 | UX-03 | Импорт/экспорт/конфликты | UX-01, IO-02, IO-03 | Выбор→проверка→итог→commit/cancel; дубликаты и несовместимость понятны; несколько экспортных пакетов |
 | APK-01 | Отдельная Java/WebView оболочка и APK build script | B-01 | applicationId lab.maze.reboot, встроенные assets; debug APK устанавливается, старое приложение доступно |
 | APK-02 | File picker, chunked export/sharesheet, background hooks | APK-01, UX-03, REC-03 | Нет одного блокирующего многомегабайтного bridge-вызова; cancel чистит только свой временный файл; JSON читается на ПК |

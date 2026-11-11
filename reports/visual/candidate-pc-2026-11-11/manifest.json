@@ -1,0 +1,331 @@
+{
+  "profile": "visual-v1",
+  "capturedAt": "2026-11-11T08:08:38.636Z",
+  "browser": "141.0.7390.37",
+  "os": "darwin 25.6.0",
+  "cpu": "Apple M4 Pro",
+  "viewport": [
+    1280,
+    720
+  ],
+  "baseline": "first-candidate-not-automatically-approved",
+  "results": [
+    {
+      "id": "inside-black",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          0
+        ],
+        "target": [
+          0,
+          1.7,
+          -1
+        ]
+      },
+      "checks": [
+        "black-fabric",
+        "posts",
+        "braces",
+        "roof-underside",
+        "fasteners"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": true,
+        "depthWrite": false
+      },
+      "calls": 8,
+      "triangles": 22867,
+      "geometries": 7,
+      "textures": 2
+    },
+    {
+      "id": "near-pore",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          -0.75
+        ],
+        "target": [
+          0,
+          1.7,
+          -1
+        ]
+      },
+      "checks": [
+        "near-pores",
+        "no-timber-swallowed-by-panel",
+        "same-physical-thickness"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": true,
+        "depthWrite": false
+      },
+      "calls": 7,
+      "triangles": 22611,
+      "geometries": 6,
+      "textures": 2
+    },
+    {
+      "id": "grazing-wall",
+      "camera": {
+        "position": [
+          -0.7,
+          1.7,
+          -0.65
+        ],
+        "target": [
+          0.7,
+          1.7,
+          -0.9
+        ]
+      },
+      "checks": [
+        "colored-fabric",
+        "grazing-occlusion",
+        "no-sorting-pops"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": true,
+        "depthWrite": false
+      },
+      "calls": 7,
+      "triangles": 22611,
+      "geometries": 6,
+      "textures": 2
+    },
+    {
+      "id": "crossing",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          1.5
+        ],
+        "target": [
+          0,
+          1.7,
+          4
+        ]
+      },
+      "checks": [
+        "opening-silhouettes",
+        "no-light-leak-through-closed-wall",
+        "clearance-vs-collision"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": true,
+        "depthWrite": false
+      },
+      "calls": 8,
+      "triangles": 22867,
+      "geometries": 7,
+      "textures": 2
+    },
+    {
+      "id": "outside-day",
+      "camera": {
+        "position": [
+          11,
+          8,
+          11
+        ],
+        "target": [
+          0,
+          1.2,
+          1
+        ]
+      },
+      "checks": [
+        "forest",
+        "sun",
+        "ground",
+        "circular-sections",
+        "triangle",
+        "full-timber-frame"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": true,
+        "depthWrite": false
+      },
+      "calls": 7,
+      "triangles": 22611,
+      "geometries": 6,
+      "textures": 2
+    },
+    {
+      "id": "roof-backlight",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          4
+        ],
+        "target": [
+          0,
+          2.5,
+          5
+        ]
+      },
+      "checks": [
+        "roof-pores",
+        "backlit-roof-scatter",
+        "holes-not-covered"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": true,
+        "depthWrite": false
+      },
+      "calls": 10,
+      "triangles": 22917,
+      "geometries": 9,
+      "textures": 3
+    },
+    {
+      "id": "low-sun",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          0
+        ],
+        "target": [
+          1,
+          1.7,
+          0
+        ]
+      },
+      "checks": [
+        "backlight-dependence",
+        "forest-orientation",
+        "low-sun-shadows"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": true,
+        "depthWrite": false
+      },
+      "calls": 7,
+      "triangles": 22611,
+      "geometries": 6,
+      "textures": 2
+    },
+    {
+      "id": "opaque-control",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          -0.75
+        ],
+        "target": [
+          0,
+          1.7,
+          -1
+        ]
+      },
+      "checks": [
+        "no-transmission-when-disabled",
+        "no-light-through-closed-panel"
+      ],
+      "worldHash": "7aa5acc249563907a446c2c1ca5a20ec566592e2b19f9d8c5c7cf2e9e3876821",
+      "layoutHash": "68a288057066a66bce3c0286fed9eb42e450d764faf2403fddd975b9ac449b4f",
+      "physicalSegments": 1523,
+      "solids": 363,
+      "dpr": 1,
+      "canvas": [
+        1280,
+        720
+      ],
+      "backend": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+      "material": {
+        "transparent": false,
+        "depthWrite": true
+      },
+      "calls": 8,
+      "triangles": 22867,
+      "geometries": 7,
+      "textures": 2
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,270 @@
+{
+  "firstMedianBytes": 7034912,
+  "lastMedianBytes": 7564668,
+  "ratio": 1.0753038559686319,
+  "rows": [
+    {
+      "cycle": 0,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [
+        "lost",
+        "restored"
+      ],
+      "heapBytes": 6713552
+    },
+    {
+      "cycle": 1,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 6933968
+    },
+    {
+      "cycle": 2,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7034912
+    },
+    {
+      "cycle": 3,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7099932
+    },
+    {
+      "cycle": 4,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7149108
+    },
+    {
+      "cycle": 5,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7152984
+    },
+    {
+      "cycle": 6,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7133948
+    },
+    {
+      "cycle": 7,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7317888
+    },
+    {
+      "cycle": 8,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7480640
+    },
+    {
+      "cycle": 9,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7503892
+    },
+    {
+      "cycle": 10,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7510908
+    },
+    {
+      "cycle": 11,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7525352
+    },
+    {
+      "cycle": 12,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7528060
+    },
+    {
+      "cycle": 13,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7513972
+    },
+    {
+      "cycle": 14,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7551952
+    },
+    {
+      "cycle": 15,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7557116
+    },
+    {
+      "cycle": 16,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7563636
+    },
+    {
+      "cycle": 17,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7564668
+    },
+    {
+      "cycle": 18,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7567400
+    },
+    {
+      "cycle": 19,
+      "used": {
+        "geometries": 7,
+        "textures": 2
+      },
+      "disposed": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "contexts": [],
+      "heapBytes": 7571164
+    }
+  ]
+}

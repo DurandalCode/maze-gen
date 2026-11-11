@@ -8,8 +8,8 @@ test('new application starts without runtime errors or external requests', async
     if (new URL(request.url()).origin !== 'http://127.0.0.1:1421') external.push(request.url());
   });
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Лабиринт начинается с формы.');
-  await expect(page.getByText('В разработке', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Библиотека лабиринтов');
+  await expect(page.getByText('Здесь начнётся первый маршрут', { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
