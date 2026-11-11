@@ -1,6 +1,6 @@
 # Задачи реализации
 
-Статус: **готовы к последовательному выполнению; код ребута ещё не реализован**. Детализация выполнена по поручению пользователя; результаты проверок пока не получены.
+Статус: **выполнены B-01/02, G-01…04, N-01/02**. Результаты проверок: [B-01](../../../reports/B-01.md). Остальные задачи выполняются по зависимостям. Новое ядро проверено на контрольных случаях, масштабирование ещё не принято.
 
 Контракты: [решения](decisions.md), [геометрия](geometry.md), [генератор](generator.md), [исполнение/данные/UX](runtime-storage.md), [приёмка](acceptance.md), [исследовательский этап](analysis.md). Gates — [plan.md](plan.md).
 
@@ -10,15 +10,15 @@
 
 | ID | Задача и результат | Зависит от | Критерий готовности |
 |---|---|---|---|
-| B-01 | Новое приложение в корне, package.json/lockfile, dev/build/check/test, правила импортов; src/ и tests/ | — | Чистая сборка/запуск по новой конфигурации; ядро не импортирует legacy, React/Three/DOM; сохранённые .tools/dist не используются как исходники; dev origin 1421 |
-| B-02 | Целевые визуальные сцены и профиль вида; reports/visual/ и visual fixture settings | B-01 | VIS-01 описан с камерами/настройками и всеми требуемыми элементами; физическая толщина и каркас заданы единым профилем; старое приложение запускать не требуется, отсутствующие эталоны явно отмечены |
-| G-01 | Схема Document/Definition/Instance, нормализация, hashes и входные лимиты; src/domain/ | B-01 | NaN/Infinity/duplicate IDs/unknown primitive отклоняются; canonical round-trip; metadata не меняет geometry hash |
-| G-02 | Каталог и параметры 4 контрольных форм; src/catalog/ | G-01 | Rectangle/triangle/circle/explicitLoops дают общий contour; версия и параметры проверяются; definition отделено от instance |
-| G-03 | Boolean/triangulation адаптер, дуги и допуски; src/geometry/kernel/ | G-01 | GEO-01/03/06: аналитические площади, отверстия, касания и вырождения; нет NaN/разрывов; ошибка библиотеки не становится успехом |
-| G-04 | Проёмы, соединения, панели/опоры/крыша и PhysicalSnapshot; src/geometry/compile/ | G-02, G-03 | GEO-02/04/06; круг с проёмом через начало дуги, direct-join, реальный просвет, пролёты; смета по тем же элементам |
-| N-01 | Проходимая область, navmesh, семантический граф и маршрут; src/navigation/ | G-04 | GEO-02/03/04; cycles/развилки не зависят от triangulation; центроид вне пола не ломает путь; маршрут проверен физикой |
-| N-02 | Непрерывное движение/скольжение и общий контроллер; src/session/movement/ | N-01 | Swept path не пересекает стены, большой dt не телепортирует; скорости 1,4/2,8; keyboard/touch сопоставимы |
-| B-03 | Независимые F-01…05, M-50/M-100 и маршруты benchmark; tests/fixtures/ | G-04, N-02 | Допустимые fixtures валидны, ошибочные дают ожидаемые codes; hashes и состав фиксированы до оптимизации |
+| B-01 | **Выполнено, [отчёт](../../../reports/B-01.md).** Новое приложение в корне, package.json/lockfile, dev/build/check/test, правила импортов; src/ и tests/ | — | Чистая сборка/запуск по новой конфигурации; ядро не импортирует legacy, React/Three/DOM; сохранённые .tools/dist не используются как исходники; dev origin 1421 |
+| B-02 | **Выполнено, [отчёт](../../../reports/core-foundation.md).** Целевые визуальные сцены и профиль вида; reports/visual/ и visual fixture settings | B-01 | VIS-01 описан с камерами/настройками и всеми требуемыми элементами; физическая толщина и каркас заданы единым профилем; старое приложение запускать не требуется, отсутствующие эталоны явно отмечены |
+| G-01 | **Выполнено, [отчёт](../../../reports/core-foundation.md).** Схема Document/Definition/Instance, нормализация, hashes и входные лимиты; src/domain/ | B-01 | NaN/Infinity/duplicate IDs/unknown primitive отклоняются; canonical round-trip; metadata не меняет geometry hash |
+| G-02 | **Выполнено, [отчёт](../../../reports/core-foundation.md).** Каталог и параметры 4 контрольных форм; src/catalog/ | G-01 | Rectangle/triangle/circle/explicitLoops дают общий contour; версия и параметры проверяются; definition отделено от instance |
+| G-03 | **Выполнено, [отчёт](../../../reports/core-foundation.md).** Boolean/triangulation адаптер, дуги и допуски; src/geometry/kernel/ | G-01 | GEO-01/03/06: аналитические площади, отверстия, касания и вырождения; нет NaN/разрывов; ошибка библиотеки не становится успехом |
+| G-04 | **Выполнено, [отчёт](../../../reports/core-foundation.md).** Проёмы, соединения, панели/опоры/крыша и PhysicalSnapshot; src/geometry/compile/ | G-02, G-03 | GEO-02/04/06; круг с проёмом через начало дуги, direct-join, реальный просвет, пролёты; смета по тем же элементам |
+| N-01 | **Выполнено, [отчёт](../../../reports/core-foundation.md).** Проходимая область, navmesh, семантический граф и маршрут; src/navigation/ | G-04 | GEO-02/03/04; cycles/развилки не зависят от triangulation; центроид вне пола не ломает путь; маршрут проверен физикой |
+| N-02 | **Выполнено, [отчёт](../../../reports/core-foundation.md).** Непрерывное движение/скольжение и общий контроллер; src/session/movement/ | N-01 | Swept path не пересекает стены, большой dt не телепортирует; скорости 1,4/2,8; keyboard/touch сопоставимы |
+| B-03 | **Выполнено, [отчёт](../../../reports/fixtures/README.md).** Независимые F-01…05, M-50/M-100 и маршруты benchmark; tests/fixtures/ | G-04, N-02 | Допустимые fixtures валидны, ошибочные дают ожидаемые codes; hashes и состав фиксированы до оптимизации |
 
 G-03 — ограниченная проверка выбранного kernel: если он не проходит оракулы, заменить адаптер и повторить те же проверки до распространения дефекта дальше. Fixtures создаются независимо от нового генератора.
 
@@ -26,22 +26,22 @@ G-03 — ограниченная проверка выбранного kernel: 
 
 | ID | Задача и результат | Зависит от | Критерий готовности |
 |---|---|---|---|
-| J-01 | Jobs state machine, protocol, bounded queue/cancel; src/jobs/ | G-01 | RUN-01 на медленном/падающем worker; stale revision отбрасывается, terminal event один, очередь ограничена |
-| J-02 | Compile/navigation/metrics в compute-worker | J-01, N-01 | Snapshot передаётся один раз; transfer не detatch активный буфер; PERF-06; recovery после terminate |
-| R-01 | 2D/3D из PhysicalSnapshot, материалы и disposal; src/renderer/ | G-04, B-02 | F-02: те же проёмы/стены/опоры, отверстия крыши; VIS-01; dispose проверен |
-| R-02 | Камера, окружение, прозрачность, resize/context-loss | R-01, N-02, J-02 | Полный вид; FAIL-04; пауза/восстановление; нет лишних RAF/listeners после открытия/закрытия |
+| J-01 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** Jobs state machine, protocol, bounded queue/cancel; src/jobs/ | G-01 | RUN-01 на медленном/падающем worker; stale revision отбрасывается, terminal event один, очередь ограничена |
+| J-02 | **В работе.** Compile/navigation/metrics в compute-worker | J-01, N-01 | Snapshot передаётся один раз; transfer не detatch активный буфер; PERF-06; recovery после terminate |
+| R-01 | **В работе.** 2D/3D из PhysicalSnapshot, материалы и disposal; src/renderer/ | G-04, B-02 | F-02: те же проёмы/стены/опоры, отверстия крыши; VIS-01; dispose проверен |
+| R-02 | **В работе.** Камера, окружение, прозрачность, resize/context-loss | R-01, N-02, J-02 | Полный вид; FAIL-04; пауза/восстановление; нет лишних RAF/listeners после открытия/закрытия |
 | R-03 | CPU/GPU-профиль и оптимизация без потери вида | R-02, B-03 | VIS-01+PERF-01/08 на ПК, PERF-09 отчёт; конкретные bottlenecks закрыты; Android проверяется APK-03 |
 
 ## Хранение, запись и обмен
 
 | ID | Задача и результат | Зависит от | Критерий готовности |
 |---|---|---|---|
-| DB-01 | IndexedDB schema/indexes, repository и storage-worker | G-01, J-01 | DB-02 atomicity; summaries согласованы; quota/schema errors не меняют старые указатели; старые базы не затронуты |
-| DB-02 | Pagination/search/sort summaries и отдельная загрузка тел | DB-01 | DB-01 оракул, L-1000/PERF-04; список не читает maps/chunks; stable cursor при равных датах |
-| DB-03 | Draft/revisions, rename/delete, повреждения и сбор неиспользуемых данных | DB-01 | Draft восстанавливается; rename сохраняет hash; удаление учитывает ссылки; одна плохая запись не блокирует библиотеку |
-| REC-01 | Session/condition, fixed-step distance, chunks 10 Гц | N-02, DB-01 | REC-01 оракул; дистанция независима от частоты записи; paused не добавляет activeTime; prepared требует сохранённой карты |
-| REC-02 | Idempotent flush/finalize, backpressure и ошибки | REC-01 | Повтор sequence no-op, конфликт явный, finish не откатывается; FAIL-01/05, W-60/PERF-07; очередь ограничена |
-| REC-03 | Interrupted recovery и lifecycle hooks | REC-02, R-02 | Перезапуск с последнего commit/sequence, без скачка; неподтверждённый интервал обозначен; listeners освобождены |
+| DB-01 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** IndexedDB schema/indexes, repository и storage-worker | G-01, J-01 | DB-02 atomicity; summaries согласованы; quota/schema errors не меняют старые указатели; старые базы не затронуты |
+| DB-02 | **В работе.** Pagination/search/sort summaries и отдельная загрузка тел | DB-01 | DB-01 оракул, L-1000/PERF-04; список не читает maps/chunks; stable cursor при равных датах |
+| DB-03 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** Draft/revisions, rename/delete, повреждения и сбор неиспользуемых данных | DB-01 | Draft восстанавливается; rename сохраняет hash; удаление учитывает ссылки; одна плохая запись не блокирует библиотеку |
+| REC-01 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** Session/condition, fixed-step distance, chunks 10 Гц | N-02, DB-01 | REC-01 оракул; дистанция независима от частоты записи; paused не добавляет activeTime; prepared требует сохранённой карты |
+| REC-02 | **В работе.** Idempotent flush/finalize, backpressure и ошибки | REC-01 | Повтор sequence no-op, конфликт явный, finish не откатывается; FAIL-01/05, W-60/PERF-07; очередь ограничена |
+| REC-03 | **В работе.** Interrupted recovery и lifecycle hooks | REC-02, R-02 | Перезапуск с последнего commit/sequence, без скачка; неподтверждённый интервал обозначен; listeners освобождены |
 | IO-01 | Package schema, dependency closure, hashes и preflight | G-02, DB-01, REC-01 | IO-01/02; F-02 восстанавливается без каталога; limits до allocation; старые форматы отклоняются |
 | IO-02 | Staging, conflict preview и atomic import | IO-01, DB-03, J-02 | DB-02/IO-02/FAIL-02; duplicate no-op; конфликт не затирает; отмена до commit не меняет библиотеку |
 | IO-03 | Экспорт выбора и разбиение на пакеты 32 MiB | IO-01, REC-02 | Каждый пакет самодостаточен; dependencies полны; сериализация в worker, полного JSON в React нет |

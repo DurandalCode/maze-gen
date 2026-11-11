@@ -8,3 +8,6 @@ test-results/
 
 .local-data/
 work/
+
+.vite/
+playwright-report/

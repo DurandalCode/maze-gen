@@ -1,0 +1,335 @@
+{
+  "version": "visual-fixtures-v1",
+  "profile": "visual-v1",
+  "units": "m/radians",
+  "fixture": "VIS-MIX-01",
+  "fixtureLayout": {
+    "siteBounds": [
+      -12,
+      -12,
+      12,
+      12
+    ],
+    "instances": [
+      {
+        "id": "square",
+        "definition": "square-2x2",
+        "position": [
+          0,
+          0
+        ],
+        "rotationRad": 0
+      },
+      {
+        "id": "hall",
+        "definition": "rectangle-2x6",
+        "position": [
+          0,
+          5
+        ],
+        "rotationRad": 0
+      },
+      {
+        "id": "circle",
+        "definition": "circle-2",
+        "position": [
+          5,
+          0
+        ],
+        "rotationRad": 0
+      },
+      {
+        "id": "triangle",
+        "definition": "triangle-4",
+        "position": [
+          -5,
+          0
+        ],
+        "rotationRad": 0.523598776
+      }
+    ],
+    "note": "Construction fixture, not yet a ready navigation map. G-04 adds explicit openings/connections; no implied adjacency.",
+    "openings": {
+      "entrance": "square edge-3",
+      "connection": "square edge-2 -> hall edge-0",
+      "exit": "hall edge-1"
+    }
+  },
+  "capture": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "dpr": 1,
+    "fixedSeed": "visual-forest-v1",
+    "animationTimeSeconds": 0,
+    "warmupFrames": 120
+  },
+  "baseline": {
+    "oldScreenshots": "not-available",
+    "newScreenshots": "not-run-until-R-01",
+    "pixelEquivalence": "not-claimed"
+  },
+  "scenes": [
+    {
+      "id": "inside-black",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          0
+        ],
+        "target": [
+          0,
+          1.7,
+          -1
+        ]
+      },
+      "wallColor": "#181818",
+      "roof": true,
+      "translucentFabric": true,
+      "sun": {
+        "day": 15,
+        "minutes": 780
+      },
+      "forest": {
+        "side": "north",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "black-fabric",
+        "posts",
+        "braces",
+        "roof-underside",
+        "fasteners"
+      ]
+    },
+    {
+      "id": "near-pore",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          -0.75
+        ],
+        "target": [
+          0,
+          1.7,
+          -1
+        ]
+      },
+      "wallColor": "#181818",
+      "roof": false,
+      "translucentFabric": true,
+      "sun": {
+        "day": 15,
+        "minutes": 780
+      },
+      "forest": {
+        "side": "north",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "near-pores",
+        "no-timber-swallowed-by-panel",
+        "same-physical-thickness"
+      ]
+    },
+    {
+      "id": "grazing-wall",
+      "camera": {
+        "position": [
+          -0.7,
+          1.7,
+          -0.65
+        ],
+        "target": [
+          0.7,
+          1.7,
+          -0.9
+        ]
+      },
+      "wallColor": "#3f7157",
+      "roof": false,
+      "translucentFabric": true,
+      "sun": {
+        "day": 15,
+        "minutes": 1020
+      },
+      "forest": {
+        "side": "north",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "colored-fabric",
+        "grazing-occlusion",
+        "no-sorting-pops"
+      ]
+    },
+    {
+      "id": "crossing",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          1.5
+        ],
+        "target": [
+          0,
+          1.7,
+          4
+        ]
+      },
+      "wallColor": "#181818",
+      "roof": true,
+      "translucentFabric": true,
+      "sun": {
+        "day": 15,
+        "minutes": 780
+      },
+      "forest": {
+        "side": "north",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "opening-silhouettes",
+        "no-light-leak-through-closed-wall",
+        "clearance-vs-collision"
+      ]
+    },
+    {
+      "id": "outside-day",
+      "camera": {
+        "position": [
+          11,
+          8,
+          11
+        ],
+        "target": [
+          0,
+          1.2,
+          1
+        ]
+      },
+      "wallColor": "#3f7157",
+      "roof": false,
+      "translucentFabric": true,
+      "sun": {
+        "day": 15,
+        "minutes": 780
+      },
+      "forest": {
+        "side": "north",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "forest",
+        "sun",
+        "ground",
+        "circular-sections",
+        "triangle",
+        "full-timber-frame"
+      ]
+    },
+    {
+      "id": "roof-backlight",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          4
+        ],
+        "target": [
+          0,
+          2.5,
+          5
+        ]
+      },
+      "wallColor": "#181818",
+      "roof": true,
+      "translucentFabric": true,
+      "sun": {
+        "day": 15,
+        "minutes": 780
+      },
+      "forest": {
+        "side": "north",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "roof-pores",
+        "backlit-roof-scatter",
+        "holes-not-covered"
+      ]
+    },
+    {
+      "id": "low-sun",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          0
+        ],
+        "target": [
+          1,
+          1.7,
+          0
+        ]
+      },
+      "wallColor": "#181818",
+      "roof": false,
+      "translucentFabric": true,
+      "sun": {
+        "day": 15,
+        "minutes": 1140
+      },
+      "forest": {
+        "side": "east",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "backlight-dependence",
+        "forest-orientation",
+        "low-sun-shadows"
+      ]
+    },
+    {
+      "id": "opaque-control",
+      "camera": {
+        "position": [
+          0,
+          1.7,
+          -0.75
+        ],
+        "target": [
+          0,
+          1.7,
+          -1
+        ]
+      },
+      "wallColor": "#181818",
+      "roof": true,
+      "translucentFabric": false,
+      "sun": {
+        "day": 15,
+        "minutes": 780
+      },
+      "forest": {
+        "side": "north",
+        "distance": 12,
+        "offset": 0
+      },
+      "checks": [
+        "no-transmission-when-disabled",
+        "no-light-through-closed-panel"
+      ]
+    }
+  ]
+}

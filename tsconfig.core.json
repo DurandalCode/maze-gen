@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": [
+    "src/domain/**/*.ts",
+    "src/catalog/**/*.ts",
+    "src/geometry/**/*.ts",
+    "src/navigation/**/*.ts",
+    "src/generation/**/*.ts",
+    "src/observation/**/*.ts",
+    "src/analysis/**/*.ts",
+    "src/session/**/*.ts"
+  ]
+}
