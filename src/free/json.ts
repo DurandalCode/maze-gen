@@ -12,6 +12,8 @@ function inspect(d: FreeDraft): void {
   validateConstruction(d.construction);
   const l = d.layout;
   if (!l || ![l.modules, l.spaces, l.connections, l.openings, l.walls].every(Array.isArray) || l.modules.length > 2500 || l.spaces.length > 10000 || l.connections.length > 20000 || l.walls.length > 100000 || l.openings.length > 10000 || typeof l.entrance !== 'string' || typeof l.exit !== 'string') throw Error('Некорректная структура размещения.');
+  if(l.zones!==undefined&&(!Array.isArray(l.zones)||l.zones.length>100||l.zones.some(z=>!z||typeof z.id!=='string'||typeof z.title!=='string'||z.title.length>200||!['branching','braided','winding'].includes(z.style))||new Set(l.zones.map(z=>z.id)).size!==l.zones.length))throw Error('Некорректные зоны.');
+  if([...l.modules,...l.spaces].some(m=>m.zone!==undefined&&(!l.zones?.some(z=>z.id===m.zone))))throw Error('Неизвестная зона пространства.');
   if(l.bridges!==undefined&&(!Array.isArray(l.bridges)||l.bridges.length>100||l.bridges.length>0&&d.version!==2))throw Error('Некорректный список мостов.');
   if (l.supports !== undefined && (!Array.isArray(l.supports) || l.supports.length > 100000 || l.supports.some(p => !p || ![p.x, p.z].every(Number.isFinite)))) throw Error('Некорректные опоры.');
   if (l.preservedPanels !== undefined && (!Array.isArray(l.preservedPanels) || l.preservedPanels.length > 100000)) throw Error('Некорректные сохранённые панели.');
@@ -53,6 +55,8 @@ export function decodeFree(value: Record<string, unknown>): Maze {
 }
 export function freeIdentity(maze: Maze): unknown {
   const l = structuredClone(maze.free!);
+  delete l.zones;
+  for(const room of [...l.modules,...l.spaces])delete room.zone;
   l.modules.sort((a, b) => a.id.localeCompare(b.id));
   l.spaces.sort((a, b) => a.id.localeCompare(b.id));
   l.connections.sort((a, b) => a.id.localeCompare(b.id));

@@ -1,13 +1,15 @@
 import type { Environment } from '../core/environment';
 import type { Construction, Parameters, Point, Wall } from '../core/maze';
-export interface FreeModule { id: string; type: '2x2' | '2x6' | 'custom'; x: number; z: number; angle: number; width?: number; depth?: number }
-export interface FreeSpace { id: string; kind: 'hall' | 'corridor'; polygon: Point[]; holes?: Point[][] }
+export interface FreeModule { zone?:string; id: string; type: '2x2' | '2x6' | 'custom'; x: number; z: number; angle: number; width?: number; depth?: number }
+export interface FreeSpace { zone?:string; id: string; kind: 'hall' | 'corridor'; polygon: Point[]; holes?: Point[][] }
 /** edge is clockwise from the local north edge; offset is metres from its midpoint. */
 export interface Anchor { room: string; edge: number; offset: number }
 export interface FreeOpening extends Anchor { id: string; width: number }
 export interface FreeConnection { id: string; a: Anchor; b: Anchor; width: number }
 export interface FreeBridge extends FreeConnection {rise:number;stairRun:number}
+export interface FreeZone {id:string;title:string;style:'branching'|'braided'|'winding'}
 export interface FreeLayout {
+  zones?:FreeZone[];
   /** v7 maps: covered, reversible crossings with two stair flights. */
   bridges?:FreeBridge[];
   modules: FreeModule[]; spaces: FreeSpace[]; connections: FreeConnection[]; openings: FreeOpening[];

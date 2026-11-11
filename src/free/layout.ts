@@ -1,3 +1,4 @@
+import {detectFreeIslands,type FreeIsland} from './islands';
 import {freeSpatialRay} from './spatial-visibility';
 import {bridgeGeometry,bridgeColumns,bridgeIssues,bridgeSurface,bridgeSamples} from './bridges';
 import { validateParameters, validateConstruction } from '../core/maze';
@@ -92,6 +93,9 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   } catch (e) {
     return [{ code: 'parameters', message: (e as Error).message, ids: [] }];
   }
+  const zoneIds=new Set((l.zones??[]).map(z=>z.id));
+  if(zoneIds.size!==(l.zones??[]).length||(l.zones??[]).some(z=>!z.id||!['branching','braided','winding'].includes(z.style)))issue('zone','Некорректные зоны.');
+  for(const room of [...l.modules,...l.spaces])if(room.zone!==undefined&&!zoneIds.has(room.zone))issue('zone','Неизвестная зона пространства.',room.id);
   if (!l.modules.length) issue('empty', 'Добавьте хотя бы один модуль.');
   const ids = new Set<string>();
   for (const v of [...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]]) {
@@ -420,3 +424,6 @@ export function freeMaze(d: FreeDraft, check = true): Maze {
   runtimeCache.set(layout,nav);
   return { version: layout.bridges?.length?7:5, free: layout, parameters: structuredClone(d.parameters), width: d.parameters.columns, depth: d.parameters.rows, passages: nav.passages, entrance: portal(layout.entrance), exit: portal(layout.exit), portals: layout.openings.map(o => portal(o.id)), ...d.construction, ...(d.environment ? { environment: structuredClone(d.environment) } : {}) };
 }
+
+
+export function freeIslands(layout:FreeLayout):FreeIsland[]{const p=physical(layout);return detectFreeIslands(p.panels,p.contains);}

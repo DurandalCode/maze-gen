@@ -3,7 +3,7 @@ import { freeAreaWeights, outlineDistances } from './analysis-geometry';
 import { sideDistricts } from '../analysis/side-districts';
 import { shortestPath } from '../core/pathfinding';
 import type { Maze, Point } from '../core/maze';
-import { freeRuntime, freeRay } from './layout';
+import { freeRuntime, freeRay,freeIslands } from './layout';
 import { distance,intersection } from './geometry';
 import { random } from '../core/random';
 import { routeTraps } from '../analysis/route-traps';
@@ -94,6 +94,8 @@ export function checkFreeQuality(maze: Maze): string[] {
   const errors: string[] = [], p = maze.parameters;
   if ((p.routeTrapCount ?? 0) > 0 && (p.routeTrapCount ?? 0) > routeTraps(maze).qualifiedCount) errors.push('Не выполнено требование маршрутных ловушек.');
   if ((p.loopTrapCount ?? 0) > 0 && (p.loopTrapCount ?? 0) > loopTraps(maze).qualifiedCount) errors.push('Не выполнено требование кольцевых ловушек.');
+  const requestedIslands=p.freeIslandCount??p.freeZoneCount??0;
+  if(requestedIslands>0&&requestedIslands>freeIslands(maze.free!).length)errors.push('Не выполнено требование замкнутых островов.');
   if (!p.design) return errors;
   const r = freeRuntime(maze), limits = effectiveLimits(p);
   let sight = 0, straight = 0, run = 0;

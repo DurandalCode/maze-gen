@@ -28,6 +28,8 @@ export interface Parameters {
   freeAngleSpread?:number;
   freeJunctionDegree?:3|5;
   freeBridgeCount?:number;
+  freeZoneCount?:number;
+  freeIslandCount?:number;
   generationType?:GenerationType;
   design?:DesignLimits;
   /** Requested minimum number of distinct directional-trap forks; absent means zero. */
@@ -102,6 +104,10 @@ export function validateParameters(p: Parameters): void {
   if((p.loopTrapCount??0)>p.extraConnections)throw new Error('Для каждой кольцевой ловушки нужно хотя бы одно дополнительное соединение.');
   if(p.routeTrapCount!==undefined&&(!Number.isInteger(p.routeTrapCount)||p.routeTrapCount<0||p.routeTrapCount>6))throw new Error('Число ловушек должно быть целым от 0 до 6.');
   if(p.placementMode==='free'&&p.generationType==='two-storey')throw Error('Свободное размещение доступно для одноэтажных типов.');
+  if(p.freeZoneCount!==undefined&&(!Number.isInteger(p.freeZoneCount)||p.freeZoneCount!==0&&(p.freeZoneCount<2||p.freeZoneCount>5)))throw Error('Зон: 0 или от 2 до 5.');
+  if(p.freeIslandCount!==undefined&&(!Number.isInteger(p.freeIslandCount)||p.freeIslandCount<0||p.freeIslandCount>(p.freeZoneCount??0)))throw Error('Число островов должно быть от 0 до числа зон.');
+  if((p.freeZoneCount??0)>0&&p.placementMode!=='free')throw Error('Зоны доступны в свободной планировке.');
+  if((p.freeZoneCount??0)>0&&(p.extraConnections<(p.freeIslandCount??p.freeZoneCount!)+(p.freeBridgeCount??0)))throw Error('Для островов и мостов нужно достаточно дополнительных соединений.');
   if(p.freeBridgeCount!==undefined&&(!Number.isInteger(p.freeBridgeCount)||p.freeBridgeCount<0||p.freeBridgeCount>2||p.freeBridgeCount>p.extraConnections))throw Error('Крытых мостов: от 0 до 2, не больше числа дополнительных соединений.');
   if(p.freeAngleSpread!==undefined&&(!Number.isFinite(p.freeAngleSpread)||p.freeAngleSpread<0||p.freeAngleSpread>120))throw Error('Разброс углов: от 0 до 120°.');
   if(p.freeJunctionDegree!==undefined&&![3,5].includes(p.freeJunctionDegree))throw Error('Перекрёсток: 3 или 5 проходов.');

@@ -1,3 +1,5 @@
+import {freeZoneSummary} from './free/zones';
+import {freeIslands} from './free/layout';
 import {FreeEditor} from './free/editor';
 import type {FreeDraft} from './free/model';
 import {mazeDraft} from './free/json';
@@ -73,6 +75,7 @@ function App() {
   const [result, setResult] = useState<WalkResult | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [blindPreparing,setBlindPreparing]=useState(false);
   const [busy, setBusy] = useState(false);
   const [generationMs, setGenerationMs] = useState<number | null>(null);
   const [portalEdit, setPortalEdit] = useState<PortalEdit>(null);
@@ -118,7 +121,7 @@ function App() {
   };
   const regenerate = async (blind = false, parameters:Parameters=draft) => {
     resetNotice();
-    setBusy(true);
+    setBusy(true);setBlindPreparing(blind);
     try {
       const start = performance.now();
       const generated=(parameters.placementMode==='free'||parameters.generationType==='two-storey'||parameters.generationType==='corridor'||parameters.generationType==='living'||(parameters.routeTrapCount??0)>0 || (parameters.loopTrapCount??0)>0 || parameters.design) ? await new Promise<Maze>((resolve,reject)=>{
@@ -134,15 +137,16 @@ function App() {
       const moved=oldPortals.some((p,i)=>!newPortals[i] || !samePortal(p,newPortals[i]!));
       const reshaped=parameters.columns!==next.parameters.columns||parameters.rows!==next.parameters.rows||JSON.stringify(parameters.shape)!==JSON.stringify(next.parameters.shape);
       setMaze(next); setDraft(current=>JSON.stringify(current)===JSON.stringify(parameters)?structuredClone(next.parameters):current); setResult(null); setShowRoute(false); setPortalEdit(null);setShapeEditing(false);
-      if (blind) void beginWalk(next);
+      if (blind) await beginWalk(next);
       else setMessage(reshaped?`Подобрана другая форма: ${next.parameters.columns}×${next.parameters.rows}, ${domainOf(next).modules.reduce((a,b)=>a+b,0)} модулей.`:moved?'Лабиринт сгенерирован. Проёмы перенесены на ближайшие свободные участки границы.':'Лабиринт сгенерирован. Seed сохранён.');
     } catch (e) { setMessage('');setError(e instanceof Error ? e.message : String(e)); }
-    finally {generationCancel.current=null;setBusy(false);}
+    finally {generationCancel.current=null;setBusy(false);setBlindPreparing(false);}
   };
   useEffect(()=>{
-    if(new URLSearchParams(window.location.search).get('preset')!=='free-bridges')return;
-    const parameters:Parameters={placementMode:'free',columns:30,rows:30,moduleSize:2,corridorWidth:2,extraConnections:2,freeBridgeCount:2,seed:'bridges-5',algorithm:'prim'};
-    setDraft(parameters);void regenerate(false,parameters);
+    const query=new URLSearchParams(window.location.search),preset=query.get('preset');
+    if(preset!=='free-bridges'&&preset!=='free-zones')return;
+    const parameters:Parameters=preset==='free-zones'?{placementMode:'free',columns:60,rows:50,moduleSize:2,corridorWidth:2,extraConnections:5,freeZoneCount:3,freeIslandCount:3,freeBridgeCount:2,seed:'zones-1',algorithm:'prim'}:{placementMode:'free',columns:30,rows:30,moduleSize:2,corridorWidth:2,extraConnections:2,freeBridgeCount:2,seed:'bridges-5',algorithm:'prim'};
+    setDraft(parameters);void regenerate(query.get('blind')==='1',parameters);
     return ()=>generationCancel.current?.();
   },[]);
   const persistRun=useCallback((value:WalkResult,status:'in-progress'|'stopped'|'finished')=>{
@@ -213,6 +217,7 @@ function App() {
 
   if(freeDocument)return <FreeEditor initial={freeDocument} initialResult={result} onClose={(_document,next,nextResult)=>{if(next){setMaze(next);setDraft(structuredClone(next.parameters));setResult(nextResult);setShowRoute(!!nextResult);}else setMessage('Черновик сохранён на устройстве. На карте показан последний готовый лабиринт.');setFreeDocument(null);}}/>;
   return <div className={`app-shell ${mode !== 'map' ? 'is-walking' : ''} ${section==='settings'?'settings-open':''}`}>
+    {blindPreparing&&<div className="blind-preparing" role="status"><p>Готовим слепое прохождение…</p><p>{message}</p><button onClick={()=>generationCancel.current?.()}>Отменить генерацию</button></div>}
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Logo /></div><strong>MAZE <span>LAB</span></strong><span className="version">0.1</span></div>
       <div className="topbar-description">Лаборатория физических лабиринтов</div>
@@ -239,7 +244,8 @@ function App() {
           <div className="field-pair">{parameterNumber(metricSite?'Ширина площадки, м':'Столбцы', 'columns',metricSite?2:1,100,metricSite?0.1:1)}{parameterNumber(metricSite?'Глубина площадки, м':'Строки', 'rows',metricSite?2:1,100,metricSite?0.1:1)}</div>
           {draft.placementMode!=='free' && draft.moduleSize !== undefined && draft.generationType!=='corridor' && parameterNumber('Размер модуля', 'moduleSize', 0.8, 10, 0.1, 'м')}
           {parameterNumber(metricSite?'Ширина прохода, максимум':draft.moduleSize === undefined ? 'Ширина коридора' : 'Проход между модулями', 'corridorWidth', metricSite?1:.8, metricSite?3:10, .1, 'м')}
-          {draft.placementMode==='free'&&<label className="field"><span>Крытые мосты</span><input aria-label="Крытые мосты" type="number" min={0} max={2} step={1} value={Number.isNaN(draft.freeBridgeCount)?'':draft.freeBridgeCount??0} onChange={e=>{const count=e.target.valueAsNumber;setDraft(p=>({...p,freeBridgeCount:count,extraConnections:Number.isFinite(count)?Math.max(Number.isFinite(p.extraConnections)?p.extraConnections:0,count):p.extraConnections}));}}/><small>Переходы над проходами с двумя лестницами. Входят в дополнительные соединения.</small></label>}
+          {draft.placementMode==='free'&&<><label className="field"><span>Зоны</span><select aria-label="Зоны" value={draft.freeZoneCount??0} onChange={e=>{const count=Number(e.target.value);setDraft(p=>({...p,freeZoneCount:count,freeIslandCount:count,extraConnections:Math.max(p.extraConnections,count+(p.freeBridgeCount??0))}));}}>{[0,2,3,4,5].map(n=><option key={n} value={n}>{n||'Без зон'}</option>)}</select><small>Связанные области с разным ростом ветвей. Для трёх зон и двух мостов начните с площадки 60×50 м.</small></label>{!!draft.freeZoneCount&&<label className="field"><span>Островов, не менее</span><input aria-label="Островов, не менее" type="number" min={0} max={draft.freeZoneCount} step={1} value={Number.isNaN(draft.freeIslandCount)?'':draft.freeIslandCount??draft.freeZoneCount} onChange={e=>{const count=e.target.valueAsNumber;setDraft(p=>({...p,freeIslandCount:count,extraConnections:Number.isFinite(count)?Math.max(p.extraConnections,count+(p.freeBridgeCount??0)):p.extraConnections}));}}/><small>Замкнутые недоступные участки, окружённые настоящими проходами.</small></label>}</>}
+          {draft.placementMode==='free'&&<label className="field"><span>Крытые мосты</span><input aria-label="Крытые мосты" type="number" min={0} max={2} step={1} value={Number.isNaN(draft.freeBridgeCount)?'':draft.freeBridgeCount??0} onChange={e=>{const count=e.target.valueAsNumber;setDraft(p=>({...p,freeBridgeCount:count,extraConnections:Number.isFinite(count)?Math.max(Number.isFinite(p.extraConnections)?p.extraConnections:0,count+(p.freeIslandCount??p.freeZoneCount??0)):p.extraConnections}));}}/><small>Переходы над проходами с двумя лестницами. Входят в дополнительные соединения.</small></label>}
           {parameterNumber('Дополнительные соединения', 'extraConnections', 0, 20000)}
           {parameterNumber('Ловушки на маршруте, не менее', 'routeTrapCount', 0, 6)}
           {parameterNumber('Кольцевые ловушки, не менее', 'loopTrapCount', 0, 6)}
@@ -269,6 +275,7 @@ function App() {
         {maze.storeys&&<div className="floor-tabs" aria-label="Выбор этажа">{[0,1].map(f=><button type="button" key={f} aria-pressed={selectedFloor===f} onClick={()=>selectFloor(f)}>Этаж {f+1}</button>)}</div>}
         {maze.storeys&&<p className="living-summary">Модули: этаж 1 — {domainOf(maze.storeys.floors[0]).modules.reduce((a,b)=>a+b,0)} · этаж 2 — {domainOf(maze.storeys.floors[1]).modules.reduce((a,b)=>a+b,0)} · всего {moduleCount} · лестниц: {maze.storeys.stairs.length} · минимум переходов: {minimumFloorChanges(maze)} · площадь полов: {number(analysis.area,1)} м² · участок: {number(domainOf(maze.storeys.floors[0]).area,1)} м²</p>}
         <div className="workspace-header"><div><div className="eyebrow">РАБОЧАЯ ОБЛАСТЬ</div><h2>{(maze.version===5||maze.version===7)?'Свободный':generationName(maze.parameters)} лабиринт <span>{maze.parameters.columns} × {maze.parameters.rows}</span></h2><div className="workspace-module-count" aria-label={maze.parameters.moduleSize===undefined?"Количество клеток":"Количество модулей"}>{maze.parameters.moduleSize===undefined?"Клетки":"Модули"}: <strong>{number(maze.parameters.moduleSize===undefined?analysis.cells:moduleCount)}</strong></div>{maze.version===4&&<p className="living-summary">2×2: {maze.layout!.modules.filter(m=>m.type==='2x2').length} · 2×6: {maze.layout!.modules.filter(m=>m.type==='2x6').length} · {number(analysis.area,1)} м² · {number(maze.width,1)} × {number(maze.depth,1)} м · стоек: {supportCount}{maze.layout?.spaces&&<> · площадка: {number(spaceSummary!.siteArea,1)} м² · недоступно: {number(spaceSummary!.inaccessibleArea,1)} м² · залов: {spaceSummary!.halls} · островов: {spaceSummary!.islands}</>}</p>}{livingInfo&&<p className="living-summary">{livingInfo.layers} слоёв · {livingInfo.ratio===null?'нет контурных связей':number(livingInfo.ratio*100)+'% контурных связей'}{livingInfo.layers<2?' · Недостаточно места для нескольких вложенных контуров.':''}</p>}</div><div className="file-actions">{(maze.version===5||maze.version===7)&&<label className="route-toggle"><input type="checkbox" role="switch" aria-label="Редактор свободного размещения" checked={false} onChange={()=>setFreeDocument(mazeDraft(maze))}/>Редактор свободного размещения</label>}{maze.parameters.moduleSize!==undefined&&maze.version!==6&&(maze.version!==5&&maze.version!==7)&&<button onClick={()=>{try{setFreeDocument(convertToFree(maze));}catch(e){setError(String(e));}}}>Создать свободную копию</button>}<button onClick={()=>setLibraryOpen(true)}>Библиотека</button><button disabled={busy} onClick={()=>void saveShared()}>В библиотеку</button><button disabled={busy} onClick={() => void load()}><span aria-hidden="true">↥</span> Открыть</button><button disabled={busy} onClick={() => void save()}><span aria-hidden="true">↧</span> Сохранить</button></div></div>
+        {!!maze.free?.zones?.length&&<p className="living-summary">Зон: {freeZoneSummary(maze.free).length} · замкнутых островов: {freeIslands(maze.free).length}. Состав и зоны сохраняются в JSON.</p>}
         {!!maze.free?.bridges?.length&&<p className="living-summary">Крытых мостов: {maze.free.bridges.length} · лестниц: {maze.free.bridges.length*2}. Пунктир М на плане — верхний проход; пересечение с нижним не создаёт развилку. Высоту стен меняйте в редакторе вместе с геометрией мостов.</p>}
         <LibraryPanel open={libraryOpen} revision={libraryRevision} onClose={()=>setLibraryOpen(false)} onMaze={openLibraryMaze} onWalk={openLibraryWalk} onPlay={next=>{openLibraryMaze(next);void beginWalk(next);}}/>
         <div className="view-toolbar"><div className="view-tabs"><span className="active"><span>▦</span> Карта</span><button disabled={!analysis.reachable||busy} onClick={() => { resetNotice(); void beginWalk(maze); }}><span>◉</span> Пройти от первого лица <span>↗</span></button></div><button type="button" className="analyze-shortcut" disabled={busy} onClick={()=>setMode('inspect')}>Осмотреть снаружи</button><button type="button" className="analyze-shortcut" onClick={requestAnalysis}>Проанализировать</button><label className="route-toggle"><input type="checkbox" checked={!!maze.roof} onChange={e=>setMaze(current=>({...current,roof:e.target.checked}))}/><span className="switch"/>Крыша</label><label className="route-toggle"><input type="checkbox" checked={showRoute} onChange={e => setShowRoute(e.target.checked)} /><span className="switch" />Кратчайший путь</label></div>
