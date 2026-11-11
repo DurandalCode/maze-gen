@@ -308,3 +308,28 @@ describe('strongly non-orthogonal junctions', () => {
     expect(() => generate({ ...base, freeJunctionDegree: 4 as 3 })).toThrow('Перекрёсток');
   });
 });
+
+test('a partition immediately behind an entrance cannot leave a valid but blocked portal route', () => {
+  const d = fixture();
+  d.layout.walls = [{id:'blocked-entry',x1:9.01,z1:9,x2:9.01,z2:11}];
+  expect(validateFree(d).some(i=>i.code==='clearance')).toBe(true);
+  const m=freeMaze(d,false);
+  expect(routePoints(m)).toEqual([]);
+});
+
+test('a concave hall with its vertex centroid outside still has usable navigation and roundtrips', () => {
+  const d=fixture();
+  d.layout.modules=d.layout.modules.slice(0,1);
+  d.layout.spaces=[{id:'hall',kind:'hall',polygon:[{x:13,z:9},{x:19,z:9},{x:19,z:11},{x:15,z:11},{x:15,z:15},{x:13,z:15}]}];
+  d.layout.connections=[{id:'link',a:{room:'a',edge:1,offset:0},b:{room:'hall',edge:5,offset:2},width:1.4}];
+  d.layout.openings[1]={id:'out',room:'hall',edge:1,offset:0,width:1.4};
+  d.layout.supports=[{x:16,z:9},{x:17,z:11},{x:15,z:13},{x:13,z:12}];
+  expect(validateFree(d)).toEqual([]);
+  const maze=freeMaze(d),restored=deserialize(serialize(maze)),route=routePoints(restored);
+  expect(route.length).toBeGreaterThan(2);
+  const world=new CollisionWorld([...walls(restored),...supportColliders(restored)]);
+  for(let i=1;i<route.length;i++){
+    const a=route[i-1]!,b=route[i]!;
+    expect(distance(world.move(a,{x:b.x-a.x,z:b.z-a.z}),b)).toBeLessThan(1e-5);
+  }
+});

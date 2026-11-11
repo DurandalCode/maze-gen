@@ -82,8 +82,8 @@ export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePort
 
 export interface WalkResult { recorder: Recorder; finished: boolean; id?:string }
 
-export function WalkCanvas({ maze, onEnd, onError, onCheckpoint, inspection=false }: {
-  maze: Maze; onEnd: (result: WalkResult) => void; onError: (message: string) => void; onCheckpoint?: (result:WalkResult)=>void; inspection?:boolean;
+export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspection=false }: {
+  maze: Maze; onCancel: () => void; onEnd: (result: WalkResult) => void; onError: (message: string) => void; onCheckpoint?: (result:WalkResult)=>void; inspection?:boolean;
 }) {
   const portals = mazePortals(maze);
   const startNumber = portals.findIndex(p => samePortal(p, maze.entrance))+1;
@@ -111,7 +111,7 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint, inspection=fals
     if (endedRef.current) return;
     if (touch) { clearTouch(); activeRef.current = true; setLocked(true); return; }
     try { await canvas.current?.requestPointerLock(); setLockError(''); }
-    catch { setLockError('Не удалось захватить мышь. Нажмите ещё раз или проверьте разрешения окна.'); }
+    catch { setLockError('Браузер не разрешил захват мыши. Можно повторить попытку или продолжить с джойстиками: они работают мышью и касанием.'); }
   };
   useEffect(() => {
     if (!canvas.current) return;
@@ -188,8 +188,11 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint, inspection=fals
   }, [maze, onEnd, onError, onCheckpoint,inspection]);
   const stop = () => {
     const player = playerRef.current;
-    if (!player || endedRef.current) return;
+    if (endedRef.current) return;
     endedRef.current = true; pause();
+    // Previewing the start screen is not a stopped attempt. Cancellation also
+    // works while the lazy scene is still loading and preserves earlier results.
+    if (!player || inspection || player.recorder.elapsed === 0) { onCancel(); return; }
     if (player.recorder.distance > 0) player.recorder.record(player.position, player.recorder.elapsed, true);
     onEnd({ id:runId.current,recorder: player.recorder, finished: false });
   };
@@ -207,7 +210,7 @@ export function WalkCanvas({ maze, onEnd, onError, onCheckpoint, inspection=fals
       <label className="walk-touch-choice"><input type="checkbox" checked={touch} onChange={event => { clearTouch(); setTouch(event.target.checked); }} /> Управление двумя джойстиками</label>
       <button className="primary" onClick={() => void lock()}>{inspection?'Начать осмотр':stats.elapsed > 0 ? 'Продолжить' : 'Начать прохождение'} <span>↗</span></button>
       <small>{touch ? 'Чем сильнее отклонён левый джойстик, тем быстрее движение: у края — бег. Кнопка «Пауза» останавливает таймер.' : 'Esc — пауза и освобождение курсора. Таймер на паузе не идёт.'}</small>
-      {lockError && <p role="alert">{lockError}</p>}
+      {lockError && <><p role="alert">{lockError}</p><button onClick={() => { clearTouch(); setTouch(true); setLockError(''); activeRef.current = true; setLocked(true); }}>Продолжить с джойстиками</button></>}
     </div></div>}
     <div className="walk-footer">ВЫСОТА ГЛАЗ 1,7 м <span /> СТЕНЫ {maze.wallHeight.toLocaleString('ru-RU')} м <span /> {maze.roof ? 'С КРЫШЕЙ' : 'ОТКРЫТОЕ НЕБО'} <span /> СКОРОСТЬ {touch ? 'ДО 2,8' : '1,4'} м/с</div>
   </div>;

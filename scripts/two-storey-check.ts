@@ -38,8 +38,11 @@ try{
     Player.prototype.updateAnalog=function(dt:number,forward:number,right:number,sprint=false){(window as any).__storeyPlayer=this;return original.call(this,dt,forward,right,sprint);};
   });
   await page.getByRole('button',{name:/Пройти от первого лица/}).click();
+  if(process.env.MAZE_TOUCH==='1')await page.getByLabel('Управление двумя джойстиками').check();
   await page.getByRole('button',{name:'Начать прохождение'}).click();
-  await page.keyboard.down('w');await page.waitForFunction(()=>!!(window as any).__storeyPlayer);await page.keyboard.up('w');
+  if(process.env.MAZE_TOUCH!=='1')await page.keyboard.down('w');
+  await page.waitForFunction(()=>!!(window as any).__storeyPlayer);
+  if(process.env.MAZE_TOUCH!=='1')await page.keyboard.up('w');
   await page.evaluate(async()=>{
     const {routePoints}=await import('/src/core/pathfinding.ts'),p=(window as any).__storeyPlayer,points=routePoints(p.maze);
     for(let i=1;i<points.length;i++){const q=points[i]!;let steps=0;while(Math.hypot(q.x-p.position.x,q.z-p.position.z)>.015){if(steps++>1500)throw Error('Stuck approaching stair');const dx=q.x-p.position.x,dz=q.z-p.position.z;p.yaw=Math.atan2(-dx,-dz);p.updateAnalog(Math.min(.02,Math.hypot(dx,dz)/1.4),1,0);}

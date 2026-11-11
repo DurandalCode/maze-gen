@@ -6,8 +6,10 @@ export class CollisionWorld {
   private buckets = new Map<string, Wall[]>();
   constructor(segments: readonly Wall[], private bucketSize = 2) {
     for (const wall of segments) {
-      for (let x = Math.floor((Math.min(wall.x1, wall.x2) - 0.1) / bucketSize); x <= Math.floor((Math.max(wall.x1, wall.x2) + 0.1) / bucketSize); x++)
-        for (let z = Math.floor((Math.min(wall.z1, wall.z2) - 0.1) / bucketSize); z <= Math.floor((Math.max(wall.z1, wall.z2) + 0.1) / bucketSize); z++) {
+      // An oriented rectangle extends along both its tangent and normal.
+      const padding = (wall.thickness ?? WALL_THICKNESS) / 2 * Math.SQRT2;
+      for (let x = Math.floor((Math.min(wall.x1, wall.x2) - padding) / bucketSize); x <= Math.floor((Math.max(wall.x1, wall.x2) + padding) / bucketSize); x++)
+        for (let z = Math.floor((Math.min(wall.z1, wall.z2) - padding) / bucketSize); z <= Math.floor((Math.max(wall.z1, wall.z2) + padding) / bucketSize); z++) {
           const key = `${x},${z}`;
           const list = this.buckets.get(key) ?? []; list.push(wall); this.buckets.set(key, list);
         }
@@ -32,9 +34,9 @@ export class CollisionWorld {
     const steps = Math.max(1, Math.ceil(Math.hypot(delta.x, delta.z) / (radius * 0.25)));
     const result = { ...start }, dx = delta.x / steps, dz = delta.z / steps;
     for (let i = 0; i < steps; i++) {
-      const x = { x: result.x+dx, z: result.z };
+      const x = { ...result, x: result.x+dx };
       if (!this.blocked(x, radius)) result.x = x.x;
-      const z = { x: result.x, z: result.z+dz };
+      const z = { ...result, z: result.z+dz };
       if (!this.blocked(z, radius)) result.z = z.z;
       onStep?.(result);
     }

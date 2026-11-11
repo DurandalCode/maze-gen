@@ -205,8 +205,36 @@ function localRoute(a: Point, b: Point, poly: Point[], holes: Point[][], obstacl
   }
   return null;
 }
+/** Keep legacy centres whenever safe; concave rooms and halls with holes need
+ * an interior anchor rather than the average of their boundary vertices. */
+function navigationCenter(room: ReturnType<typeof rooms>[number], obstacles: Wall[]): Point {
+  const center = centroid(room.polygon), clear = (p: Point) => pointIn(p, room.polygon)
+    && !room.holes.some(h => pointIn(p, h))
+    && obstacles.every(w => wallDistance(p, w) >= .25 - EPS);
+  if (clear(center)) return center;
+  const candidates: Point[] = [];
+  for (const w of [...edges(room.polygon), ...room.holes.flatMap(edges)]) {
+    const [a, b] = ends(w), length = distance(a, b);
+    if (length < EPS) continue;
+    const mid = lerp(a, b, .5);
+    for (const offset of [.35, -.35, .5, -.5]) candidates.push({
+      x: mid.x - (b.z - a.z) / length * offset,
+      z: mid.z + (b.x - a.x) / length * offset,
+    });
+  }
+  // Additional interior candidates handle short, crowded edges without an
+  // unbounded search on large imported halls.
+  const box = bounds(room.polygon);
+  for (let x = 1; x < 16; x++) for (let z = 1; z < 16; z++) candidates.push({
+    x: box.x1 + (box.x2 - box.x1) * x / 16,
+    z: box.z1 + (box.z2 - box.z1) * z / 16,
+  });
+  candidates.sort((a, b) => distance(a, center) - distance(b, center));
+  // No safe anchor means navigation remains invalid and validation reports it.
+  return candidates.find(clear) ?? center;
+}
 export function buildNavigation(l: FreeLayout) {
-  const phys = physical(l), rs = phys.rooms, centers = rs.map(r => centroid(r.polygon)), passages = rs.map(() => [] as number[]), paths: (Point[] | null)[] = [], edgePaths = new Map<string, Point[]>();
+  const phys = physical(l), rs = phys.rooms, centers = rs.map(r => navigationCenter(r, phys.obstacles)), passages = rs.map(() => [] as number[]), paths: (Point[] | null)[] = [], edgePaths = new Map<string, Point[]>();
   for (const c of l.connections) try {
     const g = connectionGeometry(l, c), a = rs.findIndex(r => r.id === c.a.room), b = rs.findIndex(r => r.id === c.b.room), inward = (p: typeof g.a) => ({ x: p.mid.x - p.normal.x * .35, z: p.mid.z - p.normal.z * .35 }), pa = inward(g.a), pb = inward(g.b), ra = localRoute(centers[a]!, pa, rs[a]!.polygon, rs[a]!.holes, phys.obstacles), rb = localRoute(pb, centers[b]!, rs[b]!.polygon, rs[b]!.holes, phys.obstacles);
     let route = ra && rb ? [...ra, g.a.mid, g.b.mid, ...rb] : null;
@@ -229,7 +257,7 @@ export function buildNavigation(l: FreeLayout) {
   }
   const portalPaths = new Map<string, Point[]>();
   for (const o of l.openings) try {
-    const g = anchorGeometry(l, o, o.width), i = rs.findIndex(r => r.id === o.room), a = { x: g.mid.x - g.normal.x * .35, z: g.mid.z - g.normal.z * .35 }, route = localRoute(centers[i]!, a, rs[i]!.polygon, rs[i]!.holes, phys.obstacles);
+    const g = anchorGeometry(l, o, o.width), i = rs.findIndex(r => r.id === o.room), a = { x: g.mid.x - g.normal.x * .35, z: g.mid.z - g.normal.z * .35 }, approach = localRoute(centers[i]!, a, rs[i]!.polygon, rs[i]!.holes, phys.obstacles), route = approach && phys.obstacles.every(w => movementClearance(a, g.mid, w) >= .25 - EPS) ? approach : null;
     paths.push(route);
     if (route) portalPaths.set(o.id, [...route, g.mid]);
   } catch {
@@ -298,7 +326,10 @@ export function freePortal(maze: Maze, id: string) {
 }
 export function freeRoute(maze: Maze, from = maze.entrance.cell, to = maze.exit.cell) {
   let routes=referenceRoutes.get(maze);if(!routes){routes=new Map();referenceRoutes.set(maze,routes);}const key=`${from}:${to}`,cached=routes.get(key);if(cached)return cached;
-  const r = freeRuntime(maze), l = maze.free!, nodes: { point: Point; room: number }[] = [], adjacent = new Map<number, { to: number; path: Point[]; cost: number }[]>(), add = (p: Point, room: number) => {
+  const r = freeRuntime(maze), l = maze.free!;
+  // Old saved maps can contain blocked openings. Never draw a route through them.
+  if (from === maze.entrance.cell && !r.portalPaths.has(l.entrance) || to === maze.exit.cell && !r.portalPaths.has(l.exit)) return { regions: [] as number[], points: [] as Point[] };
+  const nodes: { point: Point; room: number }[] = [], adjacent = new Map<number, { to: number; path: Point[]; cost: number }[]>(), add = (p: Point, room: number) => {
     nodes.push({ point: p, room });
     return nodes.length - 1;
   }, cost = (p: Point[]) => p.slice(1).reduce((n, v, i) => n + distance(v, p[i]!), 0), link = (a: number, b: number, path: Point[]) => {
