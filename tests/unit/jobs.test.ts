@@ -111,3 +111,37 @@ test('aborted signal does not leak an owner or start a worker', async () => {
   expect(manager.stats().owners).toBe(0);
   manager.dispose();
 });
+
+test('import cancellation waits for the commit boundary and complete wins a late cancel', async () => {
+  const controls: unknown[] = [];
+  const { manager, workers } = setup();
+  const job = manager.submit('import', null, 'import', {});
+  const worker = workers[0]!,
+    request = worker.requests[0]!;
+  worker.postMessage = (value) => {
+    controls.push(value);
+  };
+  job.cancel();
+  job.cancel();
+  expect(job.state()).toBe('running');
+  expect(worker.terminated).toBe(false);
+  expect(controls).toEqual([{ protocolVersion: 1, kind: 'cancel', jobId: request.jobId }]);
+  worker.reply(0, 'result', { committed: true });
+  expect(await job.result).toMatchObject({ state: 'completed', payload: { committed: true } });
+  manager.dispose();
+});
+test('import abort acknowledgement is cancelled; disposal has an explicitly unknown outcome', async () => {
+  const { manager, workers } = setup();
+  const job = manager.submit('import', null, 'import', {}),
+    worker = workers[0]!;
+  worker.postMessage = () => {};
+  job.cancel();
+  worker.onmessage?.({ data: response(worker.requests[0]!, 'cancelled', { committed: false }) });
+  expect((await job.result).state).toBe('cancelled');
+  const second = manager.submit('import2', null, 'import', {});
+  manager.dispose();
+  expect(await second.result).toMatchObject({
+    state: 'failed',
+    payload: { code: 'IMPORT_OUTCOME_UNKNOWN' },
+  });
+});

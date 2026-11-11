@@ -77,6 +77,7 @@ export function compute(
     return {
       message: response(request, 'result', {
         ok: true,
+        revisionHash: prepared.world.revisionHash,
         worldHash: prepared.world.physical.worldHash,
         navHash: prepared.world.navigation.navHash,
         versions: VERSIONS,

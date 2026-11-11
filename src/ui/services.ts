@@ -23,6 +23,12 @@ export function unwrap<T>(outcome: JobOutcome): T {
 export async function store<T>(operation: Operation, input: unknown): Promise<T> {
   return unwrap<T>(await storage.submit(`storage-${++sequence}`, null, operation, input).result);
 }
+export function commitImport(importId: string, copyConflictingSessions: boolean) {
+  return storage.submit(`storage-${++sequence}`, null, 'import', {
+    importId,
+    copyConflictingSessions,
+  });
+}
 export async function prepare(document: Document, signal?: AbortSignal): Promise<PreparedWorld> {
   const result = unwrap<Preparation>(
     await compute.submit('selected-world', document.revision, 'compile', { document }, { signal })

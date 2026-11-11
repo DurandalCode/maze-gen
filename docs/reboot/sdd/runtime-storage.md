@@ -20,7 +20,7 @@ IndexedDB `maze-reboot-v1`, schemaVersion=1. В браузере ребут ис
 
 | Store | Ключ | Содержимое и индексы |
 |---|---|---|
-| projects | projectId | Название, currentRevisionHash, createdAt, updatedAt; индекс updatedAt+id |
+| projects | projectId | Название, currentRevisionHash, createdAt, updatedAt, optional originId для импортированной копии; индекс updatedAt+id |
 | drafts | projectId | Последний подтверждённый редактором черновик, commandRevision, baseRevisionHash |
 | definitions | contentHash | Immutable определение модуля |
 | maps | revisionHash | Immutable документ без встроенных дубликатов definition bodies, список зависимостей |

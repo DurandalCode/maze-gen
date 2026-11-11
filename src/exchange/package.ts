@@ -204,7 +204,9 @@ export function validatePackage(value: unknown): ValidatedPackage {
   if (!Number.isFinite(Date.parse(exportedAt))) error('PACKAGE_SCHEMA', 'Неверная дата экспорта');
   const rawDefinitions = array(o.definitions, PACKAGE_LIMITS.definitions, 'definitions');
   const rawMaps = array(o.maps, PACKAGE_LIMITS.maps, 'maps');
-  const rawProjects = array(o.projects ?? [], PACKAGE_LIMITS.maps, 'projects');
+  // Projects can share an immutable map; their count is bounded by the file's
+  // byte limit, rather than incorrectly treating every project as another map.
+  const rawProjects = array(o.projects ?? [], PACKAGE_LIMITS.bytes, 'projects');
   const rawSessions = array(o.sessions, PACKAGE_LIMITS.sessions, 'sessions');
   const rawChunks = array(o.chunks, PACKAGE_LIMITS.chunks, 'chunks');
   let sampleCount = 0;
@@ -279,7 +281,7 @@ export function validatePackage(value: unknown): ValidatedPackage {
   const projects = rawProjects.map((raw) => {
     const p = object(
       raw,
-      ['projectId', 'title', 'currentRevisionHash', 'createdAt', 'updatedAt'],
+      ['projectId', 'title', 'currentRevisionHash', 'createdAt', 'updatedAt', 'originId'],
       'project',
     );
     const currentRevisionHash = hash(p.currentRevisionHash, 'currentRevisionHash');
@@ -295,6 +297,7 @@ export function validatePackage(value: unknown): ValidatedPackage {
       currentRevisionHash,
       createdAt,
       updatedAt,
+      ...(p.originId === undefined ? {} : { originId: text(p.originId, 'project.originId') }),
     };
   });
   unique(projects, (p) => p.projectId, 'projects');

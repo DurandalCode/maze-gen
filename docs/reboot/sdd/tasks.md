@@ -42,9 +42,9 @@ G-03 — ограниченная проверка выбранного kernel: 
 | REC-01 | **Выполнено, [отчёт](../../../reports/runtime-foundation.md).** Session/condition, fixed-step distance, chunks 10 Гц | N-02, DB-01 | REC-01 оракул; дистанция независима от частоты записи; paused не добавляет activeTime; prepared требует сохранённой карты |
 | REC-02 | **В работе.** Idempotent flush/finalize, backpressure и ошибки | REC-01 | Повтор sequence no-op, конфликт явный, finish не откатывается; FAIL-01/05, W-60/PERF-07; очередь ограничена |
 | REC-03 | **Выполнено на ПК, [отчёт](../../../reports/ui-runtime.md).** Interrupted recovery и lifecycle hooks | REC-02, R-02 | Перезапуск с последнего commit/sequence, без скачка; неподтверждённый интервал обозначен; listeners освобождены |
-| IO-01 | **В работе: строгий parser/dependency/hash preflight и 4 оракула.** Package schema, dependency closure, hashes и preflight | G-02, DB-01, REC-01 | IO-01/02; F-02 восстанавливается без каталога; limits до allocation; старые форматы отклоняются |
-| IO-02 | Staging, conflict preview и atomic import | IO-01, DB-03, J-02 | DB-02/IO-02/FAIL-02; duplicate no-op; конфликт не затирает; отмена до commit не меняет библиотеку |
-| IO-03 | Экспорт выбора и разбиение на пакеты 32 MiB | IO-01, REC-02 | Каждый пакет самодостаточен; dependencies полны; сериализация в worker, полного JSON в React нет |
+| IO-01 | **Выполнено на ПК, [отчёт](../../../reports/exchange.md); перенос в APK открыт в APK-03.** Package schema, dependency closure, hashes и preflight | G-02, DB-01, REC-01 | IO-01/02; F-02 восстанавливается без каталога; limits до allocation; старые форматы отклоняются |
+| IO-02 | **Выполнено на ПК, [отчёт](../../../reports/exchange.md).** Staging, conflict preview и atomic import | IO-01, DB-03, J-02 | DB-02/IO-02/FAIL-02; duplicate no-op; конфликт не затирает; отмена до commit не меняет библиотеку |
+| IO-03 | **Выполнено на ПК, [отчёт](../../../reports/exchange.md).** Экспорт выбора и разбиение на пакеты 32 MiB | IO-01, REC-02 | Каждый пакет самодостаточен; dependencies полны; сериализация в worker, полного JSON в React нет |
 
 ## APK и сценарии первого прототипа
 
@@ -52,7 +52,7 @@ G-03 — ограниченная проверка выбранного kernel: 
 |---|---|---|---|
 | UX-01 | **В работе: функциональный сценарий проверен в браузере; L-1000/PERF открыт.** Библиотека/карточка/просмотр, независимые loading/error | DB-02, DB-03, R-02 | UX-01 оракул; 30 строк первой страницы; поиск/вкладки доступны при ошибке; touch ≥44px |
 | UX-02 | **В работе: browser E2E pass; зависимые gates открыты.** Слепой старт, пауза и результат | UX-01, REC-03 | План/раскрывающее имя не показаны; previewed записан; saving/saved/error различимы |
-| UX-03 | Импорт/экспорт/конфликты | UX-01, IO-02, IO-03 | Выбор→проверка→итог→commit/cancel; дубликаты и несовместимость понятны; несколько экспортных пакетов |
+| UX-03 | **В работе: browser file→preflight→commit/cancel→export pass; Android открыт.** Импорт/экспорт/конфликты | UX-01, IO-02, IO-03 | Выбор→проверка→итог→commit/cancel; дубликаты и несовместимость понятны; несколько экспортных пакетов |
 | APK-01 | Отдельная Java/WebView оболочка и APK build script | B-01 | applicationId lab.maze.reboot, встроенные assets; debug APK устанавливается, старое приложение доступно |
 | APK-02 | File picker, chunked export/sharesheet, background hooks | APK-01, UX-03, REC-03 | Нет одного блокирующего многомегабайтного bridge-вызова; cancel чистит только свой временный файл; JSON читается на ПК |
 | APK-03 | Физическое устройство: обмен, lifecycle, обновление и графический gate | APK-02, UX-02, R-03 | IO-01, FAIL-04/05, PERF-02/08, VIS-01; APK без сервера; обновление сохраняет библиотеку; устройство/WebView в отчёте |

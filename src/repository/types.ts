@@ -6,6 +6,7 @@ export interface Project {
   currentRevisionHash: string;
   createdAt: number;
   updatedAt: number;
+  originId?: string;
 }
 export interface StoredMap {
   revisionHash: string;

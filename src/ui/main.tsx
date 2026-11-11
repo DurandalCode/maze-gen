@@ -8,6 +8,9 @@ import { makeCondition } from '../session/format';
 import { store, prepare, revision, message } from './services';
 import { starterDocument } from './starter';
 import { WorldView } from './WorldView';
+import { ImportPanel } from './ImportPanel';
+import { ExportPanel } from './ExportPanel';
+import type { ExportSelection } from '../exchange/export-repository';
 import { WalkView, stateLabels } from './WalkView';
 import './styles.css';
 
@@ -60,6 +63,11 @@ function useListing<T>(
 }
 type Selection = { world: PreparedWorld; title: string; preview: boolean; mapHash: string };
 function App() {
+  const [exportSelection, setExportSelection] = useState<ExportSelection | null>(null);
+  const [markedMaps, setMarkedMaps] = useState<string[]>([]);
+  const [markedWalks, setMarkedWalks] = useState<string[]>([]);
+  const mark = (id: string, checked: boolean, setter: typeof setMarkedMaps) =>
+    setter((old) => (checked ? [...old.filter((v) => v !== id), id] : old.filter((v) => v !== id)));
   const [tab, setTab] = useState<'maps' | 'walks'>('maps');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('updated-desc');
@@ -274,6 +282,12 @@ function App() {
           </button>
         </aside>
       )}
+      <ImportPanel
+        onCommitted={(notice) => {
+          setNotice(notice);
+          setRefresh((n) => n + 1);
+        }}
+      />
       <nav className="tabs" aria-label="Библиотека">
         <button aria-current={tab === 'maps' ? 'page' : undefined} onClick={() => setTab('maps')}>
           Карты
@@ -316,6 +330,23 @@ function App() {
           <button onClick={() => setMapFilter('')}>Сбросить фильтр карты</button>
         )}
       </div>
+      {!!(markedMaps.length + markedWalks.length) && (
+        <div className="toolbar">
+          <button
+            onClick={() => setExportSelection({ mapHashes: markedMaps, sessionIds: markedWalks })}
+          >
+            Экспортировать выбранное ({markedMaps.length + markedWalks.length})
+          </button>
+          <button
+            onClick={() => {
+              setMarkedMaps([]);
+              setMarkedWalks([]);
+            }}
+          >
+            Снять выбор
+          </button>
+        </div>
+      )}
       <section
         className="library"
         aria-label={tab === 'maps' ? 'Список карт' : 'Список прохождений'}
@@ -348,6 +379,15 @@ function App() {
           ? maps.rows.map((row, index) => (
               <article className="card" key={row.revisionHash}>
                 <div>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      aria-label={`Выбрать карту ${index + 1}`}
+                      checked={markedMaps.includes(row.revisionHash)}
+                      onChange={(e) => mark(row.revisionHash, e.target.checked, setMarkedMaps)}
+                    />
+                    Выбрать
+                  </label>
                   <p className="eyebrow">
                     КАРТА {index + 1} · {row.revisionHash.slice(0, 8)}
                   </p>
@@ -375,6 +415,13 @@ function App() {
                   >
                     Переименовать
                   </button>
+                  <button
+                    onClick={() =>
+                      setExportSelection({ mapHashes: [row.revisionHash], sessionIds: [] })
+                    }
+                  >
+                    Экспорт карты
+                  </button>
                   <button onClick={() => void removeMap(row)}>Удалить</button>
                 </div>
               </article>
@@ -383,6 +430,15 @@ function App() {
               <article className="card" key={row.sessionId}>
                 <div>
                   <p className="eyebrow">ПОПЫТКА {row.sessionId.slice(0, 8)}</p>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      aria-label={`Выбрать попытку ${row.sessionId.slice(0, 8)}`}
+                      checked={markedWalks.includes(row.sessionId)}
+                      onChange={(e) => mark(row.sessionId, e.target.checked, setMarkedWalks)}
+                    />
+                    Выбрать
+                  </label>
                   <h2>{stateLabels[row.status]}</h2>
                   <p>
                     {(row.elapsedMs / 1000).toFixed(1)} с · {row.distanceM.toFixed(2)} м
@@ -391,6 +447,13 @@ function App() {
                 <div className="actions">
                   <button onClick={() => void openWalk(row)}>
                     {['finished', 'stopped'].includes(row.status) ? 'Результат' : 'Продолжить'}
+                  </button>
+                  <button
+                    onClick={() =>
+                      setExportSelection({ mapHashes: [], sessionIds: [row.sessionId] })
+                    }
+                  >
+                    Экспорт попытки
                   </button>
                   <button
                     onClick={() =>
@@ -462,6 +525,13 @@ function App() {
             )}
           </section>
         </div>
+      )}
+      {exportSelection && (
+        <ExportPanel
+          key={JSON.stringify(exportSelection)}
+          selection={exportSelection}
+          onClose={() => setExportSelection(null)}
+        />
       )}
       {rename && (
         <div className="modal-backdrop">

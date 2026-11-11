@@ -25,6 +25,7 @@ interface JobRecord {
   settle: (outcome: JobOutcome) => void;
   progress?: ((payload: unknown) => void) | undefined;
   cleanup?: () => void;
+  cancelRequested?: boolean;
 }
 let nextId = 0;
 export class JobManager {
@@ -105,7 +106,17 @@ export class JobManager {
         if (this.port !== port) return;
         const record = this.current;
         this.stopWorker();
-        if (record) this.finish(record, 'failed', { code: 'WORKER_CRASH' });
+        if (record)
+          this.finish(
+            record,
+            'failed',
+            record.request.operation === 'import'
+              ? {
+                  code: 'IMPORT_OUTCOME_UNKNOWN',
+                  message: 'Хранилище отключилось. Проверьте библиотеку: импорт мог завершиться.',
+                }
+              : { code: 'WORKER_CRASH' },
+          );
         this.drain();
       };
     }
@@ -143,14 +154,20 @@ export class JobManager {
     }
     this.finish(
       record,
-      !fresh
-        ? 'cancelled'
-        : value.kind === 'result'
+      r.operation === 'import'
+        ? value.kind === 'result'
           ? 'completed'
-          : value.kind === 'error'
-            ? 'failed'
-            : 'cancelled',
-      !fresh ? { reason: 'stale' } : value.payload,
+          : value.kind === 'cancelled'
+            ? 'cancelled'
+            : 'failed'
+        : !fresh
+          ? 'cancelled'
+          : value.kind === 'result'
+            ? 'completed'
+            : value.kind === 'error'
+              ? 'failed'
+              : 'cancelled',
+      !fresh && r.operation !== 'import' ? { reason: 'stale' } : value.payload,
     );
     this.drain();
   }
@@ -168,8 +185,36 @@ export class JobManager {
     // Release potentially large inputs after terminal outcome.
     record.request = { ...record.request, input: null };
   }
-  private cancel(record: JobRecord): void {
+  private cancel(record: JobRecord, force = false): void {
     if (['completed', 'failed', 'cancelled'].includes(record.state)) return;
+    if (this.current === record && record.request.operation === 'import') {
+      if (force) {
+        this.stopWorker();
+        this.finish(record, 'failed', {
+          code: 'IMPORT_OUTCOME_UNKNOWN',
+          message:
+            'Связь с хранилищем закрыта. Проверьте библиотеку: транзакция могла завершиться.',
+        });
+        return;
+      }
+      if (!record.cancelRequested) {
+        record.cancelRequested = true;
+        try {
+          this.port?.postMessage({
+            protocolVersion: PROTOCOL_VERSION,
+            kind: 'cancel',
+            jobId: record.request.jobId,
+          });
+        } catch {
+          this.stopWorker();
+          this.finish(record, 'failed', { code: 'IMPORT_OUTCOME_UNKNOWN' });
+          this.drain();
+        }
+      }
+      // Wait for transaction.abort or transaction.complete. A completed import
+      // must never be reported as cancelled merely because cancel arrived late.
+      return;
+    }
     if (this.current === record) this.stopWorker();
     this.finish(record, 'cancelled', { reason: 'cancelled' });
     this.drain();
@@ -193,7 +238,8 @@ export class JobManager {
   }
   dispose(): void {
     this.disposed = true;
-    for (const r of [...this.pending, ...(this.current ? [this.current] : [])]) this.cancel(r);
+    for (const r of [...this.pending, ...(this.current ? [this.current] : [])])
+      this.cancel(r, true);
     this.stopWorker();
     this.latest.clear();
   }

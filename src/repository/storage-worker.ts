@@ -6,6 +6,13 @@ import type { MapRevision } from '../domain';
 import type { JobRequest } from '../jobs/protocol';
 import type { ChunkInput, Condition, SessionState } from '../session/types';
 import type { ListQuery } from './types';
+import { ImportRepository } from '../exchange/import-repository';
+import type { GeometryProof } from '../exchange/import-repository';
+import { parsePackage, PACKAGE_LIMITS } from '../exchange/package';
+import { ExportRepository } from '../exchange/export-repository';
+import type { ExportSelection, ExportPacket } from '../exchange/export-repository';
+let activeExport: { id: string; packets: AsyncGenerator<ExportPacket>; touchedAt: number } | null =
+  null;
 const scope = globalThis as unknown as {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
   postMessage: (message: unknown) => void;
@@ -28,7 +35,7 @@ function string(input: Record<string, unknown>, key: string): string {
     throw new StorageError('INVALID_REQUEST', `Invalid ${key}`);
   return value;
 }
-async function dispatch(request: JobRequest): Promise<unknown> {
+async function dispatch(request: JobRequest, signal: AbortSignal): Promise<unknown> {
   if (!STORAGE_OPERATIONS.includes(request.operation as (typeof STORAGE_OPERATIONS)[number]))
     throw new StorageError('UNSUPPORTED_OPERATION', 'Unsupported storage operation');
   const input = payload(request.input),
@@ -40,6 +47,8 @@ async function dispatch(request: JobRequest): Promise<unknown> {
       if (input.kind === 'drafts') return repo.listDrafts();
       break;
     case 'get':
+      if (input.kind === 'import-map')
+        return new ImportRepository(repo).map(string(input, 'importId'), string(input, 'hash'));
       if (input.kind === 'map') return repo.getMap(string(input, 'hash'));
       if (input.kind === 'draft') return repo.getDraft(string(input, 'projectId'));
       if (input.kind === 'project') return repo.getProject(string(input, 'projectId'));
@@ -101,14 +110,103 @@ async function dispatch(request: JobRequest): Promise<unknown> {
     case 'recover':
       await repo.cleanupStaging();
       return { drafts: await repo.listDrafts(), sessions: await repo.sessions.recover() };
+    case 'validate-import': {
+      const imports = new ImportRepository(repo);
+      if (input.kind === 'cancel') {
+        await imports.cancel(string(input, 'importId'));
+        return { cancelled: true };
+      }
+      if (input.kind === 'finish')
+        return imports.validateGeometry(string(input, 'importId'), input.proofs as GeometryProof[]);
+      const file = input.file;
+      if (!(file instanceof Blob)) throw new StorageError('INVALID_FILE', 'Выберите JSON-файл');
+      if (file.size > PACKAGE_LIMITS.bytes)
+        throw new StorageError('FILE_TOO_LARGE', 'Один пакет не может превышать 32 MiB UTF-8.');
+      return imports.stage(parsePackage(await file.text()));
+    }
+    case 'import':
+      return new ImportRepository(repo).commit(
+        string(input, 'importId'),
+        input.copyConflictingSessions === true,
+        signal,
+      );
+    case 'export': {
+      if (activeExport && Date.now() - activeExport.touchedAt > 5 * 60_000) {
+        await activeExport.packets.return(undefined);
+        activeExport = null;
+      }
+      if (input.kind === 'cancel') {
+        if (activeExport && activeExport.id === input.exportId) {
+          await activeExport.packets.return(undefined);
+          activeExport = null;
+        }
+        return { cancelled: true };
+      }
+      if (input.kind === 'begin') {
+        if (activeExport) await activeExport.packets.return(undefined);
+        activeExport = {
+          id: crypto.randomUUID(),
+          packets: new ExportRepository(repo).packets(input.selection as ExportSelection),
+          touchedAt: Date.now(),
+        };
+      } else if (!activeExport || activeExport.id !== input.exportId)
+        throw new StorageError('EXPORT_NOT_FOUND', 'Экспорт закрыт. Повторите выбор.');
+      const current = activeExport!;
+      try {
+        const next = await current.packets.next();
+        current.touchedAt = Date.now();
+        if (next.done) {
+          activeExport = null;
+          return { exportId: current.id, done: true };
+        }
+        const packet = next.value;
+        const blob = new Blob([packet.bytes.buffer as ArrayBuffer], { type: 'application/json' });
+        if (packet.last) {
+          await current.packets.return(undefined);
+          activeExport = null;
+        }
+        return {
+          exportId: current.id,
+          done: false,
+          packet: {
+            blob,
+            bytes: blob.size,
+            number: packet.number,
+            last: packet.last,
+            counts: packet.counts,
+            filename: `maze-${current.id.slice(0, 8)}-${packet.number}.json`,
+          },
+        };
+      } catch (error) {
+        await current.packets.return(undefined);
+        if (activeExport === current) activeExport = null;
+        throw error;
+      }
+    }
   }
   throw new StorageError('UNSUPPORTED_OPERATION', 'Storage operation is not implemented');
 }
 // Requests may read concurrently; IndexedDB serializes overlapping write transactions atomically.
+const controllers = new Map<string, AbortController>();
 scope.onmessage = (event) => {
+  const control = event.data as {
+    protocolVersion?: unknown;
+    kind?: unknown;
+    jobId?: unknown;
+  } | null;
+  if (
+    control?.protocolVersion === 1 &&
+    control.kind === 'cancel' &&
+    typeof control.jobId === 'string'
+  ) {
+    controllers.get(control.jobId)?.abort();
+    return;
+  }
   if (!isJobRequest(event.data)) return;
   const request = event.data;
-  void dispatch(request)
+  const controller = new AbortController();
+  controllers.set(request.jobId, controller);
+  void dispatch(request, controller.signal)
     .then((result) => scope.postMessage(response(request, 'result', result)))
     .catch((error) => {
       const code =
@@ -120,13 +218,20 @@ scope.onmessage = (event) => {
               ? error.name
               : 'STORAGE_ERROR';
       scope.postMessage(
-        response(request, 'error', {
-          code,
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Не удалось выполнить действие. Данные не перезаписаны.',
-        }),
+        response(
+          request,
+          request.operation === 'import' && (code === 'CANCELLED' || code === 'AbortError')
+            ? 'cancelled'
+            : 'error',
+          {
+            code,
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Не удалось выполнить действие. Данные не перезаписаны.',
+          },
+        ),
       );
-    });
+    })
+    .finally(() => controllers.delete(request.jobId));
 };

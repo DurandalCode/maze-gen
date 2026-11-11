@@ -135,6 +135,9 @@ export function makeChunk(value: ChunkInput): WalkChunk {
     elapsedMs,
     distanceM,
   };
+  for (let i = 1; i < events.length; i++)
+    if (events[i]!.activeTimeMs < events[i - 1]!.activeTimeMs)
+      fail('TIME_ORDER', 'events', 'Events must be monotone');
   return { ...body, contentHash: hashValue(body) };
 }
 export function parseChunk(value: unknown): WalkChunk {

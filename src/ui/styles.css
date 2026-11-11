@@ -300,3 +300,39 @@ dd {
     padding: 20px;
   }
 }
+
+.import-panel {
+  margin: 20px 0;
+  border: 1px solid #425d4d;
+  border-radius: 8px;
+  padding: 16px;
+}
+summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.import-panel button {
+  margin: 12px 8px 0 0;
+}
+.checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+.checkbox input {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.download {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 12px 18px;
+  background: #c9dda2;
+  color: #13251c;
+  border-radius: 6px;
+  margin: 12px 0;
+}
