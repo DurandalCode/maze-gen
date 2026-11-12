@@ -42,6 +42,7 @@ export interface Parameters {
   freeVortexContinuous?:boolean;
   freeVortexHybrid?:boolean;
   freeVortexHybridDeep?:boolean;
+  freeVortexMultiBand?:boolean;
   freeVortexKnots?:boolean;
   /** Additional native crosslinks through suitable interior gaps, up to this budget. */
   freeInfillPassages?:number;
@@ -138,6 +139,9 @@ export function validateParameters(p: Parameters): void {
   if(p.freeVortexHybridDeep&&!p.freeVortexHybrid)throw Error('Глубокий возврат требует межспиральный гибрид.');
   if(p.freeVortexHybrid!==undefined&&typeof p.freeVortexHybrid!=='boolean')throw Error('Некорректные межспиральные дворы.');
   if(p.freeVortexHybrid&&(!p.freeVortexContinuous||p.freeRoutePattern!=='vortex'||p.freeCavityMaze))throw Error('Межспиральные дворы требуют непрерывный вортекс без органического заполнения.');
+  if(p.freeVortexMultiBand!==undefined&&typeof p.freeVortexMultiBand!=='boolean')throw Error('Некорректный многополосный вортекс.');
+  if(p.freeVortexMultiBand&&!p.freeVortexContinuous)throw Error('Многополосный вортекс требует непрерывного профиля.');
+  if(p.freeVortexMultiBand&&p.freeVortexHybrid)throw Error('Многополосный вортекс и межспиральный гибрид — отдельные профили.');
   if(p.freeVortexContinuous!==undefined&&typeof p.freeVortexContinuous!=='boolean')throw Error('Некорректный непрерывный вортекс.');
   if(p.freeVortexContinuous&&(!p.freeVortexChaotic||p.freeVortexDeepRegions))throw Error('Непрерывный вортекс требует хаотичного пресета без вложенных районов.');
   if(p.freeVortexDeepRegions!==undefined&&typeof p.freeVortexDeepRegions!=='boolean')throw Error('Некорректные возвратные районы вортекса.');
