@@ -1,3 +1,4 @@
+import {generateDeepVortex} from './vortex-deep';
 import {carveContinuousVortex} from './vortex-continuous';
 import {continuousVortexStructure} from './vortex-continuous-structure';
 import {vortexDistrictStructure} from './vortex-district-structure';
@@ -20,6 +21,7 @@ import {freeGroundLengths,freeLayoutLengths,freeLengthLimits} from './path-limit
 /** Four interlaced Archimedean arms. Each step changes radius and heading;
  * crossroads connect real module faces across adjacent turns. */
 export function generateVortex(parameters:Parameters,previous?:Maze,progress?:(message:string)=>void):Maze {
+ if(parameters.freeVortexMultiBand)return generateDeepVortex(parameters,previous,progress);
  const target=parameters.freeModuleTarget??96,count=target/4;
  const onKnotProgress=(m:string)=>progress?.(m.replace('vortex-knot-entry','Входной перекрёсток').replace('vortex-knot-winding','Поворотный перекрёсток').replace('vortex-knot-braid','Боковой перекрёсток').replace('vortex-knot-return','Дальний перекрёсток').replace('vortex-knot-offset','Смещённый перекрёсток'));
  if(!Number.isInteger(count)||count<20)throw Error('Вортекс: число модулей — 80, 84, 88 и далее с шагом 4.');
