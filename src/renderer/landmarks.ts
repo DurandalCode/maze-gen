@@ -3,6 +3,7 @@ import { environmentOf, forestFrame, sunDirection } from '../core/environment';
 import type { Maze } from '../core/maze';
 import { random } from '../core/random';
 import { foliageAssets } from './foliage';
+import { exitTowerMesh } from './exit-tower';
 
 function sunHalo(): THREE.DataTexture {
   const size = 128, pixels = new Uint8Array(size*size*4);
@@ -86,7 +87,7 @@ export class WorldLandmarks {
     }));
     this.halo.name = 'sun-halo'; this.halo.renderOrder = -1;
     this.sun.add(this.disc, this.halo);
-    this.group.add(forestMesh(maze), this.sun);
+    this.group.add(forestMesh(maze), exitTowerMesh(maze), this.sun);
   }
 
   update(camera: THREE.PerspectiveCamera): void {

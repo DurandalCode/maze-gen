@@ -223,6 +223,7 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
       <span className="eyebrow">{inspection?'ОСМОТР СООРУЖЕНИЯ':'ПОЛЕВОЕ ИССЛЕДОВАНИЕ / 01'}</span>
       <h2>{inspection?'Посмотри снаружи.':stats.elapsed > 0 ? 'Продолжим путь?' : 'Найди свой выход.'}</h2>
       {inspection?<p>Обойди сооружение и осмотри каркас. Стены остаются препятствиями.<br />Осмотр не записывается как прохождение.</p>:<p>Вход {startNumber} → выход {finishNumber}. Найди выбранный выход.<br />После прохождения сравним твой путь с кратчайшим.</p>}
+      <p>Ориентир выхода — А-образная башня высотой 6 м. Крыша и стены могут закрывать её изнутри.</p>
       {touch ? <div className="key-guide touch-guide"><span>ЛЕВЫЙ · ходьба / бег</span><span>ПРАВЫЙ · обзор</span></div> : <div className="key-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> движение</span><span><kbd>⇧</kbd> быстрее</span><span>МЫШЬ · обзор</span></div>}
       <label className="walk-touch-choice"><input type="checkbox" checked={touch} onChange={event => { clearTouch(); setTouch(event.target.checked); }} /> Управление двумя джойстиками</label>
       <button className="primary" onClick={() => void lock()}>{inspection?'Начать осмотр':stats.elapsed > 0 ? 'Продолжить' : 'Начать прохождение'} <span>↗</span></button>
