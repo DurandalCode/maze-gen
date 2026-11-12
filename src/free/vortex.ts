@@ -1,3 +1,5 @@
+import{reserveHybridVortex,separateHybridBlindBranch,fitHybridTurningFrames}from'./vortex-hybrid-reservation';
+import{inspectHybridVortexDepth}from'./vortex-hybrid-depth';
 import{generateVortexHybrid}from'./vortex-hybrid';
 import {carveContinuousVortex} from './vortex-continuous';
 import {continuousVortexStructure} from './vortex-continuous-structure';
@@ -60,6 +62,8 @@ export function generateVortex(parameters:Parameters,previous?:Maze,progress?:(m
  const original=knotted||chaotic?structuredClone(layout):undefined;
  let mutable=central?carveCentralVortex(layout,width,parameters.corridorWidth):traps?carveVortexTraps(layout,width):undefined;
  if(chaotic){carveChaoticVortex(layout,original!,parameters.corridorWidth,random(parameters.seed+'|chaos-v1'),progress);mutable=new Set();}
+ const deepPool=parameters.freeVortexHybridDeep?structuredClone(layout):undefined;
+ if(deepPool)stabilizeVortexConnections(deepPool,parameters.corridorWidth,true);
  if(parameters.freeVortexContinuous)carveContinuousVortex(layout,parameters);
  if(parameters.freeVortexDeepRegions)deepenVortexRegions(layout,parameters.corridorWidth,progress);
  if(knotted)mutable=carveVortexKnots(layout,original!,parameters.corridorWidth,onKnotProgress,random(parameters.seed+'|knots-v1'));
@@ -77,6 +81,7 @@ export function generateVortex(parameters:Parameters,previous?:Maze,progress?:(m
  // Rotate the completed native structure, keeping seeded carving independent
  // of floating-point sorting ties introduced by a global orientation change.
  const rotation=rng()*Math.PI*2;for(const m of layout.modules){const x=m.x-cx,z=m.z-cz;m.x=parameters.columns/2+x*Math.cos(rotation)-z*Math.sin(rotation);m.z=parameters.rows/2+x*Math.sin(rotation)+z*Math.cos(rotation);m.angle+=rotation*180/Math.PI;}
+ if(deepPool)for(const m of deepPool.modules){const x=m.x-cx,z=m.z-cz;m.x=parameters.columns/2+x*Math.cos(rotation)-z*Math.sin(rotation);m.z=parameters.rows/2+x*Math.sin(rotation)+z*Math.cos(rotation);m.angle+=rotation*180/Math.PI;}
  if(layout.modules.some(m=>modulePolygon(m).some(p=>p.x<0||p.z<0||p.x>parameters.columns||p.z>parameters.rows)))throw Error('Вортекс не помещается на площадке. Для 96 модулей нужна площадка около 60×60 м.');
  if(central&&!selectOppositePortals(layout,layout.openings,width).length)throw Error('Ветви вышли за наружные опорные плоскости входа/выхода.');
  const draft:FreeDraft={kind:'maze-lab-free-draft',version:1,parameters:{...parameters},construction:{...(previous?{wallHeight:previous.wallHeight,wallColor:previous.wallColor,translucentFabric:previous.translucentFabric}:DEFAULT_CONSTRUCTION),roof:true},layout};
@@ -86,7 +91,16 @@ export function generateVortex(parameters:Parameters,previous?:Maze,progress?:(m
  if(knotted)progress?.('Вортекс: разнесённые перекрёстки готовы.');
  if(parameters.freeVortexDeepRegions&&vortexDistrictStructure(maze).some(d=>d.doorsAtFork!==2||d.containsEntrance||d.containsExit||d.independentInnerCycles<3||d.internalJunctions<6||d.deepestJunction<15))throw Error('Не подтверждена внутренняя глубина возвратных районов.');
  if(parameters.freeVortexContinuous){const report=continuousVortexStructure(maze);if(report.loops.some(l=>!l.allInteriorDegreesTwo||l.doorsAtFork!==2||l.deadEnds.length||l.internalJunctions||l.forkVisibleAfterTwoRoomsFromEitherDoor.some(Boolean))||report.realRouteFragments.filter(f=>f.length>=28&&f.turnsOver20>=10).length<3)throw Error('Не подтверждены чистые петли и сходный непрерывный правильный путь.');}
+ if(parameters.freeVortexHybridDeep){
+  progress?.('Резервируем три настоящих витка для чистого возврата.');
+  maze=fitHybridTurningFrames(separateHybridBlindBranch(reserveHybridVortex(maze,deepPool!)),deepPool!);
+ }
  if(parameters.freeVortexHybrid)maze=generateVortexHybrid(maze,progress);
+ if(parameters.freeVortexHybridDeep){
+  const depths=inspectHybridVortexDepth(maze,{x:parameters.columns/2,z:parameters.rows/2});
+  if(!depths.some(d=>d.qualifies&&d.pure&&d.inwardExcursion>=10-1e-7&&d.inwardBandConnections.length>=3))throw Error('Не подтверждён чистый возврат через три витка с заходом внутрь на10м.');
+  const final=freeGroundLengths(maze);if(final.straight>limits.straight+1e-7||final.run>limits.run+1e-7)throw Error('Глубокий гибрид превышает сохранённые физические пределы.');
+ }
  if(previous?.environment)maze.environment=structuredClone(previous.environment);return maze;
 }
 function connected(l:FreeLayout){const seen=new Set([l.modules[0]!.id]),queue=[l.modules[0]!.id];for(const at of queue)for(const c of l.connections){const to=c.a.room===at?c.b.room:c.b.room===at?c.a.room:undefined;if(to&&!seen.has(to)){seen.add(to);queue.push(to);}}return seen.size===l.modules.length;}
