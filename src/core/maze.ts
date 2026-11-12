@@ -40,6 +40,7 @@ export interface Parameters {
   freeVortexChaotic?:boolean;
   freeVortexDeepRegions?:boolean;
   freeVortexContinuous?:boolean;
+  freeVortexHybrid?:boolean;
   freeVortexKnots?:boolean;
   /** Additional native crosslinks through suitable interior gaps, up to this budget. */
   freeInfillPassages?:number;
@@ -129,6 +130,8 @@ export function validateParameters(p: Parameters): void {
   if(p.freeRequiredBridgeCount!==undefined&&(!Number.isInteger(p.freeRequiredBridgeCount)||p.freeRequiredBridgeCount<0||p.freeRequiredBridgeCount>(p.freeBridgeCount??0)))throw Error('Обязательных мостов должно быть от 0 до общего числа мостов.');
   if(p.freeModuleTarget!==undefined&&(!Number.isInteger(p.freeModuleTarget)||p.freeModuleTarget<8||p.freeModuleTarget>250))throw Error('Целевое число свободных модулей: от 8 до 250.');
   if(p.freeConnectionSpan!==undefined&&(!Number.isFinite(p.freeConnectionSpan)||p.freeConnectionSpan<1||p.freeConnectionSpan>3))throw Error('Пролёт свободного соединения должен быть от 1 до 3 м.');
+  if(p.freeVortexHybrid!==undefined&&typeof p.freeVortexHybrid!=='boolean')throw Error('Некорректные межспиральные дворы.');
+  if(p.freeVortexHybrid&&(!p.freeVortexContinuous||p.freeRoutePattern!=='vortex'||p.freeCavityMaze))throw Error('Межспиральные дворы требуют непрерывный вортекс без органического заполнения.');
   if(p.freeVortexContinuous!==undefined&&typeof p.freeVortexContinuous!=='boolean')throw Error('Некорректный непрерывный вортекс.');
   if(p.freeVortexContinuous&&(!p.freeVortexChaotic||p.freeVortexDeepRegions))throw Error('Непрерывный вортекс требует хаотичного пресета без вложенных районов.');
   if(p.freeVortexDeepRegions!==undefined&&typeof p.freeVortexDeepRegions!=='boolean')throw Error('Некорректные возвратные районы вортекса.');

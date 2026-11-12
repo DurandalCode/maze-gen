@@ -10,7 +10,7 @@ import {area,distance,edges,ends,segmentDistance,segmentInside,segment,pointIn,s
 const signed=(p:Point[])=>p.reduce((s,a,i)=>{const b=p[(i+1)%p.length]!;return s+a.x*b.z-b.x*a.z;},0);
 /** Existing connector floors become ordinary native polygon rooms, retaining
  * the same panels and supports, so a real side doorway can open into a void. */
-export function promoteCavityConnectors(d:FreeDraft){const l=d.layout,old=[...l.connections];l.connections=[];for(const c of old){const g=connectionGeometry(d.layout,c);if(distance(g.a.mid,g.b.mid)<1){l.connections.push(c);continue;}const id=`void-frame-${c.id}`;l.spaces.push({id,kind:'corridor',polygon:[g.a.from,g.b.to,g.b.from,g.a.to]});l.connections.push({id:c.id+'-a',a:c.a,b:{room:id,edge:3,offset:0},width:c.width},{id:c.id+'-b',a:{room:id,edge:1,offset:0},b:c.b,width:c.width});}}
+export function promoteCavityConnectors(d:FreeDraft,preserve:ReadonlySet<string>=new Set()){const l=d.layout,old=[...l.connections];l.connections=[];for(const c of old){if(preserve.has(c.id)){l.connections.push(c);continue;}const g=connectionGeometry(d.layout,c);if(distance(g.a.mid,g.b.mid)<1){l.connections.push(c);continue;}const id=`void-frame-${c.id}`;l.spaces.push({id,kind:'corridor',polygon:[g.a.from,g.b.to,g.b.from,g.a.to]});l.connections.push({id:c.id+'-a',a:c.a,b:{room:id,edge:3,offset:0},width:c.width},{id:c.id+'-b',a:{room:id,edge:1,offset:0},b:c.b,width:c.width});}}
 export interface VoidInfillResult{maze:Maze;filled:{area:number;center:Point;doors:number;id:string}[];attempts:number}
 /** Fill actual closed negative spaces in the existing organic floor boundary.
  * Their irregular outline is retained; surrounding floors/modules never move. */

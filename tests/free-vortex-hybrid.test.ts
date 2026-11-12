@@ -1,0 +1,27 @@
+import{beforeAll,expect,test}from'bun:test';
+import{generate}from'../src/generators/generate';
+import{hybridVortexParameters,chaoticVortexParameters,leaveContinuousVortex}from'../src/free/vortex-parameters';
+import{validateParameters,type Maze,walls}from'../src/core/maze';
+import{physical,freeRuntime,connectionGeometry}from'../src/free/layout';
+import{area,distance,ends}from'../src/free/geometry';
+import{cavityInventory}from'../src/free/cavity-inventory';
+import{auditModuleWalls}from'../src/free/module-origin';
+import{freeGroundLengths}from'../src/free/path-limits';
+import{vortexDistrictStructure}from'../src/free/vortex-district-structure';
+import{routeTraps}from'../src/analysis/route-traps';
+import{loopTraps}from'../src/analysis/loop-traps';
+import{serialize,deserialize}from'../src/persistence/maze-json';
+import{CollisionWorld}from'../src/simulation/collisions';
+import{supportColliders}from'../src/core/structure';
+const p=hybridVortexParameters({columns:70,rows:70,corridorWidth:2,moduleSize:2,seed:'vortex-chaotic-05',algorithm:'prim',extraConnections:0});let base:Maze,maze:Maze;
+beforeAll(()=>{base=generate({...p,freeVortexHybrid:false});maze=generate(p);},240000);
+test('only the explicit hybrid modifier enables bay growth and preserves the local run60 preset',()=>{expect(()=>validateParameters(p)).not.toThrow();expect(()=>validateParameters({...p,freeVortexContinuous:false})).toThrow();expect(()=>validateParameters({...p,freeCavityMaze:true})).toThrow();expect(p.design?.maxForcedRun).toBe(60);expect(chaoticVortexParameters(p).design?.maxForcedRun).toBe(16);expect(leaveContinuousVortex(p).freeVortexHybrid).toBe(false);expect(leaveContinuousVortex(p).design?.maxForcedRun).toBe(16);});
+test('three real negative-space sectors gain distributed modules and irregular through courtyards, not two strips',()=>{
+ const report=maze.free!.cavityReport!,bays=report.regions.filter(r=>r.status==='partial');expect(bays).toHaveLength(3);expect(bays.every(r=>r.cells>=5&&r.doors>=2)).toBe(true);expect(report.construction!.addedModules).toBeGreaterThanOrEqual(24);expect(report.construction!.openedCourtyards).toBeGreaterThanOrEqual(6);expect(report.filledArea).toBeGreaterThan(350);
+ const floor=(m:Maze)=>physical(m.free!).polygons.reduce((s,p)=>s+area(p),0);expect(floor(maze)-floor(base)).toBeCloseTo(report.filledArea,6);expect(report.filledArea+report.blockedArea+report.outsideArea).toBeCloseTo(cavityInventory(base).negativeArea,6);
+ for(const old of base.free!.modules)expect(maze.free!.modules.find(m=>m.id===old.id)).toEqual(old);
+ for(const old of base.free!.connections)expect(maze.free!.connections.find(c=>c.id===old.id)).toEqual(old);
+ expect(maze.free!.spaces.filter(s=>s.kind==='hall').every(s=>s.polygon.length>4&&area(s.polygon)<=24)).toBe(true);expect(auditModuleWalls(maze.free!).issues).toEqual([]);expect(maze.free!.modules.every(m=>!m.frameOnly&&(m.type==='2x2'||m.type==='2x6'))).toBe(true);expect(maze.free!.preservedPanels).toBeUndefined();expect(maze.free!.supports).toBeUndefined();
+});
+test('clean K components and both actual trap qualifications survive the hybrid floor',()=>{expect(routeTraps(maze).qualifiedCount).toBeGreaterThanOrEqual(2);expect(loopTraps(maze).qualifiedCount).toBe(2);const r=freeRuntime(maze);for(const [i,d]of vortexDistrictStructure(maze).entries()){expect(d.members).toEqual(vortexDistrictStructure(base)[i]!.members);expect(d.doorsAtFork).toBe(2);expect(d.deadEnds).toEqual([]);expect(d.internalJunctions).toBe(0);expect(d.members.every(id=>r.passages[r.rooms.findIndex(q=>q.id===id)]!.length===2)).toBe(true);}expect(freeGroundLengths(maze).straight).toBeLessThanOrEqual(8+1e-7);expect(freeGroundLengths(maze).run).toBeLessThanOrEqual(60+1e-7);});
+test('all actual capsule paths clear real walls and posts; supported spans and native JSON remain valid',()=>{const r=freeRuntime(maze),world=new CollisionWorld([...walls(maze),...supportColliders(maze)]);for(const path of [...r.edgePaths.values(),...r.portalPaths.values()])for(let i=1;i<path.length;i++){const a=path[i-1]!,b=path[i]!;expect(distance(world.move(a,{x:b.x-a.x,z:b.z-a.z}),b)).toBeLessThan(1e-5);}for(const c of maze.free!.moduleConstruction!.spans)for(const wall of connectionGeometry(maze.free!,c).sides)expect(distance(...ends(wall))).toBeLessThanOrEqual(3+1e-7);expect(serialize(deserialize(serialize(maze)))).toBe(serialize(maze));expect(maze.roof).toBe(true);},30000);

@@ -1,0 +1,7 @@
+import{mkdir}from'node:fs/promises';
+import{chromium}from'playwright';
+import{resolve}from'node:path';
+if(!process.env.MAZE_GEOMETRY_ID)throw Error('Set MAZE_GEOMETRY_ID');
+await mkdir(process.env.VORTEX_OUTPUT_DIR??'test-results',{recursive:true});
+const browser=await chromium.launch({executablePath:process.env.MAZE_BROWSER??'/Applications/Yandex.app/Contents/MacOS/Yandex',headless:true,args:['--enable-unsafe-swiftshader']}),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+try{await page.goto('http://127.0.0.1:1424/?maze='+process.env.MAZE_GEOMETRY_ID,{waitUntil:'domcontentloaded'});await page.getByLabel('Количество модулей',{exact:true}).getByText('100',{exact:true}).waitFor({timeout:60000});const toggle=page.getByLabel('Ловушки на карте',{exact:true});await toggle.waitFor();const start=performance.now();await toggle.check();await page.getByLabel('Выбрать ловушку',{exact:true}).waitFor();const seconds=(performance.now()-start)/1000,labels=await page.getByLabel('Выбрать ловушку',{exact:true}).locator('option').allTextContents();if(!['Л1','Л2','К1','К2'].every(k=>labels.includes(k)))throw Error('Overlay lost its qualified traps');if(errors.length)throw Error(errors.join('\n'));await page.screenshot({path:resolve(process.env.VORTEX_OUTPUT_DIR??'test-results','vortex-hybrid-fast-overlay.png'),fullPage:true});console.log(JSON.stringify({overlaySeconds:seconds,labels,errors}));}finally{await browser.close();}
