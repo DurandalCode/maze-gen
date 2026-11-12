@@ -8,19 +8,19 @@ import {bridgeGeometry} from './bridges';
 import {pathLength} from '../core/pathfinding';
 /** Actual doorway-to-doorway paths, including bends around physical screens.
  * The explicit bridge experiment measures continuous ground stretches separately. */
-export function freeGroundLengths(maze:Maze){
+export function freeGroundLengths(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'){
  const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];
- return {...measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)}))),bridges:(maze.free!.bridges??[]).map(b=>({id:b.id,length:pathLength(bridgeGeometry(maze.free!,b).path)}))};
+ return {...measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,undefined,normalizedConnectors(maze,normalized)),bridges:(maze.free!.bridges??[]).map(b=>({id:b.id,length:pathLength(bridgeGeometry(maze.free!,b).path)}))};
 }
 /** Longest actual directed corridor witness for constructive repair. */
-export function freeGroundRunWitness(maze:Maze){
+export function freeGroundRunWitness(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'){
  const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];let best={length:0,rooms:[] as string[],points:[] as Point[]};
- measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(length,chain,points)=>{if(length>best.length)best={length,rooms:chain.map(i=>r.rooms[i]!.id),points};});return best;
+ measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(length,chain,points)=>{if(length>best.length)best={length,rooms:chain.map(i=>r.rooms[i]!.id),points};},normalizedConnectors(maze,normalized));return best;
 }
 /** Directed chain containing the longest physical straight ground segment. */
-export function freeGroundStraightWitness(maze:Maze){
+export function freeGroundStraightWitness(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'){
  const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];let best={length:0,rooms:[] as string[],points:[] as Point[]};
- measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(_length,chain,points,straight)=>{if(straight>best.length)best={length:straight,rooms:chain.map(i=>r.rooms[i]!.id),points};});return best;
+ measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(_length,chain,points,straight)=>{if(straight>best.length)best={length:straight,rooms:chain.map(i=>r.rooms[i]!.id),points};},normalizedConnectors(maze,normalized));return best;
 }
 /** Geometry-only growth guard: no simulation, whole-maze navigation or scoring.
  * Only chains changed by the new leaf need checking; final portals are checked later. */
@@ -50,14 +50,14 @@ export function freeLengthLimits(p:Parameters){
  const value=(key:'maxForcedStraight'|'maxForcedRun',fallback:number)=>p.design?.disabledLimits?.includes(key)?Infinity:p.design?.[key]??fallback;
  return {straight:value('maxForcedStraight',8),run:value('maxForcedRun',16)};
 }
-function measure(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'centers'|'passages'|'obstacles'> & {links:{a:number;b:number;points:Point[]}[]},portals:{cell:number;point:Point}[],onlyStart?:number,witness?:(length:number,chain:number[],points:Point[],straight:number)=>void){
+function measure(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'centers'|'passages'|'obstacles'> & {links:{a:number;b:number;points:Point[]}[]},portals:{cell:number;point:Point}[],onlyStart?:number,witness?:(length:number,chain:number[],points:Point[],straight:number)=>void,transparent?:ReadonlySet<number>){
  let straight=0,run=0;
  const terminalRooms=new Set(portals.map(p=>p.cell));
  const cached=new Map<string,Point[]|null>();
  const inside=(room:number,a:Point,b:Point)=>{const key=[room,a.x,a.z,b.x,b.z].join(':');if(!cached.has(key))cached.set(key,localRoute(a,b,r.rooms[room]!.polygon,r.rooms[room]!.holes,r.obstacles));return cached.get(key);};
  for(let a=0;a<r.rooms.length;a++)if(onlyStart===undefined||a===onlyStart)for(const b of r.passages[a]!){
   const chain=[a,b],seen=new Set([a]);let at=b,previous=a;
-  while(!seen.has(at)){const next=continuation(r,at,previous,terminalRooms);if(next===undefined)break;seen.add(at);chain.push(next);previous=at;at=next;}
+  while(!seen.has(at)){const next=continuation(r,at,previous,terminalRooms,transparent);if(next===undefined)break;seen.add(at);chain.push(next);previous=at;at=next;}
   const start=portals.find(p=>p.cell===a),end=portals.find(p=>p.cell===at),points:Point[]=[start?start.point:r.centers[a]!];
   for(let i=1;i<chain.length;i++){
    const from=chain[i-1]!,to=chain[i]!,link=r.links.find(e=>e.a===from&&e.b===to||e.b===from&&e.a===to)!;
@@ -82,15 +82,33 @@ function measure(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'centers'|'passag
  * Keep measuring through its junction instead of letting decorative buds hide
  * a long main corridor. Real portal terminals, longer branches and loops
  * remain genuine choices. */
-function continuation(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'passages'>,at:number,previous:number,terminalRooms:ReadonlySet<number>):number|undefined {
+function continuation(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'passages'>,at:number,previous:number,terminalRooms:ReadonlySet<number>,transparent?:ReadonlySet<number>):number|undefined {
  if(terminalRooms.has(at))return undefined;
  const ns=r.passages[at]!;
  if(ns.length===2)return ns.find(n=>n!==previous);
  if(ns.length<3)return undefined;
  const onward=ns.filter(n=>n!==previous).filter(n=>{
+  if(transparent){
+   const seen=new Set([at]);let current=n,small=0;
+   while(!seen.has(current)){
+    seen.add(current);if(terminalRooms.has(current))return true;
+    const poly=r.rooms[current]!.polygon;
+    if(!transparent.has(current)){if(poly.some(a=>poly.some(b=>Math.hypot(a.x-b.x,a.z-b.z)>3.01)))return true;if(++small>=2)return true;}
+    const onward=r.passages[current]!.filter(v=>!seen.has(v));
+    if(onward.length===0)return false;if(onward.length>1)return true;current=onward[0]!;
+   }
+   return true;
+  }
   if(terminalRooms.has(n)||r.passages[n]!.length!==1)return true;
   const poly=r.rooms[n]!.polygon;
   return poly.some(a=>poly.some(b=>Math.hypot(a.x-b.x,a.z-b.z)>3.01));
  });
  return onward.length===1?onward[0]:undefined;
+}
+
+/** Versioned construction guard: promotion of a native span adds no room choice. */
+function normalizedConnectors(maze:Maze,enabled:boolean):ReadonlySet<number>|undefined{
+ if(!enabled)return undefined;
+ const spans=new Set(maze.free!.moduleConstruction?.spans.map(c=>'void-frame-'+c.id)??[]);
+ return new Set(freeRuntime(maze).rooms.flatMap((r,i)=>spans.has(r.id)?[i]:[]));
 }

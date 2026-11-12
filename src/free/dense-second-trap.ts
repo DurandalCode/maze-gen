@@ -1,3 +1,4 @@
+import {organicDenseSector} from './organic-dense-sector';
 import {denseTwoRowVariants} from './dense-two-row-layout';
 import type {Maze} from '../core/maze';
 import type {Anchor,FreeConnection,FreeDraft,FreeModule} from './model';
@@ -26,7 +27,7 @@ interface Site {root:string;anchor:Anchor;tail:string;join:Anchor;side:number}
 /** Locate a later route fork and its neighbouring deep arm. The far arm frame
  * can be sectioned into real modules: one remains a false end, while the other
  * sections join a different sector through an existing supported boundary. */
-function sites(source:Maze){
+export function denseTrapSites(source:Maze){
  const r=freeRuntime(source),route=shortestPath(source),onRoute=new Set(route),result:Site[]=[],width=1.4;
  const used=[...source.free!.connections.flatMap(c=>[{...c.a,width:c.width},{...c.b,width:c.width}]),...source.free!.openings];
  for(let i=1;i<route.length-2;i++){
@@ -51,11 +52,12 @@ function sites(source:Maze){
  * that loop; this intermediate body is never saved or returned by the UI. */
 export function generateSecondDenseTrap(source:Maze,onProgress?:(s:string)=>void,returnLoopReady=false):Maze{
  const sourceModules=source.free!.modules,baseline=sourceModules.filter(m=>!m.id.startsWith('route-arm-')),width=Math.min(1.4,source.parameters.corridorWidth);let hash=2166136261;for(const c of source.parameters.seed)hash=Math.imul(hash^c.charCodeAt(0),16777619);const prefix='dense-apex-'+(hash>>>0).toString(16),failures=new Set<string>();let finalChecks=0;
- for(const site of sites(source).slice(0,4)){
-  const base=mazeDraft(source),parts=squareFrameAssembly(base,site.tail,prefix+'-tail');
+ for(const site of denseTrapSites(source).slice(0,4)){
+  const base=mazeDraft(source),parts=squareFrameAssembly(base,site.tail,source.parameters.freePassagePattern==='organic-sectors-v1'?'organic-sector-tail':prefix+'-tail');
   append(base,{id:prefix+'-tail-door',a:{room:parts[1]!.id,edge:1,offset:0},b:{room:parts[2]!.id,edge:3,offset:0},width});
   append(base,{id:prefix+'-sector-door',a:{room:parts[1]!.id,edge:site.side,offset:0},b:site.join,width});
   if(validateFree(base,false).length)continue;
+  if(source.parameters.freePassagePattern==='organic-sectors-v1')return organicDenseSector(source,base,site.anchor,{room:parts[2]!.id,edge:1,offset:0},onProgress);
   const originalFloor=physical(base.layout).polygons;
   for(const offset of [1,0,2,-1,-2])for(const span of [3,2.5,2,1.5,1,.75,.5])for(const bend of (returnLoopReady?[0]:[-30,-15,0,15])){
    const draft=structuredClone(base);let from={...site.anchor,offset},bad=false;

@@ -9,9 +9,9 @@ import {CollisionWorld} from '../simulation/collisions';
 import {freeGroundLengths} from './path-limits';
 export interface CavityModuleGrowth {draft:FreeDraft;addedModules:number;addedConnections:number;loops:number;reason:string}
 interface Slot{anchor:Anchor;point:Point;normal:Point;degree:number}
-interface Node{draft:FreeDraft;root:string;last:string;count:number;score:number}
+interface Node{draft:FreeDraft;root:string;last:string;count:number;score:number;peak?:number;centerPeak?:number}
 /** Native modules only. A failed search leaves the source draft untouched. */
-export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,budget:number,onProgress?:(s:string)=>void,options?:{root?:string;target?:string;deferLengthCheck?:boolean;minimumExitDistance?:number;exitPoint?:Point;minimumNewModules?:number;acceptCandidate?:(draft:FreeDraft)=>boolean;maxDepth?:number;diverse?:boolean;targetAnchors?:Anchor[];lateral?:boolean}):CavityModuleGrowth{
+export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,budget:number,onProgress?:(s:string)=>void,options?:{root?:string;target?:string;deferLengthCheck?:boolean;minimumExitDistance?:number;exitPoint?:Point;minimumNewModules?:number;acceptCandidate?:(draft:FreeDraft)=>boolean;maxDepth?:number;diverse?:boolean;rootAnchors?:Anchor[];targetAnchors?:Anchor[];lateral?:boolean;maximumSpanFirst?:boolean;retainExcursion?:boolean;targetApproachDistance?:number;physicalExcursion?:boolean;throughRoutes?:boolean;minimumGraphSeparation?:number}):CavityModuleGrowth{
  const fail=(reason:string):CavityModuleGrowth=>({draft:source,addedModules:0,addedConnections:0,loops:0,reason});
  const depthLimit=Math.min(options?.maxDepth??4,Math.max(0,Math.floor(budget)));
  if(!depthLimit||!Number.isFinite(budget))return fail('Нет бюджета на полноценный модуль.');
@@ -44,8 +44,8 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
  const adjacency=new Map<string,string[]>();for(const c of source.layout.connections){adjacency.set(c.a.room,[...adjacency.get(c.a.room)??[],c.b.room]);adjacency.set(c.b.room,[...adjacency.get(c.b.room)??[],c.a.room]);}
  const distances=new Map<string,Map<string,number>>();
  const apart=(a:string,b:string)=>{if(!distances.has(a)){const d=new Map([[a,0]]),q=[a];for(const at of q)for(const next of adjacency.get(at)??[])if(!d.has(next)){d.set(next,d.get(at)!+1);q.push(next);}distances.set(a,d);}return distances.get(a)!.get(b)??0;};
- const targets=(root:string)=>oldSlots.filter(s=>apart(root,s.anchor.room)>=(options?.root&&options.target?(options.minimumNewModules??0)>=6?1:(options.minimumNewModules??0)>=4?2:3:3)&&(!options?.target||s.anchor.room===options.target)&&(!options?.targetAnchors||options.targetAnchors.some(a=>a.room===s.anchor.room&&a.edge===s.anchor.edge&&Math.abs(a.offset-s.anchor.offset)<1e-6)));
- const roots=oldSlots.filter(s=>(!options?.root||s.anchor.room===options.root)&&targets(s.anchor.room).length).sort((a,b)=>{
+ const targets=(root:string)=>oldSlots.filter(s=>apart(root,s.anchor.room)>=(options?.minimumGraphSeparation??(options?.root&&options.target?(options.minimumNewModules??0)>=6?1:(options.minimumNewModules??0)>=4?2:3:3))&&(!options?.target||s.anchor.room===options.target)&&(!options?.targetAnchors||options.targetAnchors.some(a=>a.room===s.anchor.room&&a.edge===s.anchor.edge&&Math.abs(a.offset-s.anchor.offset)<1e-6)));
+ const roots=oldSlots.filter(s=>(!options?.root||s.anchor.room===options.root)&&(!options?.rootAnchors||options.rootAnchors.some(a=>a.room===s.anchor.room&&a.edge===s.anchor.edge&&Math.abs(a.offset-s.anchor.offset)<1e-6))&&targets(s.anchor.room).length).sort((a,b)=>{
   const score=(s:Slot)=>Math.min(...targets(s.anchor.room).map(t=>distance(s.point,t.point)));
   return Number(b.degree>=2)-Number(a.degree>=2)||score(a)-score(b);
  });
@@ -71,7 +71,7 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
    const connection={id:id(),a:a.anchor,b:b.anchor,width},g=connectionGeometry(node.draft.layout,connection),longest=Math.max(...g.sides.map(w=>distance(...ends(w))));
    if(longest>3+1e-7||!within(g.polygon))continue;
    if(node.count<(options?.minimumNewModules??0))continue;
-   if(options?.minimumExitDistance&&options.exitPoint&&!node.draft.layout.modules.some(m=>!source.layout.modules.some(old=>old.id===m.id)&&distance(m,options.exitPoint!)>=options.minimumExitDistance!))continue;
+   if(options?.minimumExitDistance&&options.exitPoint&&(!node.draft.layout.modules.some(m=>!source.layout.modules.some(old=>old.id===m.id)&&distance(m,options.exitPoint!)>=options.minimumExitDistance!)||options.physicalExcursion&&Math.max(node.peak??0,distance(g.a.mid,options.exitPoint),distance(g.b.mid,options.exitPoint))<options.minimumExitDistance))continue;
    const next=structuredClone(node.draft);next.layout.connections.push({...connection,spanAudit:{desired:3,actual:longest,...(longest<3-1e-6?{reason:'Замыкание между фиксированными модульными проёмами полости.'}:{})}});
    if(completeChecks>=12){exhausted=true;return {lengthRejected};}
    completeChecks++;const issue=complete(next);if(issue.reason){reasons.add(issue.reason);lengthRejected ||= issue.length;continue;}
@@ -85,13 +85,16 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
  for(let depth=0;depth<depthLimit&&!exhausted;depth++){
   const nextFrontier:Node[]=[];let depthChecks=0,depthGeometry=0;
   placements:for(const node of frontier){
-   const from=depth===0?roots.filter(s=>s.anchor.room===node.root):shuffle(slots(node.draft.layout,node.last),rng);
-   starts:for(const start of from){let perStart=0;for(const type of shuffle(['2x2','2x6'] as const,rng))for(const incoming of (type==='2x2'?[Math.floor(rng()*4)]:shuffle([2*Math.floor(rng()*2),1+2*Math.floor(rng()*2)],rng)))for(const bend of shuffle([0,-15,15,-30,30],rng)){
+   const incomingEdges=options?.throughRoutes&&!source.layout.modules.some(m=>m.id===node.last)?node.draft.layout.connections.flatMap(c=>c.a.room===node.last?[c.a.edge]:c.b.room===node.last?[c.b.edge]:[]):[];
+   const from=(depth===0?roots.filter(s=>s.anchor.room===node.root):shuffle(slots(node.draft.layout,node.last),rng)).filter(s=>!incomingEdges.includes(s.anchor.edge));
+   starts:for(const start of from){let perStart=0,perStartRaw=0;for(const type of shuffle(['2x2','2x6'] as const,rng))for(const incoming of (type==='2x2'?[Math.floor(rng()*4)]:shuffle([2*Math.floor(rng()*2),1+2*Math.floor(rng()*2)],rng)))for(const bend of shuffle([0,-15,15,-30,30],rng)){
     if(options?.diverse&&perStart>=12)continue starts;
     if(exhausted||depthChecks>=512||depthGeometry>=(focused?96:48))break placements;
     const a=anchorGeometry(node.draft.layout,start.anchor,width),normals=[-90,0,90,180],angle=((Math.atan2(-a.normal.z,-a.normal.x)*180/Math.PI+bend-normals[incoming]!)%360+360)%360;
     const module:FreeModule={id:id(),type,x:0,z:0,angle},anchor={room:module.id,edge:incoming,offset:0},gate=anchorGeometry({...emptyLayout(),modules:[module]},anchor,width);
-    for(const lateral of (options?.lateral?[0,-.8,.8,-1.6,1.6,-2.2,2.2]:[0]))for(const span of [3,2.5,2,1.5,1]){
+    const laterals=options?.lateral?[0,-.8,.8,-1.6,1.6,-2.2,2.2]:[0],spans=[3,2.5,2,1.5,1],placements=options?.maximumSpanFirst?spans.flatMap(span=>laterals.map(lateral=>({span,lateral}))):laterals.flatMap(lateral=>spans.map(span=>({span,lateral})));
+    for(const {span,lateral}of placements){
+     if(options?.maximumSpanFirst&&perStartRaw++>=48)continue starts;
      if(exhausted||depthChecks++>=512||depthGeometry>=(focused?96:48))break placements;rawChecks++;
      const tangent={x:-a.normal.z*lateral,z:a.normal.x*lateral},shifted={...gate,from:{x:gate.from.x+tangent.x,z:gate.from.z+tangent.z},to:{x:gate.to.x+tangent.x,z:gate.to.z+tangent.z}},gap=maximumConnectionGap(a,shifted,span);if(gap<.15)continue;
      module.x=a.mid.x+a.normal.x*gap+tangent.x-gate.mid.x;module.z=a.mid.z+a.normal.z*gap+tangent.z-gate.mid.z;
@@ -101,7 +104,7 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
      if(focused){let floor=focusedFloor.get(node.draft.layout);if(!floor){floor=physical(node.draft.layout).polygons;focusedFloor.set(node.draft.layout,floor);}if(floor.some(p=>overlap(modulePolygon(module),p)||overlap(g.polygon,p)))continue;const widths=[segmentDistance(g.a.from,g.sides[0]!),segmentDistance(g.a.to,g.sides[1]!),segmentDistance(g.b.from,g.sides[1]!),segmentDistance(g.b.to,g.sides[0]!)];if(Math.min(...widths)<1-1e-7)continue;}
      const next=structuredClone(node.draft);next.layout.modules.push(structuredClone(module));next.layout.connections.push({...connection,spanAudit:{desired:3,actual:span,...(span<3?{reason:'Ограничение геометрией полости и модульного замыкания.'}:{})}});
      geometryChecks++;depthGeometry++;perStart++;const issues=focused?[]:validateFree(next,false);if(issues.length){reasons.add(issues[0]!.message);continue;}
-     const score=Math.min(...targets(node.root).map(t=>distance(t.point,module)))-(options?.minimumExitDistance&&options.exitPoint?Math.min(options.minimumExitDistance,distance(module,options.exitPoint))*2:0),candidate:Node={draft:next,root:node.root,last:module.id,count:node.count+1,score};
+     const centerDistance=options?.exitPoint?distance(module,options.exitPoint):0,excursion=options?.exitPoint?(options.physicalExcursion?Math.max(distance(g.a.mid,options.exitPoint),distance(g.b.mid,options.exitPoint)):centerDistance):0,peak=Math.max(node.peak??0,excursion),centerPeak=Math.max(node.centerPeak??0,centerDistance),completedPeak=options?.physicalExcursion?Math.min(peak,centerPeak):peak,targetDistance=Math.min(...targets(node.root).map(t=>distance({x:t.point.x+t.normal.x*(options?.targetApproachDistance??0),z:t.point.z+t.normal.z*(options?.targetApproachDistance??0)},module))),score=options?.retainExcursion&&options.minimumExitDistance&&options.exitPoint?(completedPeak>=options.minimumExitDistance?targetDistance-1000:targetDistance*.25+Math.max(0,peak<options.minimumExitDistance?options.minimumExitDistance-excursion:0,centerPeak<options.minimumExitDistance?options.minimumExitDistance-centerDistance:0)*4):targetDistance-(options?.minimumExitDistance&&options.exitPoint?Math.min(options.minimumExitDistance,distance(module,options.exitPoint))*2:0),candidate:Node={draft:next,root:node.root,last:module.id,count:node.count+1,score,...(options?.retainExcursion?{peak,centerPeak}:{})};
      const closure=close(candidate);if(closure.result)return closure.result;
      // A too-long closure calls for another topological contact, never a
      // smaller spacing of the same candidate.

@@ -9,6 +9,7 @@ import {auditModuleWalls} from './module-origin';
 /** Compose the requested gameplay features before the public length/quality
  * acceptance. Intermediate detours never replace the user's current map. */
 export function generateDenseGameplay(source:Maze,parameters:Parameters,onProgress?:(s:string)=>void):Maze{
+ if(parameters.freePassagePattern==='organic-sectors-v1'&&(parameters.loopTrapCount??0)>0)throw Error('Органические межсекторные связи пока поддерживают маршрутные Л без обязательного возвратного К. Для прежнего К сохранён отдельный двухрядный вариант.');
  let maze=generateDenseTraps(source,1,onProgress);
  if((parameters.routeTrapCount??0)>=2)maze=generateSecondDenseTrap(maze,onProgress,(parameters.loopTrapCount??0)>0);
  if((parameters.loopTrapCount??0)>0){
