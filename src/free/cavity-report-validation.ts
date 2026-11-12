@@ -1,0 +1,10 @@
+const record=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
+const finite=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
+const fields=(v:unknown,keys:string[])=>record(v)&&keys.every(k=>finite(v[k]));
+export function validSpanAudit(v:unknown):boolean{return record(v)&&finite(v.desired)&&finite(v.actual)&&(v.reason===undefined||typeof v.reason==='string'&&v.reason.length<=2000);}
+export function validCavityReport(v:unknown):boolean{
+ if(!record(v)||typeof v.seed!=='string'||!fields(v,['filledArea','blockedArea','outsideArea'])||!Array.isArray(v.regions)||v.regions.length>10000||v.regions.some(r=>!record(r)||typeof r.id!=='string'||typeof r.reason!=='string'||r.reason.length>3000||typeof r.status!=='string'||!fields(r,['area','filledArea','blockedArea','cells','doors'])))return false;
+ if(v.construction!==undefined&&!fields(v.construction,['baseModules','addedModules','openedCourtyards','certifiedWalls']))return false;
+ if(v.baseGeometry!==undefined){const b=v.baseGeometry;if(!record(b)||!fields(b,['modules','axisSpan','axisDirections','longestSide'])||!fields(b.connectionBend,['min','mean','max'])||!fields(b.gap,['min','mean','max','deviation']))return false;if(b.spanAudit!==undefined){const a=b.spanAudit;if(!record(a)||!fields(a,['audited','atMaximum'])||(a.atMaximum as number)>(a.audited as number)||!Array.isArray(a.fallbacks)||a.fallbacks.length>20000||a.fallbacks.some(f=>!validSpanAudit(f)||!record(f)||typeof f.connection!=='string'||f.connection.length>100))return false;}}
+ return true;
+}

@@ -1,3 +1,4 @@
+import {maximumSpacingParameters} from './maximum-settings';
 import {bridgeGeometry} from './bridges';
 import { EnvironmentControls } from '../ui/environment-controls';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type PointerEvent } from 'react';
@@ -48,6 +49,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
   const mutate = (f: (draft: FreeDraft) => void) => {
     const next = structuredClone(d);
     f(next);
+    if(JSON.stringify(next.layout)!==JSON.stringify(d.layout))delete next.layout.cavityReport;
     update(next);
   };
   useEffect(() => {
@@ -179,7 +181,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
     setPreview(next);
   };
   const up = () => {
-    if (drag.current && preview) update(preview);
+    if (drag.current && preview) {const next=structuredClone(preview);delete next.layout.cavityReport;update(next);}
     drag.current = null;
     setPreview(null);
   };
@@ -280,9 +282,16 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
   const anchorOptions = (value: Anchor, onChange: (a: Anchor) => void) => <><label className="field">Пространство<select aria-label="Пространство" value={value.room} onChange={e => onChange({ ...value, room: e.target.value, edge: 0, offset: 0 })}>{rooms(l).map(r => <option key={r.id} value={r.id}>{r.id}</option>)}</select></label>{numberField('Сторона', value.edge, v => onChange({ ...value, edge: v }), 1, 0, (rooms(l).find(r => r.id === value.room)?.polygon.length ?? 4) - 1)}{numberField('Смещение проёма, м', value.offset, v => onChange({ ...value, offset: v }))}</>;
   if (walk) return <main className="walk-main"><WalkCanvas maze={walk} inspection={inspection} onCancel={onWalkCancel} onError={onWalkError} onCheckpoint={onWalkCheckpoint} onEnd={onWalkEnd}/></main>;
   return <div className="free-app"><header className="topbar"><div className="brand"><strong>MAZE <span>LAB</span></strong></div><label className="route-toggle"><input type="checkbox" role="switch" aria-label="Редактор свободного размещения" checked onChange={()=>onClose(d,ready,result)}/> Редактор свободного размещения</label><span>Черновик сохраняется на устройстве</span></header><aside className="free-sidebar"><h2>Свободное размещение</h2><label className="field">Тип лабиринта<select aria-label="Тип лабиринта" value={d.parameters.generationType ?? 'classical'} onChange={e => mutate(n => n.parameters.generationType = e.target.value as Parameters['generationType'])}><option value="classical">Классический</option><option value="living">Живой</option><option value="corridor">Коридорный</option></select></label><label className="field">Алгоритм<select value={d.parameters.algorithm} onChange={e => mutate(n => n.parameters.algorithm = e.target.value as Parameters['algorithm'])}><option value="backtracker">Recursive Backtracker</option><option value="prim">Randomized Prim</option></select></label>
+    <label className="field">Рисунок свободной планировки<select aria-label="Рисунок свободной планировки" value={d.parameters.freeRoutePattern??'organic'} onChange={e=>{const pattern=e.target.value as 'organic'|'switchbacks';mutate(n=>{n.parameters.freeRoutePattern=pattern;if(pattern==='switchbacks'){n.parameters.extraConnections=Math.max(n.parameters.extraConnections,2);n.parameters.freeJunctionDegree=3;}});}}><option value="organic">Органический рост</option><option value="switchbacks">Переплетённый маршрут</option></select><small>Переплетённый маршрут: каркас из 89 модулей с кольцами и длинными боковыми ветвями; рост до заданной цели. Начните с 90 модулей, площадки 100×100 м и пролёта 3 м. Не менее двух дополнительных соединений, без зон и мостов.</small></label>
+    <label className="field">Модулей при генерации, цель<input aria-label="Модулей при генерации, цель" type="number" min={8} max={250} step={1} value={d.parameters.freeModuleTarget??''} placeholder="Автоматически" onChange={e=>{const value=e.target.value===''?undefined:e.target.valueAsNumber;mutate(n=>n.parameters.freeModuleTarget=value);}}/></label>
+    <label><input type="checkbox" checked={d.parameters.freeSpanPolicy==='maximum'} onChange={e=>mutate(n=>{n.parameters=maximumSpacingParameters(n.parameters,e.target.checked);})}/> Стремиться к максимальному разнесению</label><p>Для новой генерации сначала проверяется целевой пролёт. Уменьшение — только из-за геометрии; включение задаёт 8/16 м. Загруженные параметры сами не меняются.</p>
+    <label className="field">Пролёт соединения, м<input aria-label="Пролёт соединения, м" type="number" min={1} max={3} step={0.1} value={d.parameters.freeConnectionSpan??''} placeholder="Автоматически" onChange={e=>{const value=e.target.value===''?undefined:e.target.valueAsNumber;mutate(n=>n.parameters.freeConnectionSpan=value);}}/><small>Длина самой длинной стороны соединения. Пустое поле — автоматический выбор.</small></label>
+    {numberField('До связей в промежутках',d.parameters.freeInfillPassages??0,v=>mutate(n=>n.parameters.freeInfillPassages=v),1,0,12)}<p>Добавляются к базовым циклам, только где помещаются. 0 — выключено. Для свободной одноэтажной планировки без мостов.</p>
     <label className="field">Зоны<select aria-label="Зоны" value={d.parameters.freeZoneCount??0} onChange={e=>{const count=Number(e.target.value);mutate(n=>{n.parameters.freeZoneCount=count;n.parameters.freeIslandCount=count;n.parameters.extraConnections=Math.max(n.parameters.extraConnections,count+(n.parameters.freeBridgeCount??0));});}}>{[0,2,3,4,5].map(n=><option key={n} value={n}>{n||'Без зон'}</option>)}</select></label>
     {!!d.parameters.freeZoneCount&&numberField('Островов, не менее',d.parameters.freeIslandCount??d.parameters.freeZoneCount,v=>mutate(n=>{n.parameters.freeIslandCount=v;if(Number.isFinite(v))n.parameters.extraConnections=Math.max(n.parameters.extraConnections,v+(n.parameters.freeBridgeCount??0));}),1,0,d.parameters.freeZoneCount)}<p>Три зоны и два моста: рекомендуемая исходная площадка 60×50 м. Настройки применяются при генерации; текущая конструкция остаётся редактируемой.</p>
-    {numberField('Крытые мосты',d.parameters.freeBridgeCount??0,v=>mutate(n=>{n.parameters.freeBridgeCount=v;n.parameters.extraConnections=Math.max(n.parameters.extraConnections,v+(n.parameters.freeIslandCount??n.parameters.freeZoneCount??0));}),1,0,2)}<p>Мост проходит над нижним маршрутом. Две лестницы занимают отдельное место; каждый мост входит в число дополнительных соединений.</p>
+    {numberField('Крытые мосты',d.parameters.freeBridgeCount??0,v=>mutate(n=>{n.parameters.freeBridgeCount=v;n.parameters.extraConnections=Math.max(n.parameters.extraConnections,v+(n.parameters.freeIslandCount??n.parameters.freeZoneCount??0));}),1,0,4)}<p>Мост проходит над нижним маршрутом. Две лестницы занимают отдельное место; необязательные мосты входят в число дополнительных соединений.</p>
+    {numberField('Обязательных мостов на пути',d.parameters.freeRequiredBridgeCount??0,v=>mutate(n=>n.parameters.freeRequiredBridgeCount=v),1,0,d.parameters.freeBridgeCount??0)}<label className="coldspot-check"><input aria-label="Обязательный проход под мостом" type="checkbox" checked={!!d.parameters.freeRequireUnderpass} onChange={e=>mutate(n=>n.parameters.freeRequireUnderpass=e.target.checked)}/> Обязательный проход под мостом до выхода</label>
+
     {numberField('Разброс углов, °', d.parameters.freeAngleSpread ?? 100, v => mutate(n => n.parameters.freeAngleSpread = v), 5, 0, 120)}
     <label className="field">Центральный перекрёсток<select aria-label="Центральный перекрёсток" value={d.parameters.freeJunctionDegree ?? 'auto'} onChange={e => mutate(n => {
       if (e.target.value === 'auto') delete n.parameters.freeJunctionDegree; else n.parameters.freeJunctionDegree = Number(e.target.value) as 3 | 5;
@@ -315,7 +324,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
     <label className="field">Выбрать объект<select aria-label="Выбрать объект" value={selected} onChange={e => setSelected(e.target.value)}><option value="">Нет</option>{[...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]].map(v => <option key={v.id} value={v.id}>{v.id}</option>)}</select></label><button disabled={!selected} onClick={remove}>Удалить выбранное</button>{ready && <EnvironmentControls maze={ready} onChange={environment => mutate(n => n.environment = environment)} />}<ConstructionControls value={d.construction} onChange={p => mutate(n => Object.assign(n.construction, p))} /></aside>
     <main className="free-workspace">{connectionPreview && <div className="free-notice">Предварительное соединение · проверьте пролёты на карте. <button disabled={issues.some(i => i.ids.includes(connectionPreview.id))} onClick={() => {
       const candidate = connectionPreview;
-      update(candidate.draft);
+      const next=structuredClone(candidate.draft);delete next.layout.cavityReport;update(next);
       setSelected(candidate.id);
     }}>{connectionPreview.draft.layout.bridges?.some(b=>b.id===connectionPreview.id)?'Добавить мост':'Добавить связь'}</button><button onClick={() => setConnectionPreview(null)}>Отменить связь</button></div>}<div className="free-tools"><button onClick={() => setLibrary(true)}>Библиотека</button><button onClick={() => downloadJson('maze-lab-draft.json', encodeDraft(d))}>Экспорт черновика</button><label className="free-file">Импорт JSON<input aria-label="Импорт JSON" type="file" accept=".json" onChange={e => {
       const f = e.target.files?.[0];

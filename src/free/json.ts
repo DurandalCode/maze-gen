@@ -1,3 +1,4 @@
+import {validCavityReport,validSpanAudit} from './cavity-report-validation';
 import { DEFAULT_CONSTRUCTION, validateConstruction, validateParameters, type Maze } from '../core/maze';
 import { freeMaze } from './layout';
 import { validateEnvironment } from '../core/environment';
@@ -17,9 +18,12 @@ function inspect(d: FreeDraft): void {
   if(l.bridges!==undefined&&(!Array.isArray(l.bridges)||l.bridges.length>100||l.bridges.length>0&&d.version!==2))throw Error('Некорректный список мостов.');
   for(const supports of [l.supports,l.preservedSupports])if (supports !== undefined && (!Array.isArray(supports) || supports.length > 100000 || supports.some(p => !p || ![p.x, p.z].every(Number.isFinite)))) throw Error('Некорректные опоры.');
   if (l.preservedPanels !== undefined && (!Array.isArray(l.preservedPanels) || l.preservedPanels.length > 100000)) throw Error('Некорректные сохранённые панели.');
+  if(l.cavityReport!==undefined&&!validCavityReport(l.cavityReport))throw Error('Некорректный отчёт использования пустот.');
+  if(l.moduleConstruction!==undefined&&(!l.moduleConstruction||l.moduleConstruction.version!==1||!Array.isArray(l.moduleConstruction.spans)||l.moduleConstruction.spans.length>20000||l.moduleConstruction.spans.some(c=>!c||typeof c.id!=='string'||!Number.isFinite(c.width)||[c.a,c.b].some(a=>!a||typeof a.room!=='string'||!Number.isInteger(a.edge)||!Number.isFinite(a.offset)))))throw Error('Некорректные модульные источники стен.');
   const all = [...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]];
   if (all.some(v => !v || typeof v.id !== 'string' || v.id.length > 100) || new Set(all.map(v => v.id)).size !== all.length) throw Error('Некорректные идентификаторы.');
   for (const m of l.modules) if (m.frameOnly!==undefined&&typeof m.frameOnly!=='boolean'||!['2x2', '2x6', 'custom'].includes(m.type) || ![m.x, m.z, m.angle].every(Number.isFinite) || m.type === 'custom' && (![m.width, m.depth].every(v => typeof v === 'number' && Number.isFinite(v)))) throw Error('Некорректный модуль.');
+  for(const c of [...l.connections,...l.bridges??[],...l.moduleConstruction?.spans??[]])if(c.spanAudit!==undefined&&!validSpanAudit(c.spanAudit))throw Error('Некорректный аудит пролёта.');
   for (const c of [...l.connections,...l.bridges??[]]) for (const a of [c.a, c.b]) if (!a || typeof a.room !== 'string' || !Number.isInteger(a.edge) || !Number.isFinite(a.offset) || !Number.isFinite(c.width)) throw Error('Некорректная связь.');
   for (const o of l.openings) if (typeof o.room !== 'string' || !Number.isInteger(o.edge) || ![o.offset, o.width].every(Number.isFinite)) throw Error('Некорректный проём.');
   for (const s of l.spaces) {
@@ -56,6 +60,9 @@ export function decodeFree(value: Record<string, unknown>): Maze {
 export function freeIdentity(maze: Maze): unknown {
   const l = structuredClone(maze.free!);
   delete l.zones;
+  delete l.cavityReport;
+  delete l.moduleConstruction;
+  for(const connection of [...l.connections,...l.bridges??[]])delete connection.spanAudit;
   for(const room of [...l.modules,...l.spaces])delete room.zone;
   l.modules.sort((a, b) => a.id.localeCompare(b.id));
   l.spaces.sort((a, b) => a.id.localeCompare(b.id));

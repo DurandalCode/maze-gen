@@ -23,6 +23,13 @@ function usable(a:Point,b:Point,posts:Point[]):Point[]{
  if(lo+hi>=length)return [];return [{x:a.x+ux*lo,z:a.z+uz*lo},{x:b.x-ux*hi,z:b.z-uz*hi}];
 }
 export function certifyAperturePrivacy(scene:PrivacyScene,portal:Portal,maxPocket:number,findWitness:boolean):PortalPrivacy{
+ const full=certifyPocket(scene,portal,maxPocket,false);if(full.certified)return full;
+ // A nearer, fully screened gate is a stronger certificate. Enlarging an
+ // already hidden vestibule up to a junction must not discard that proof.
+ for(let size=1;size<maxPocket;size++){const local=certifyPocket(scene,portal,size,false);if(local.certified)return local;}
+ return findWitness?certifyPocket(scene,portal,maxPocket,true):full;
+}
+function certifyPocket(scene:PrivacyScene,portal:Portal,maxPocket:number,findWitness:boolean):PortalPrivacy{
  const {opening,passages}=scene,start=opening.room;
  if(start<0||start!==portal.cell||!passages[start])throw Error('Проём не соответствует пространству.');
  const pocket=[start];while(pocket.length<maxPocket){const next=passages[pocket.at(-1)!]!.filter(n=>!pocket.includes(n));if(next.length!==1)break;pocket.push(next[0]!);}

@@ -13,6 +13,8 @@ export type Algorithm = 'backtracker' | 'prim';
 export type GenerationType = 'classical' | 'living' | 'corridor' | 'two-storey';
 export const generationName=(p:Parameters)=>p.generationType==='two-storey'?'Двухэтажный':p.generationType==='corridor'?'Коридорный':p.generationType==='living'?'Живой':'Классический';
 export interface DesignLimits {
+  /** Explicit bridge experiment: length bounds apply to continuous ground paths. */
+  groundOnlyLengths?:boolean;
   disabledLimits?:LimitKey[];
   maxForcedStraight:number; maxForcedRun:number; maxVisibleStraight:number;
   maxColdRatio:number; maxColdRegion:number;
@@ -28,6 +30,18 @@ export interface Parameters {
   freeAngleSpread?:number;
   freeJunctionDegree?:3|5;
   freeBridgeCount?:number;
+  freeModuleTarget?:number;
+  /** Target longest side of a newly grown free connector, in metres. */
+  freeConnectionSpan?:number;
+  /** Explicit maximum-spacing growth; absent preserves older seeded policies. */
+  freeSpanPolicy?:'maximum';
+  freeRoutePattern?:'organic'|'switchbacks';
+  /** Additional native crosslinks through suitable interior gaps, up to this budget. */
+  freeInfillPassages?:number;
+  /** Generate a seeded chamber maze inside organic negative spaces. */
+  freeCavityMaze?:boolean;
+  freeRequiredBridgeCount?:number;
+  freeRequireUnderpass?:boolean;
   freeZoneCount?:number;
   freeIslandCount?:number;
   generationType?:GenerationType;
@@ -107,8 +121,22 @@ export function validateParameters(p: Parameters): void {
   if(p.freeZoneCount!==undefined&&(!Number.isInteger(p.freeZoneCount)||p.freeZoneCount!==0&&(p.freeZoneCount<2||p.freeZoneCount>5)))throw Error('Зон: 0 или от 2 до 5.');
   if(p.freeIslandCount!==undefined&&(!Number.isInteger(p.freeIslandCount)||p.freeIslandCount<0||p.freeIslandCount>(p.freeZoneCount??0)))throw Error('Число островов должно быть от 0 до числа зон.');
   if((p.freeZoneCount??0)>0&&p.placementMode!=='free')throw Error('Зоны доступны в свободной планировке.');
-  if((p.freeZoneCount??0)>0&&(p.extraConnections<(p.freeIslandCount??p.freeZoneCount!)+(p.freeBridgeCount??0)))throw Error('Для островов и мостов нужно достаточно дополнительных соединений.');
-  if(p.freeBridgeCount!==undefined&&(!Number.isInteger(p.freeBridgeCount)||p.freeBridgeCount<0||p.freeBridgeCount>2||p.freeBridgeCount>p.extraConnections))throw Error('Крытых мостов: от 0 до 2, не больше числа дополнительных соединений.');
+  if(p.freeRequiredBridgeCount!==undefined&&(!Number.isInteger(p.freeRequiredBridgeCount)||p.freeRequiredBridgeCount<0||p.freeRequiredBridgeCount>(p.freeBridgeCount??0)))throw Error('Обязательных мостов должно быть от 0 до общего числа мостов.');
+  if(p.freeModuleTarget!==undefined&&(!Number.isInteger(p.freeModuleTarget)||p.freeModuleTarget<8||p.freeModuleTarget>250))throw Error('Целевое число свободных модулей: от 8 до 250.');
+  if(p.freeConnectionSpan!==undefined&&(!Number.isFinite(p.freeConnectionSpan)||p.freeConnectionSpan<1||p.freeConnectionSpan>3))throw Error('Пролёт свободного соединения должен быть от 1 до 3 м.');
+  if(p.freeRoutePattern!==undefined&&!['organic','switchbacks'].includes(p.freeRoutePattern))throw Error('Неизвестный рисунок свободного маршрута.');
+  if(p.freeSpanPolicy!==undefined&&(p.freeSpanPolicy!=='maximum'||p.placementMode!=='free'))throw Error('Максимальное разнесение доступно только для свободной планировки.');
+  if(p.freeCavityMaze!==undefined&&typeof p.freeCavityMaze!=='boolean')throw Error('Некорректная настройка лабиринта в полостях.');
+  if(p.freeCavityMaze&&(p.placementMode!=='free'||(p.freeBridgeCount??0)>0||p.freeRoutePattern==='switchbacks'))throw Error('Лабиринт в полостях доступен для органической свободной планировки без мостов.');
+  if(p.freeInfillPassages!==undefined&&(!Number.isInteger(p.freeInfillPassages)||p.freeInfillPassages<0||p.freeInfillPassages>12))throw Error('Число поперечных связей: от 0 до 12.');
+  if(p.freeInfillPassages&&(p.placementMode!=='free'||(p.freeBridgeCount??0)>0))throw Error('Связи в промежутках доступны для свободной планировки без мостов.');
+  if(p.freeRoutePattern==='switchbacks'&&p.freeJunctionDegree===5)throw Error('Переплетённый маршрут использует обычные трёхсторонние развилки.');
+  if(p.freeRoutePattern==='switchbacks'&&(p.placementMode!=='free'||p.extraConnections<2||(p.freeBridgeCount??0)>0||(p.freeZoneCount??0)>0))throw Error('Переплетённый маршрут требует свободной планировки, двух циклов и отсутствия мостов/зон.');
+  if(p.freeRequireUnderpass!==undefined&&typeof p.freeRequireUnderpass!=='boolean')throw Error('Некорректное требование нижнего прохода.');
+  if((p.freeRequiredBridgeCount||p.freeRequireUnderpass)&&p.placementMode!=='free')throw Error('Требования к маршруту мостов доступны в свободной планировке.');
+  if(p.design?.groundOnlyLengths!==undefined&&typeof p.design.groundOnlyLengths!=='boolean')throw Error('Некорректная область ограничений длины.');
+  if((p.freeZoneCount??0)>0&&(p.extraConnections<(p.freeIslandCount??p.freeZoneCount!)+(p.freeBridgeCount??0)-(p.freeRequiredBridgeCount??0)))throw Error('Для островов и мостов нужно достаточно дополнительных соединений.');
+  if(p.freeBridgeCount!==undefined&&(!Number.isInteger(p.freeBridgeCount)||p.freeBridgeCount<0||p.freeBridgeCount>4||p.freeBridgeCount-(p.freeRequiredBridgeCount??0)>p.extraConnections))throw Error('Крытых мостов: от 0 до 4; для необязательных мостов нужны дополнительные соединения.');
   if(p.freeAngleSpread!==undefined&&(!Number.isFinite(p.freeAngleSpread)||p.freeAngleSpread<0||p.freeAngleSpread>120))throw Error('Разброс углов: от 0 до 120°.');
   if(p.freeJunctionDegree!==undefined&&![3,5].includes(p.freeJunctionDegree))throw Error('Перекрёсток: 3 или 5 проходов.');
   if(p.placementMode!==undefined&&!['grid','free'].includes(p.placementMode))throw Error('Неизвестный режим размещения.');

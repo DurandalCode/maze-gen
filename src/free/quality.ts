@@ -1,4 +1,6 @@
 import {bridgeGeometry} from './bridges';
+import {bridgeRouteErrors} from './bridge-route';
+import {freeGroundLengths} from './path-limits';
 import { freeAreaWeights, outlineDistances } from './analysis-geometry';
 import { sideDistricts } from '../analysis/side-districts';
 import { shortestPath } from '../core/pathfinding';
@@ -90,8 +92,8 @@ export function analyzeFree(maze: Maze, samples = 256, profile: 'explorer' | 'co
   const unseen=areas.reduce((sum,w,i)=>sum+w*(1-probability[i]!),0)+bridgeAreas.reduce((sum,w,i)=>sum+w*(1-bridgeUsage[i]!.overProbability),0);
   return {bridgeUsage,unseenAreaRatio:totalArea?unseen/totalArea:0,probability, visits, expectedLength: expectedLength / samples, finishedRatio: finished / samples, coldAreaRatio: totalArea ? cold / totalArea : 0, largestColdArea: Math.max(0, ...regions.map(r=>r.area)), optimalLength: pathLength(routePoints(maze)), samples, profile };
 }
-export function checkFreeQuality(maze: Maze): string[] {
-  const errors: string[] = [], p = maze.parameters;
+export function checkFreeQuality(maze: Maze,options?:{quick?:boolean}): string[] {
+  const errors: string[] = [...bridgeRouteErrors(maze)], p = maze.parameters;
   if ((p.routeTrapCount ?? 0) > 0 && (p.routeTrapCount ?? 0) > routeTraps(maze).qualifiedCount) errors.push('Не выполнено требование маршрутных ловушек.');
   if ((p.loopTrapCount ?? 0) > 0 && (p.loopTrapCount ?? 0) > loopTraps(maze).qualifiedCount) errors.push('Не выполнено требование кольцевых ловушек.');
   const requestedIslands=p.freeIslandCount??p.freeZoneCount??0;
@@ -99,11 +101,12 @@ export function checkFreeQuality(maze: Maze): string[] {
   if (!p.design) return errors;
   const r = freeRuntime(maze), limits = effectiveLimits(p);
   let sight = 0, straight = 0, run = 0;
-  for (const c of r.centers) for (let deg = 0; deg < 360; deg++) {
+  if(Number.isFinite(limits.maxVisibleStraight))for (const c of r.centers) for (let deg = 0; deg < 360; deg++) {
     const angle = deg * Math.PI / 180;
     sight = Math.max(sight, freeRay(maze, c, angle, 101) + freeRay(maze, c, angle + Math.PI, 101));
   }
-  for (let a = 0; a < r.rooms.length; a++)for (const b of r.passages[a]!) {
+  if(p.design.groundOnlyLengths||options?.quick&&!maze.free?.bridges?.length){const lengths=freeGroundLengths(maze);straight=lengths.straight;run=lengths.run;}
+  else for (let a = 0; a < r.rooms.length; a++)for (const b of r.passages[a]!) {
     let prev = a, at = b, length = pathLength(r.edgePaths.get(`${a}:${b}`)!), straightLength = length, straightRun = true;
     const visited = new Set([a]);
     while (r.passages[at]!.length === 2 && !visited.has(at)) {
@@ -123,6 +126,8 @@ export function checkFreeQuality(maze: Maze): string[] {
   if (sight > limits.maxVisibleStraight) errors.push('Превышен предел видимого прямого участка.');
   if (straight > limits.maxForcedStraight) errors.push('Превышен предел прямого прохода.');
   if (run > limits.maxForcedRun) errors.push('Превышен предел прохода без выбора.');
+  // Generation uses deterministic geometry only; sampled heat belongs to explicit analysis.
+  if(options?.quick)return errors;
   const analyses = (['explorer', 'compass', 'outline'] as const).map(profile => analyzeFree(maze, 2048, profile));
   if (analyses.some(a => a.finishedRatio < 1)) errors.push('Не все симуляции поиска дошли до выхода.');
   if (analyses.some(a => a.coldAreaRatio > limits.maxColdRatio || a.largestColdArea > limits.maxColdRegion)) errors.push('Превышены ограничения холодных областей.');

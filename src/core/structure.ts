@@ -1,6 +1,6 @@
 import {bridgeGeometry} from '../free/bridges';
 import {storeyView} from './two-storey';
-import {freeRuntime,modulePolygon,size} from '../free/layout';
+import {connectionGeometry,freeRuntime,modulePolygon,size} from '../free/layout';
 import {edges,ends,segmentDistance} from '../free/geometry';
 import {corridorSupports} from './corridor-supports';
 import {footprint,metres,mergeWalls} from './corridor-geometry';
@@ -54,7 +54,11 @@ export function timberStructure(maze: Maze): TimberStructure {
         lowerFrames.push({...w,inward:{x:-dz/length,z:dx/length}});
       }
     }
-    const headers=r.panels.filter(w=>!frames.some(e=>segmentDistance(ends(w)[0],e)<1e-7&&segmentDistance(ends(w)[1],e)<1e-7));
+    // A door cuts fabric, not its supporting top rail. Generated module-backed
+    // layouts retain the original two-module spans even after floor promotion.
+    const layout=maze.free!,moduleIds=new Set(layout.modules.filter(m=>!m.frameOnly&&m.type!=='custom').map(m=>m.id));
+    const spans=[...new Map([...layout.moduleConstruction?.spans??[],...layout.connections.filter(c=>moduleIds.has(c.a.room)&&moduleIds.has(c.b.room))].map(c=>[c.id,c])).values()];
+    const headers=layout.moduleConstruction?spans.flatMap(c=>connectionGeometry(layout,c).sides).filter(w=>Math.hypot(w.x2-w.x1,w.z2-w.z1)>1e-7):r.panels.filter(w=>!frames.some(e=>segmentDistance(ends(w)[0],e)<1e-7&&segmentDistance(ends(w)[1],e)<1e-7));
     return {posts:r.posts,frames:[...frames,...headers],bracedFrames:frames,lowerFrames,braceDrop:Math.min(.42,Math.max(0,maze.wallHeight-HEADER_DEPTH-1.88))};
   }
   if(maze.navigation)return timberStructure(maze.navigation.source);

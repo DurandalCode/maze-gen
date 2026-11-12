@@ -1,3 +1,5 @@
+import {auditModuleWalls} from './module-origin';
+import {nativePanels} from './panels';
 import {detectFreeIslands,type FreeIsland} from './islands';
 import {freeSpatialRay} from './spatial-visibility';
 import {bridgeGeometry,bridgeColumns,bridgeIssues,bridgeSurface,bridgeSamples} from './bridges';
@@ -70,7 +72,7 @@ export function physical(l: FreeLayout) {
   } catch {
     /* Invalid drafts can still be drawn. */
   }
-  const panels = l.preservedPanels ? [...l.preservedPanels] : [...rs.flatMap(r => [...edges(r.polygon).flatMap(w => cutWall(w, cuts)), ...r.holes.flatMap(edges)]), ...connections.flatMap(c => c.sides)];
+  const panels = l.preservedPanels ? [...l.preservedPanels] : nativePanels([...rs.flatMap(r => [...edges(r.polygon).flatMap(w => cutWall(w, cuts)), ...r.holes.flatMap(edges)]), ...connections.flatMap(c => c.sides)]);
   panels.push(...l.walls);
   const postMap = new Map<string, Point>(), add = (p: Point) => postMap.set(`${quantize(p.x)}:${quantize(p.z)}`, p);
   l.preservedSupports?.forEach(add);
@@ -172,6 +174,7 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
     if (!segmentInside(a, b, site.contains, site.boundaries)) issue('outside', 'Стена выходит за площадку.');
     if (l.walls.includes(w as FreeLayout['walls'][number]) && !segmentInside(a, b, phys.contains, phys.boundaries)) issue('outside', 'Стена выходит за доступную область.', (w as FreeLayout['walls'][number]).id);
   }
+  if(l.moduleConstruction)out.push(...auditModuleWalls(l,phys.panels).issues);
   if (ready) {
     if (!l.openings.some(o => o.id === l.entrance) || !l.openings.some(o => o.id === l.exit) || l.entrance === l.exit) issue('portals', 'Выберите разные вход и выход.');
     const seen = new Set<string>(), queue = rs.length ? [rs[0]!.id] : [];
@@ -196,18 +199,40 @@ export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   return out;
 }
 /** Visibility graph inside each physical room, using wall-end clearance candidates. */
+const localScenes=new Map<string,{points:Point[];visibility?:Uint8Array;large:Map<number,boolean>}>();
+let localSceneBytes=0;
 export function localRoute(a: Point, b: Point, poly: Point[], holes: Point[][], obstacles: Wall[]): Point[] | null {
+  // Every accepted segment lies in this polygon. Retain all solids whose
+  // thickness plus player radius can reach it; distant rooms cannot affect it.
+  const box=bounds(poly);
+  obstacles=obstacles.filter(w=>{const h=(w.thickness??.06)/2+.25+EPS;return Math.min(w.x1,w.x2)-h<=box.x2&&Math.max(w.x1,w.x2)+h>=box.x1&&Math.min(w.z1,w.z2)-h<=box.z2&&Math.max(w.z1,w.z2)+h>=box.z1;});
   const contains = (p: Point) => pointIn(p, poly) && !holes.some(h => pointIn(p, h, false)), boundary = [...edges(poly), ...holes.flatMap(edges)], clear = (p: Point) => contains(p) && obstacles.every(w => wallDistance(p, w) >= .25 - EPS), visible = (p: Point, q: Point) => {
     if (!segmentInside(p, q, contains, boundary)) return false;
     return obstacles.every(w => movementClearance(p, q, w) >= .25 - EPS);
   };
   if (!clear(a) || !clear(b)) return null;
   if (visible(a, b)) return [a, b];
-  const nodes = [a, b];
-  for (const w of obstacles) for (const p of ends(w)) if (pointIn(p, poly)) for (let i = 0; i < 16; i++) {
-    const v = { x: p.x + Math.cos(i * Math.PI / 8) * .4, z: p.z + Math.sin(i * Math.PI / 8) * .4 };
-    if (clear(v)) nodes.push(v);
+  // Geometry-keyed and bounded: reuse visibility between obstacle candidates
+  // across door queries/cloned drafts, while observing in-place geometry edits.
+  const signature=JSON.stringify([poly,holes,obstacles.map(w=>[w.x1,w.z1,w.x2,w.z2,w.thickness??.06])]);
+  let scene=localScenes.get(signature);
+  if(scene){localScenes.delete(signature);localScenes.set(signature,scene);}else{
+    const points:Point[]=[],unique=new Set<string>();
+    for (const w of obstacles) for (const p of ends(w)) if (pointIn(p, poly)) for (let i = 0; i < 16; i++) {
+      const v = { x: p.x + Math.cos(i * Math.PI / 8) * .4, z: p.z + Math.sin(i * Math.PI / 8) * .4 },key=`${v.x}:${v.z}`;
+      if (!unique.has(key)&&clear(v)){unique.add(key);points.push(v);}
+    }
+    const bytes=points.length**2;scene={points,large:new Map(),...(bytes<=1_000_000?{visibility:new Uint8Array(bytes)}:{})};
+    while(localScenes.size>=12||localSceneBytes+(scene.visibility?.length??0)>4_000_000){const oldest=localScenes.keys().next().value!;localSceneBytes-=localScenes.get(oldest)!.visibility?.length??0;localScenes.delete(oldest);}
+    localSceneBytes+=scene.visibility?.length??0;localScenes.set(signature,scene);
   }
+  const nodes=[a,b,...scene.points],count=scene.points.length;
+  const canSee=(i:number,j:number)=>{
+    if(i<2||j<2)return visible(nodes[i]!,nodes[j]!);
+    const key=(Math.min(i,j)-2)*count+Math.max(i,j)-2,known=scene.visibility?.[key];
+    if(known)return known===1;if(scene.large.has(key))return scene.large.get(key)!;
+    const result=visible(nodes[i]!,nodes[j]!);if(scene.visibility)scene.visibility[key]=result?1:2;else if(scene.large.size<20000)scene.large.set(key,result);return result;
+  };
   const dist = nodes.map(() => Infinity), prev = nodes.map(() => -1), done = new Set<number>();
   dist[0] = 0;
   for (let i = 0; i < nodes.length; i++) {
@@ -220,7 +245,7 @@ export function localRoute(a: Point, b: Point, poly: Point[], holes: Point[][], 
       return path.reverse().map(j => nodes[j]!);
     }
     done.add(at);
-    for (let j = 0; j < nodes.length; j++)if (!done.has(j) && dist[at]! + distance(nodes[at]!, nodes[j]!) < dist[j]! && visible(nodes[at]!, nodes[j]!)) {
+    for (let j = 0; j < nodes.length; j++)if (!done.has(j) && dist[at]! + distance(nodes[at]!, nodes[j]!) < dist[j]! && canSee(at,j)) {
       dist[j] = dist[at]! + distance(nodes[at]!, nodes[j]!);
       prev[j] = at;
     }
