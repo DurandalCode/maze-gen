@@ -33,8 +33,8 @@ export function routeTraps(maze:Maze):RouteTraps {
   for(let i=0;i<route.length-1;i++){
     const fork=route[i]!,correct=route[i+1]!,choices=maze.passages[fork]!.filter(n=>n!==route[i-1]);
     if(choices.length<2)continue;
-    const fs=choices.map(n=>model.features(fork,n,i?ctx.centers[route[i-1]!]:undefined,'outline'));
-    const plus=choiceProbabilities(fs.map(f=>decisionScore(f,3,1,1.5,1))),minus=choiceProbabilities(fs.map(f=>decisionScore(f,3,1,1.5,-1)));
+    const perception=()=>{const fs=choices.map(n=>model.features(fork,n,i?ctx.centers[route[i-1]!]:undefined,'outline'));return {fs,plus:choiceProbabilities(fs.map(f=>decisionScore(f,3,1,1.5,1))),minus:choiceProbabilities(fs.map(f=>decisionScore(f,3,1,1.5,-1)))};};
+    let perceived:ReturnType<typeof perception>|undefined;
     // Initial uninterrupted retreat only; a later unrelated detour cannot count for this fork.
     let peak=distance[fork]!,awayLength=0;
     const correctAwayPath=[fork];
@@ -60,6 +60,9 @@ export function routeTraps(maze:Maze):RouteTraps {
       while(stack.length){
         const state=stack.pop()!,children=maze.passages[state.cell]!.filter(c=>c!==state.parent);
         if(children.length){for(const c of children)stack.push({cell:c,parent:state.cell,path:[...state.path,c],length:state.length+edge(state.cell,c),toward:state.toward+Math.max(0,distance[state.cell]!-distance[c]!)});continue;}
+        // Visibility rays are needed only after a genuine pendant branch has
+        // been found. Bypasses and loop components cannot qualify as dead ends.
+        const {fs,plus,minus}=perceived??=perception();
         const deadEndDistance=distance[state.cell]!,falseApproach=distance[fork]!-deadEndDistance,entryProbability=(plus[k]!+minus[k]!)/2;
         const a=ctx.centers[fork]!,b=ctx.centers[state.cell]!,lineDistance=Math.hypot(b.x-a.x,b.z-a.z);
         const deadEndVisible=(!maze.storeys||spatialLineVisible(maze,{...a,y:(a.y??0)+1.7},{...b,y:(b.y??0)+1.7}))&&sight.trace(fork,Math.atan2(b.z-a.z,b.x-a.x),lineDistance+1e-5).length>=lineDistance-1e-7;

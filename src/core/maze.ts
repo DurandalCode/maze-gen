@@ -11,7 +11,7 @@ import type { Environment } from './environment';
 
 export type Algorithm = 'backtracker' | 'prim';
 export type GenerationType = 'classical' | 'living' | 'corridor' | 'two-storey';
-export const generationName=(p:Parameters)=>p.generationType==='two-storey'?'Двухэтажный':p.generationType==='corridor'?'Коридорный':p.generationType==='living'?'Живой':'Классический';
+export const generationName=(p:Parameters)=>p.freeRoutePattern==='vortex'?'Вортексный':p.generationType==='two-storey'?'Двухэтажный':p.generationType==='corridor'?'Коридорный':p.generationType==='living'?'Живой':'Классический';
 export interface DesignLimits {
   /** Explicit bridge experiment: length bounds apply to continuous ground paths. */
   groundOnlyLengths?:boolean;
@@ -35,7 +35,12 @@ export interface Parameters {
   freeConnectionSpan?:number;
   /** Explicit maximum-spacing growth; absent preserves older seeded policies. */
   freeSpanPolicy?:'maximum';
-  freeRoutePattern?:'organic'|'switchbacks';
+  freeRoutePattern?:'organic'|'switchbacks'|'vortex';
+  freeVortexCenter?:boolean;
+  freeVortexChaotic?:boolean;
+  freeVortexDeepRegions?:boolean;
+  freeVortexContinuous?:boolean;
+  freeVortexKnots?:boolean;
   /** Additional native crosslinks through suitable interior gaps, up to this budget. */
   freeInfillPassages?:number;
   /** Generate a seeded chamber maze inside organic negative spaces. */
@@ -124,7 +129,18 @@ export function validateParameters(p: Parameters): void {
   if(p.freeRequiredBridgeCount!==undefined&&(!Number.isInteger(p.freeRequiredBridgeCount)||p.freeRequiredBridgeCount<0||p.freeRequiredBridgeCount>(p.freeBridgeCount??0)))throw Error('Обязательных мостов должно быть от 0 до общего числа мостов.');
   if(p.freeModuleTarget!==undefined&&(!Number.isInteger(p.freeModuleTarget)||p.freeModuleTarget<8||p.freeModuleTarget>250))throw Error('Целевое число свободных модулей: от 8 до 250.');
   if(p.freeConnectionSpan!==undefined&&(!Number.isFinite(p.freeConnectionSpan)||p.freeConnectionSpan<1||p.freeConnectionSpan>3))throw Error('Пролёт свободного соединения должен быть от 1 до 3 м.');
-  if(p.freeRoutePattern!==undefined&&!['organic','switchbacks'].includes(p.freeRoutePattern))throw Error('Неизвестный рисунок свободного маршрута.');
+  if(p.freeVortexContinuous!==undefined&&typeof p.freeVortexContinuous!=='boolean')throw Error('Некорректный непрерывный вортекс.');
+  if(p.freeVortexContinuous&&(!p.freeVortexChaotic||p.freeVortexDeepRegions))throw Error('Непрерывный вортекс требует хаотичного пресета без вложенных районов.');
+  if(p.freeVortexDeepRegions!==undefined&&typeof p.freeVortexDeepRegions!=='boolean')throw Error('Некорректные возвратные районы вортекса.');
+  if(p.freeVortexDeepRegions&&!p.freeVortexChaotic)throw Error('Возвратные районы требуют хаотичного вортекса.');
+  if(p.freeVortexChaotic!==undefined&&typeof p.freeVortexChaotic!=='boolean')throw Error('Некорректный хаотичный пресет вортекса.');
+  if(p.freeVortexChaotic&&p.freeRoutePattern!=='vortex')throw Error('Хаотичный пресет доступен только в вортексе.');
+  if(p.freeVortexKnots!==undefined&&typeof p.freeVortexKnots!=='boolean')throw Error('Некорректный пресет косых узлов вортекса.');
+  if(p.freeVortexKnots&&p.freeRoutePattern!=='vortex')throw Error('Косые узлы доступны только в вортексном режиме.');
+  if(p.freeVortexCenter!==undefined&&typeof p.freeVortexCenter!=='boolean')throw Error('Некорректный центральный пресет вортекса.');
+  if(p.freeVortexCenter&&p.freeRoutePattern!=='vortex')throw Error('Центральный пресет доступен только в вортексном режиме.');
+  if(p.freeRoutePattern==='vortex'&&p.placementMode!=='free')throw Error('Вортексный рисунок требует свободного размещения.');
+  if(p.freeRoutePattern!==undefined&&!['organic','switchbacks','vortex'].includes(p.freeRoutePattern))throw Error('Неизвестный рисунок свободного маршрута.');
   if(p.freeSpanPolicy!==undefined&&(p.freeSpanPolicy!=='maximum'||p.placementMode!=='free'))throw Error('Максимальное разнесение доступно только для свободной планировки.');
   if(p.freeCavityMaze!==undefined&&typeof p.freeCavityMaze!=='boolean')throw Error('Некорректная настройка лабиринта в полостях.');
   if(p.freeCavityMaze&&(p.placementMode!=='free'||(p.freeBridgeCount??0)>0||p.freeRoutePattern==='switchbacks'))throw Error('Лабиринт в полостях доступен для органической свободной планировки без мостов.');

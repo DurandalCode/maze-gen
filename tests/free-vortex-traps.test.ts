@@ -1,0 +1,24 @@
+import{beforeAll,expect,test}from'bun:test';
+import{generateFree}from'../src/free/generate';
+import{vortexParameters}from'../src/free/vortex-parameters';
+import{routeTraps}from'../src/analysis/route-traps';
+import{loopTraps}from'../src/analysis/loop-traps';
+import{trapOverlay}from'../src/ui/trap-overlay';
+import{freeRuntime,freeMaze,validateFree,connectionGeometry}from'../src/free/layout';
+import{mazeDraft}from'../src/free/json';
+import{auditModuleWalls}from'../src/free/module-origin';
+import{selectOppositePortals}from'../src/free/opposite-portals';
+import{freeGroundLengths}from'../src/free/path-limits';
+import{walls,type Maze}from'../src/core/maze';
+import{supportColliders}from'../src/core/structure';
+import{CollisionWorld}from'../src/simulation/collisions';
+import{Player}from'../src/simulation/player';
+import{routePoints}from'../src/core/pathfinding';
+import{serialize,deserialize}from'../src/persistence/maze-json';
+const parameters={...vortexParameters({columns:70,rows:70,corridorWidth:2,moduleSize:2,seed:'vortex-traps-02',algorithm:'prim',extraConnections:0}),routeTrapCount:1,loopTrapCount:1};let maze:Maze;
+beforeAll(()=>{maze=generateFree(parameters);},30000);
+function sweep(m:Maze){const world=new CollisionWorld([...walls(m),...supportColliders(m)]),r=freeRuntime(m);for(const path of [...r.edgePaths.values(),...r.portalPaths.values()])for(let i=1;i<path.length;i++){const a=path[i-1]!,b=path[i]!,end=world.move(a,{x:b.x-a.x,z:b.z-a.z});expect(Math.hypot(end.x-b.x,end.z-b.z)).toBeLessThan(1e-5);}return world;}
+test('ordinary vortex produces model-qualified dead and return traps, not just graph cycles',()=>{const dead=routeTraps(maze),loops=loopTraps(maze);expect(dead.qualifiedCount).toBeGreaterThanOrEqual(1);expect(loops.qualifiedCount).toBeGreaterThanOrEqual(1);const d=dead.candidates.find(c=>c.qualifies)!,k=loops.candidates.find(c=>c.qualifies)!;expect(d.falsePathLength).toBeGreaterThanOrEqual(10);expect(d.falseApproach).toBeGreaterThanOrEqual(6);expect(d.requiredRetreat).toBeGreaterThanOrEqual(8);expect(d.deadEndVisible).toBe(false);expect(k.length).toBeGreaterThanOrEqual(40);expect(k.loop[0]).toBe(k.loop.at(-1));expect(trapOverlay(maze,dead).map(e=>e.label)).toEqual(['Л1','К1']);},20000);
+test('all 97 visible frames and spans have real support, opposed portals and physical paths',()=>{const l=maze.free!;expect(l.modules).toHaveLength(97);expect(l.modules.filter(m=>m.type==='2x6')).toHaveLength(1);expect(l.spaces).toEqual([]);expect(l.walls).toEqual([]);expect(l.modules.some(m=>m.frameOnly)).toBe(false);expect(auditModuleWalls(l).issues).toEqual([]);expect(selectOppositePortals(l,l.openings,1.6).length).toBeGreaterThan(0);for(const c of l.connections){const g=connectionGeometry(l,c);expect(Math.max(...g.sides.map(w=>Math.hypot(w.x2-w.x1,w.z2-w.z1)))).toBeLessThanOrEqual(3+1e-7);}const n=freeGroundLengths(maze);expect(n.straight).toBeLessThanOrEqual(8);expect(n.run).toBeLessThanOrEqual(16);expect(maze.roof).toBe(true);const player=new Player(maze,sweep(maze));for(const target of routePoints(maze).slice(1)){let steps=0;while(!player.finished&&Math.hypot(player.position.x-target.x,player.position.z-target.z)>.01){if(++steps>2500)throw Error('Player stalled');const d=Math.hypot(player.position.x-target.x,player.position.z-target.z);player.yaw=Math.atan2(player.position.x-target.x,player.position.z-target.z);player.updateAnalog(Math.min(.02,d/1.4),1,0);}}expect(player.finished).toBe(true);},15000);
+test('square-post clearance survives a further 45 degree rotation of the complete structure',()=>{const draft=mazeDraft(maze),a=Math.PI/4;for(const m of draft.layout.modules){const x=m.x-35,z=m.z-35;m.x=35+x*Math.cos(a)-z*Math.sin(a);m.z=35+x*Math.sin(a)+z*Math.cos(a);m.angle+=45;}expect(validateFree(draft)).toEqual([]);sweep(freeMaze(draft,false));},15000);
+test('trap mode reproduces ordinary generation and native JSON exactly',()=>{expect(serialize(generateFree(parameters))).toBe(serialize(maze));expect(serialize(deserialize(serialize(maze)))).toBe(serialize(maze));expect(()=>generateFree({...parameters,routeTrapCount:2})).toThrow('один комплект');},30000);
