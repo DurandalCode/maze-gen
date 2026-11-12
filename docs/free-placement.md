@@ -259,3 +259,42 @@ unfinished intermediate detour is never returned as a qualified return trap.
 The public recipe must also allocate one `extraConnections` for each
 requested return. That budget is reserved for the dense return pass and is
 subtracted from the organic base's cycle budget; it is not spent twice.
+
+`freePassagePattern: 'two-row-v1'` replaces the offset-screen construction
+for newly generated dense sectors. The rejected inline pattern left alternating
+0.95m panels inside one straight corridor: map7326 had10 such panels, and
+map12c had19 including its return-room screens. Their physical collisions were
+real, but the layout did not provide the requested navigation rhythm.
+
+The new pattern fits two rows of three real2×2 frames beside each suitable
+new long frame. All internal doors are centred and fully2m wide. Selected
+whole2m boundaries stay closed, joining the surrounding framework rather
+than forming short wings in the centre of a room. Three supported3m spans
+between rows and two different routes through the six rooms create a genuine
+cycle. The original dense frame poses, court polygons and external door
+locations stay exact. Only the new problematic sectors acquire another row;
+the existing base is not widened. A finite four-variant fit keeps an ordinary
+unscreened2×6 room if a second row cannot fit; final physical acceptance still
+rejects any unresolved excessive passage length.
+
+At most two full2×2 side alcoves provide short exploratory ends. They do not
+reset the no-choice measurement and do not count as qualified route traps.
+The same target recipe independently reconstructs five two-row assemblies,
+two alcoves and the original dense core in the regression fixture. Old recipes
+without this option retain their previous geometry and seed replay. New hybrid
+creation selects the option explicitly; imported maps are not rewritten.
+
+The new return profile also turns whole native frames and uses full2m doors
+without offsets. A repair crosslink must preserve its two-door return component
+and the unchanged40m/6m/four-turn geometric criteria using the same minimum-hop
+circuit as the analyzer. Final perceptual qualification still runs afterward;
+shortening the circuit is not accepted merely because its fork remains on the
+main route. The dense construction records its reserved return corner so that
+new side branches cannot accidentally displace that planned attachment site.
+Where a long2×6 tail cannot fit between existing frames, return repair may
+instead use two separated2×2 rooms behind a real turn. This is a substantial
+two-room arm, not a one-room alcove: the regression distinguishes its physical
+turn and ten-metre route from a shallow bud that must not reset the main run.
+For this opt-in repair, all lateral placements at the3m side-span target are
+tried before smaller geometrically constrained spans. Original room poses,
+player radius and the passage-length formulas are unchanged.

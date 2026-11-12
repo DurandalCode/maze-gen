@@ -1,3 +1,4 @@
+import {denseTwoRowVariants} from './dense-two-row-layout';
 import type {Maze} from '../core/maze';
 import type {Anchor,FreeConnection,FreeDraft,FreeModule} from './model';
 import {emptyLayout} from './model';
@@ -70,15 +71,21 @@ export function generateSecondDenseTrap(source:Maze,onProgress?:(s:string)=>void
    if(bad)continue;
    append(draft,{id:prefix+'-return',a:from,b:{room:parts[2]!.id,edge:1,offset:0},width});const g=connectionGeometry(draft.layout,draft.layout.connections.at(-1)!);if(g.sides.some(w=>distance(...ends(w))>3+1e-7))continue;
    const candidateIssues=validateFree(draft,false);if(candidateIssues.length){if(failures.size<4)failures.add(candidateIssues[0]!.message);continue;}
-   for(const module of [...draft.layout.modules].filter(m=>m.id.startsWith(prefix+'-')&&m.type==='2x6'))squareFrameAssembly(draft,module.id,module.id+'-frame',true);
+   const twoRow=source.parameters.freePassagePattern==='two-row-v1';
+   if(twoRow&&returnLoopReady){const parts=squareFrameAssembly(draft,prefix+'-7',prefix+'-7-frame');for(let i=0;i<2;i++)append(draft,{id:prefix+'-7-full-'+i,a:{room:parts[i]!.id,edge:1,offset:0},b:{room:parts[i+1]!.id,edge:3,offset:0},width:2});}
+   if(!twoRow)for(const module of [...draft.layout.modules].filter(m=>m.id.startsWith(prefix+'-')&&m.type==='2x6'))squareFrameAssembly(draft,module.id,module.id+'-frame',true);
+   const variants=twoRow?denseTwoRowVariants(draft,prefix):[{draft,rows:0,kept:[]}];
+   if(!variants.length){if(failures.size<4)failures.add('Не помещаются три двухрядных участка без перемещения существующих рам.');continue;}
+   for(const variant of variants){const draft=variant.draft;
    promoteCavityConnectors(draft);const nav=freeRuntime(freeMaze(draft,false));if(nav.paths.some(p=>!p)){if(failures.size<4)failures.add('Для одного из новых стыков нет капсульного прохода.');continue;}
    if(finalChecks++>=2)throw Error('Исчерпаны две полные сборки второй ловушки. '+[...failures].join(' '));
    try{
     const result=routeDenseTraps(freeMaze(draft,false),2,onProgress,returnLoopReady);if(routeTraps(result).qualifiedCount<2)continue;
     if(baseline.some(old=>JSON.stringify(result.free!.modules.find(m=>m.id===old.id))!==JSON.stringify(old)))throw Error('Изменена исходная плотная рама.');
-    const report=result.free!.cavityReport;if(report?.construction){report.construction.addedModules+=result.free!.modules.length-sourceModules.length;report.construction.certifiedWalls=physical(result.free!).panels.length;report.regions.push({id:prefix,area:0,filledArea:0,blockedArea:0,status:'filled',cells:result.free!.modules.length-sourceModules.length,doors:0,reason:'Вторая полноценная маршрутная ловушка: новый модульный обход соединяет существующие секторы. Вспомогательные длинные рамы собраны из реальных2×2 со смещёнными метровыми дверями; исходные рамы плотной основы и дворы сохранены.'});}
+    const report=result.free!.cavityReport;if(report?.construction){if(twoRow&&returnLoopReady)report.construction.reservedReturnFork=prefix+'-7-frame-1';report.construction.addedModules+=result.free!.modules.length-sourceModules.length;report.construction.certifiedWalls=physical(result.free!).panels.length;report.regions.push({id:prefix,area:0,filledArea:0,blockedArea:0,status:'filled',cells:result.free!.modules.length-sourceModules.length,doors:0,reason:'Вторая полноценная маршрутная ловушка: новый модульный обход соединяет существующие секторы. '+(twoRow?'Двухрядных участков '+variant.rows+'; все внутренние проходы полной ширины2м, без смещённых ширм. ':'Вспомогательные длинные рамы собраны из реальных2×2 со смещёнными метровыми дверями; ')+'исходные рамы плотной основы и дворы сохранены.'});}
     return result;
    }catch(error){failures.add(String((error as Error).message));}
+   }
   }
  }
  throw Error('Не построена вторая полноценная ловушка на плотной основе. '+[...failures].join(' '));

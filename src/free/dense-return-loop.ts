@@ -1,4 +1,4 @@
-import type {Maze,Point} from '../core/maze';
+import type {Maze,Point,Parameters} from '../core/maze';
 import type {Anchor,FreeDraft} from './model';
 import {mazeDraft} from './json';
 import {anchorGeometry,connectionGeometry,freeGraphPath,freeMaze,freeRuntime,modulePolygon,validateFree} from './layout';
@@ -21,6 +21,13 @@ export function staggerDenseReturnSpans(draft:FreeDraft,ids:readonly string[],ac
   c.width=1;const shift=index%2===0?.45:-.45;
   for(const a of [c.a,c.b]){a.offset=0;const g=anchorGeometry(draft.layout,a,c.width),length=distance(g.from,g.to),dot=((g.to.x-g.from.x)*across.x+(g.to.z-g.from.z)*across.z)/length;if(Math.abs(dot)<.999)throw Error('Ступенчатые проёмы требуют параллельных сторон новых рам.');a.offset=shift*Math.sign(dot);}
  }
+}
+
+/** Gate-relative (return-axis, false-entry-axis) centres. Legacy layouts keep
+ * their exact recipe; the two-row policy turns the actual frames instead. */
+export function denseReturnModulePoints(pattern?:Parameters['freePassagePattern']):ReadonlyArray<readonly[number,number]>{
+ const first:readonly[number,number][]=[[0,7],[4.891366458960192,6.2],[9.782732917920384,5.4],[14.674099376880576,4.6]];
+ return pattern==='two-row-v1'?[...first,[12.910167354380786,1.4],[8.674099376880576,-.6],[4.438031399380786,1.4]]:[...first,[13.674099376880576,-.22842712474619],[8.674099376880576,-.22842712474619],[3.674099376880576,-.22842712474619]];
 }
 
 /** Extend a genuine pendant arm back to its own route fork. A cycle joining
@@ -87,7 +94,8 @@ export function attachDenseReturnLoop(source:Maze,forkId:string,seed:string,onPr
   onProgress?.('Возвратное кольцо К подтверждено; проверяются реальные8/16 и существующие ловушки.');
   if(repairedCandidates++>=2){rejection='Исчерпан фиксированный бюджет двух полных ремонтов длинного кольца.';return false;}
   try{
-   const fixed=branchLongRoute(maze,seed+'-return-branches',onProgress,false,6,[forkId,...originalTraps]),draft=mazeDraft(fixed),runtime=freeRuntime(fixed);
+   const returnGuards=source.parameters.freePassagePattern==='two-row-v1'?[{fork:forkId,doors:[runtime.rooms[loop.loop[1]!]!.id,runtime.rooms[loop.loop.at(-2)!]!.id]as[string,string]}]:[];
+   const fixed=branchLongRoute(maze,seed+'-return-branches',onProgress,false,6,[forkId,...originalTraps],returnGuards),draft=mazeDraft(fixed),runtimeAfter=freeRuntime(fixed);diagnosticDraft=draft;
    if(layout.modules.filter(m=>!removedRepairs.has(m.id)).some(m=>JSON.stringify(draft.layout.modules.find(n=>n.id===m.id))!==JSON.stringify(m)))throw Error('Исходные модули изменились.');
    const current=new Set(draft.layout.moduleConstruction?.spans.map(c=>c.id)??[]),ids=new Set(draft.layout.modules.filter(m=>!m.frameOnly&&m.type!=='custom').map(m=>m.id));
    if(draft.layout.moduleConstruction)for(const c of draft.layout.connections)if(ids.has(c.a.room)&&ids.has(c.b.room)&&!current.has(c.id)){draft.layout.moduleConstruction.spans.push(structuredClone(c));current.add(c.id);}
@@ -96,10 +104,10 @@ export function attachDenseReturnLoop(source:Maze,forkId:string,seed:string,onPr
    const result=freeMaze(draft,false),gates=draft.layout.openings.filter(o=>o.id===draft.layout.entrance||o.id===draft.layout.exit);
    if(!selectOppositePortals(draft.layout,gates,Math.min(...gates.map(o=>o.width))).length)throw Error('Новые рамы вышли за противоположные внешние границы проёмов.');
    const lengths=freeGroundLengths(result);if(lengths.straight>8+1e-7||lengths.run>16+1e-7)throw Error('Кольцо не выдержало физических8/16после полноценных боковых ветвей.');
-   const loopForks=new Set(loopTraps(result).candidates.filter(t=>t.qualifies).map(t=>runtime.rooms[t.fork]!.id));if(!loopForks.has(forkId)||originalLoops.some(id=>!loopForks.has(id)))throw Error('После боковых ветвей возвратная ловушка перестала квалифицироваться.');
-   const preserved=new Set(routeTraps(result).candidates.filter(t=>t.qualifies).map(t=>runtime.rooms[t.fork]!.id));if(originalTraps.some(id=>!preserved.has(id)))throw Error('Кольцо разрушило существующую отдельную тупиковую ловушку.');
+   const loopForks=new Set(loopTraps(result).candidates.filter(t=>t.qualifies).map(t=>runtimeAfter.rooms[t.fork]!.id));if(!loopForks.has(forkId)||originalLoops.some(id=>!loopForks.has(id)))throw Error('После боковых ветвей возвратная ловушка перестала квалифицироваться.');
+   const preserved=new Set(routeTraps(result).candidates.filter(t=>t.qualifies).map(t=>runtimeAfter.rooms[t.fork]!.id));if(originalTraps.some(id=>!preserved.has(id)))throw Error('Кольцо разрушило существующую отдельную тупиковую ловушку.');
    accepted=result;return true;
-  }catch(e){diagnosticDraft=(e as {diagnosticDraft?:FreeDraft})?.diagnosticDraft;rejection=e instanceof Error?e.message:String(e);return false;}
+  }catch(e){diagnosticDraft=(e as {diagnosticDraft?:FreeDraft})?.diagnosticDraft??diagnosticDraft;rejection=e instanceof Error?e.message:String(e);return false;}
  };
  const draft=mazeDraft(source);let polygon=[{x:0,z:0},{x:source.parameters.columns,z:0},{x:source.parameters.columns,z:source.parameters.rows},{x:0,z:source.parameters.rows}];
  // Preserve the actual exterior support planes during search, rather than
@@ -120,8 +128,8 @@ export function attachDenseReturnLoop(source:Maze,forkId:string,seed:string,onPr
   const origin={x:module.x,z:module.z},tail=r.centers[arm.tail]!,tailU=(tail.x-origin.x)*outward.x+(tail.z-origin.z)*outward.z,tailV=(tail.x-origin.x)*falseAxis.x+(tail.z-origin.z)*falseAxis.z;
   if(Math.abs(tailU)>.1||tailV<1.9||tailV>3)continue;
   triedFeature=true;
-  const feature=structuredClone(draft),points=[[0,7],[4.891366458960192,6.2],[9.782732917920384,5.4],[14.674099376880576,4.6],[13.674099376880576,-.22842712474619],[8.674099376880576,-.22842712474619],[3.674099376880576,-.22842712474619]],rooms=[r.rooms[arm.tail]!.id];
-  const entry=feature.layout.connections.find(c=>c.id===ownConnection.id)!;entry.width=1.8;entry.a.offset=0;entry.b.offset=0;
+  const feature=structuredClone(draft),points=denseReturnModulePoints(source.parameters.freePassagePattern),rooms=[r.rooms[arm.tail]!.id];
+  const entry=feature.layout.connections.find(c=>c.id===ownConnection.id)!;entry.width=source.parameters.freePassagePattern==='two-row-v1'?2:1.8;entry.a.offset=0;entry.b.offset=0;
   let serial=0;const prefix=`dense-return-${seed.replace(/[^a-zA-Z0-9]/g,'').slice(-32)}-`;
   for(const [u,v]of points){const id=prefix+serial++;if(feature.layout.modules.some(m=>m.id===id))throw Error('Повторный идентификатор кольца.');feature.layout.modules.push({id,type:'2x2',x:origin.x+outward.x*u!+falseAxis.x*v!,z:origin.z+outward.z*u!+falseAxis.z*v!,angle:module.angle});rooms.push(id);}
   rooms.push(forkId);let valid=true;
@@ -130,7 +138,7 @@ export function attachDenseReturnLoop(source:Maze,forkId:string,seed:string,onPr
 
    const from=[0,1,2,3].map(edge=>({room:a.id,edge,offset:0})),to=k===rooms.length-1?[gate]:[0,1,2,3].map(edge=>({room:b.id,edge,offset:0}));
    const choices=from.flatMap(aa=>to.map(bb=>{
-    const c={id:prefix+'span-'+k,a:aa,b:bb,width:k===rooms.length-1?1.4:1.8},g=connectionGeometry(feature.layout,c),pa=anchorGeometry(feature.layout,aa,c.width),pb=anchorGeometry(feature.layout,bb,c.width);
+    const c={id:prefix+'span-'+k,a:aa,b:bb,width:source.parameters.freePassagePattern==='two-row-v1'?2:k===rooms.length-1?1.4:1.8},g=connectionGeometry(feature.layout,c),pa=anchorGeometry(feature.layout,aa,c.width),pb=anchorGeometry(feature.layout,bb,c.width);
     const usable=pa.normal.x*dx+pa.normal.z*dz>.1&&pb.normal.x*dx+pb.normal.z*dz<-.1;
     const widest=Math.min(segmentDistance(g.a.from,g.sides[0]!),segmentDistance(g.a.to,g.sides[1]!),segmentDistance(g.b.from,g.sides[1]!),segmentDistance(g.b.to,g.sides[0]!)),longest=Math.max(...g.sides.map(w=>distance(...ends(w))));
     return {c,widest,longest,usable};
@@ -140,7 +148,7 @@ export function attachDenseReturnLoop(source:Maze,forkId:string,seed:string,onPr
 
    feature.layout.connections.push(connection);
   }
-  if(valid)staggerDenseReturnSpans(feature,[prefix+'span-6',prefix+'span-7'],falseAxis);
+  if(valid&&source.parameters.freePassagePattern!=='two-row-v1')staggerDenseReturnSpans(feature,[prefix+'span-6',prefix+'span-7'],falseAxis);
   if(valid){
    const protectedRooms=new Set(sourceTraps.flatMap(t=>t.falsePath).map(c=>r.rooms[c]!.id)),seen=new Set<number>();
    const newFloor=[...feature.layout.modules.filter(m=>!layout.modules.some(old=>old.id===m.id)).map(modulePolygon),...feature.layout.connections.filter(c=>!oldConnections.has(c.id)).map(c=>connectionGeometry(feature.layout,c).polygon)];

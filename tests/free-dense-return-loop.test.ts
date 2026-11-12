@@ -79,3 +79,39 @@ test('staggered offsets agree in world space for rotated native modules',async()
   for(const c of layout.connections){const p=anchorGeometry(layout,c.a,c.width).mid,q=anchorGeometry(layout,c.b,c.width).mid;expect(p.x*across.x+p.z*across.z).toBeCloseTo(q.x*across.x+q.z*across.z,9);for(const wall of connectionGeometry(layout,c).sides)expect(distance(...ends(wall))).toBeCloseTo(3,9);}
  }
 });
+
+test('two-row return uses actual shifted frames and full doors, with a 40 m physical circuit at 0°/37°',async()=>{
+ const {denseReturnModulePoints}=await import('../src/free/dense-return-loop');
+ const {connectionGeometry,freeRuntime,freeGraphPath,physical}=await import('../src/free/layout');
+ const {distance,ends,segmentDistance}=await import('../src/free/geometry');
+ const {CollisionWorld}=await import('../src/simulation/collisions');
+ const {pathLength}=await import('../src/core/pathfinding');
+ const {freeGroundLengths}=await import('../src/free/path-limits');
+ for(const angle of [0,37]){
+  const rad=angle*Math.PI/180,c=Math.cos(rad),s=Math.sin(rad),points=[[0,0],[0,2],...denseReturnModulePoints('two-row-v1')],layout=emptyLayout();
+  layout.modules=points.map(([u,v],i)=>({id:`ring${i}`,type:'2x2',x:15+v!*c-u!*s,z:15+v!*s+u!*c,angle}));
+  for(let i=0;i<points.length;i++){
+   const a=layout.modules[i]!,b=layout.modules[(i+1)%points.length]!,dx=b.x-a.x,dz=b.z-a.z,candidates=[];
+   for(let ae=0;ae<4;ae++)for(let be=0;be<4;be++){
+    const connection={id:`link${i}`,a:{room:a.id,edge:ae,offset:0},b:{room:b.id,edge:be,offset:0},width:2},g=connectionGeometry(layout,connection);
+    const width=Math.min(segmentDistance(g.a.from,g.sides[0]!),segmentDistance(g.a.to,g.sides[1]!),segmentDistance(g.b.from,g.sides[1]!),segmentDistance(g.b.to,g.sides[0]!)),longest=Math.max(...g.sides.map(w=>distance(...ends(w))));
+    if(g.a.normal.x*dx+g.a.normal.z*dz>.1&&g.b.normal.x*dx+g.b.normal.z*dz<-.1&&width>=1-1e-7&&longest<=3+1e-7)candidates.push({connection,width,longest});
+   }
+   candidates.sort((a,b)=>b.width-a.width||a.longest-b.longest);expect(candidates.length).toBeGreaterThan(0);layout.connections.push(candidates[0]!.connection);
+  }
+  layout.openings=[{id:'in',room:'ring0',edge:0,offset:0,width:2},{id:'out',room:'ring0',edge:3,offset:0,width:2}];layout.entrance='in';layout.exit='out';layout.moduleConstruction={version:1,spans:structuredClone(layout.connections)};
+  const draft:FreeDraft={kind:'maze-lab-free-draft',version:1,parameters:{placementMode:'free',columns:50,rows:50,moduleSize:2,corridorWidth:2,extraConnections:1,seed:'native-return',algorithm:'prim'},construction:DEFAULT_CONSTRUCTION,layout};
+  expect(validateFree(draft)).toEqual([]);expect(layout.connections.every(c=>c.width===2&&c.a.offset===0&&c.b.offset===0)).toBe(true);
+  const maze=freeMaze(draft,false),r=freeRuntime(maze),world=new CollisionWorld(physical(layout).obstacles),circuit=freeGraphPath(maze,[...points.map((_,i)=>i),0]);
+  expect(pathLength(circuit)).toBeGreaterThanOrEqual(40);expect(freeGroundLengths(maze).straight).toBeLessThanOrEqual(8+1e-7);
+  for(let i=1;i<circuit.length;i++){const a=circuit[i-1]!,b=circuit[i]!;expect(distance(world.move(a,{x:b.x-a.x,z:b.z-a.z}),b)).toBeLessThan(1e-5);}
+  expect(r.edgePaths.size).toBe(layout.connections.length*2);
+  const {returnCircuitPreserved}=await import('../src/free/route-crosslinks'),guard={fork:'ring0',doors:['ring1','ring8']as[string,string]};expect(returnCircuitPreserved(maze,guard)).toBe(true);
+  const shortcut=structuredClone(draft),cross={id:'shortening-crosslink',a:{room:'ring3',edge:3,offset:0},b:{room:'ring8',edge:1,offset:0},width:2};shortcut.layout.connections.push(cross);shortcut.layout.moduleConstruction!.spans.push(cross);expect(validateFree(shortcut)).toEqual([]);expect(returnCircuitPreserved(freeMaze(shortcut,false),guard)).toBe(false);
+  const branch=structuredClone(draft),parent=branch.layout.modules[5]!,twig={id:'twig',type:'2x2'as const,x:parent.x-5*s,z:parent.z+5*c,angle},twigLink={id:'twig-link',a:{room:parent.id,edge:2,offset:0},b:{room:'twig',edge:0,offset:0},width:2};branch.layout.modules.push(twig);branch.layout.connections.push(twigLink);branch.layout.moduleConstruction!.spans.push(twigLink);expect(validateFree(branch)).toEqual([]);expect(returnCircuitPreserved(freeMaze(branch,false),guard)).toBe(true);
+  // The middle square lies beyond every capsule-clear line between the
+  // two end squares: the bend is in the real footprint, not its centre path.
+  expect(points[7]![0]!*2).toBeCloseTo(points[6]![0]!+points[8]![0]!,8);expect(Math.min(points[6]![1]!,points[8]![1]!)-.75).toBeGreaterThan(points[7]![1]!+.75);
+  const westStart=layout.modules[6]!,westEnd=layout.modules[8]!;expect(distance(world.move(westStart,{x:westEnd.x-westStart.x,z:westEnd.z-westStart.z}),westEnd)).toBeGreaterThan(.1);
+ }
+});

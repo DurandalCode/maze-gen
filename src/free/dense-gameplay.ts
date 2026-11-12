@@ -28,7 +28,7 @@ export function generateDenseGameplay(source:Maze,parameters:Parameters,onProgre
     candidates.push({id,score:alignment(port(first).edge)+alignment(free[0]!)-2*alignment(port(correct).edge)});
    }
   }
-  const selected=[...new Map(candidates.map(c=>[c.id,c])).values()].sort((a,b)=>b.score-a.score)[0];if(!selected||selected.score<=0)throw Error('Нет свободного углового модуля с двумя убедительными ложными входами для возвратного кольца.');
+  const reserved=maze.free!.cavityReport?.construction?.reservedReturnFork,ranked=[...new Map(candidates.map(c=>[c.id,c])).values()].sort((a,b)=>b.score-a.score),selected=parameters.freePassagePattern==='two-row-v1'&&reserved?ranked.find(c=>c.id===reserved):ranked[0];if(!selected||selected.score<=0)throw Error('Нет свободного углового модуля с двумя убедительными ложными входами для возвратного кольца.');
   const before=maze.free!.modules.length;maze=attachDenseReturnLoop(maze,selected.id,parameters.seed+'-dense-return-v1',onProgress);
   const report=maze.free!.cavityReport;if(report?.construction){report.construction.addedModules+=maze.free!.modules.length-before;report.construction.certifiedWalls=auditModuleWalls(maze.free!).walls.length;report.regions.push({id:'dense-return-v1',area:0,filledArea:0,blockedArea:0,status:'filled',cells:maze.free!.modules.length-before,doors:0,reason:'Подтверждённое возвратное кольцо: два ложных входа возвращаются к одной развилке. Его внешний пол не выдаётся за заполнение исходных внутренних полостей.'});}
  }
