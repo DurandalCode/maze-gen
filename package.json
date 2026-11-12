@@ -14,6 +14,8 @@
     "test:two-storey": "bun test tests/two-storey.test.ts",
     "test:two-storey:browser": "bun scripts/two-storey-check.ts",
     "test:generation:browser": "bun scripts/generation-ux-check.ts",
+    "test:free-generation:browser": "bun scripts/free-generator-controls-check.ts",
+    "test:final-geometry:browser": "bun scripts/final-geometry-check.ts",
     "test:bridges:browser": "bun scripts/free-bridges-check.ts",
     "test:repairs:browser": "bun scripts/main-repair-check.ts && bun scripts/free-repair-check.ts",
     "test:zones:browser": "bun scripts/free-zones-check.ts",

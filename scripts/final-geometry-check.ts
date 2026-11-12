@@ -1,0 +1,45 @@
+/** Production browser roundtrip for a supplied final map, in an isolated API. */
+import {chromium,type Page} from 'playwright';
+import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {FileStore} from '../server/store';
+import {createFileApi} from '../server/api';
+import {serialize,deserialize} from '../src/persistence/maze-json';
+const base=process.env.MAZE_TEST_URL??'http://127.0.0.1:1422',id=process.env.MAZE_GEOMETRY_ID;
+if(!id)throw Error('Set MAZE_GEOMETRY_ID to the final saved map.');
+const response=await fetch(`${base}/api/mazes/${id}`);if(!response.ok)throw Error('Final map is unavailable.');
+const source=await response.json() as Awaited<ReturnType<FileStore['saveMaze']>>;
+const root=await mkdtemp(join(tmpdir(),'maze-final-geometry-')),store=new FileStore(root),api=createFileApi(store),saved=await store.saveMaze(source.maze,source.title);
+const browser=await chromium.launch({executablePath:process.env.MAZE_BROWSER??'/Applications/Yandex.app/Contents/MacOS/Yandex',headless:true,args:['--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+const download=async(p:Page,name:string)=>{const pending=p.waitForEvent('download');await p.getByRole('button',{name,exact:true}).click();return deserialize(await readFile((await (await pending).path())!,'utf8'));};
+try{
+ await page.route('**/api/**',async route=>{
+  const r=route.request(),reply=await api(new Request(r.url(),{method:r.method(),headers:r.headers(),...(r.method()==='POST'?{body:r.postData()}: {})}));
+  if(!reply){await route.continue();return;}await route.fulfill({status:reply.status,headers:Object.fromEntries(reply.headers),body:await reply.text()});
+ });
+ await page.goto(`${base}/?maze=${saved.id}`);
+ await page.getByLabel('Количество модулей',{exact:true}).filter({hasText:String(source.maze.free!.modules.length)}).waitFor();
+ // Regenerate the exact saved recipe through the ordinary form. This proves
+ // the bundled entry point, not merely the readability of a scripted card.
+ await page.getByRole('button',{name:'Настройки',exact:true}).click();
+ await page.getByRole('button',{name:'Сгенерировать',exact:true}).click();
+ await page.waitForFunction(()=>!document.querySelector('.generate')?.hasAttribute('disabled'),{},{timeout:45000});
+ await page.getByRole('button',{name:'Лабиринт',exact:true}).click();
+ const exported=await download(page,'Сохранить');if(serialize(exported)!==serialize(source.maze))throw Error('Map export changed final geometry.');
+ const posted=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/api/mazes'));
+ await page.getByRole('button',{name:'В библиотеку',exact:true}).click();if(!(await posted).ok())throw Error('Library save failed.');
+ await page.getByRole('switch',{name:'Редактор свободного размещения',exact:true}).check();
+ await page.getByText('Связность, пролёты, проёмы и физическая проходимость проверены.',{exact:true}).waitFor();
+ await page.getByLabel('Выбрать объект',{exact:true}).selectOption(source.maze.free!.modules[0]!.id);
+ await page.getByLabel('X, м',{exact:true}).fill('1000');
+ if(!await page.getByRole('button',{name:'Сохранить карту',exact:true}).isDisabled())throw Error('Invalid geometry remained saveable.');
+ await page.getByRole('button',{name:'Отменить правку',exact:true}).click();
+ await page.getByText('Связность, пролёты, проёмы и физическая проходимость проверены.',{exact:true}).waitFor();
+ const edited=await download(page,'Сохранить карту');if(serialize(edited)!==serialize(source.maze))throw Error('Undo/editor roundtrip changed geometry.');
+ if(errors.length)throw Error(errors.join('\n'));
+ const output=process.env.MAZE_OUTPUT_DIR??'test-results';await mkdir(output,{recursive:true});
+ const report={id,modules:source.maze.free!.modules.length,moduleConstruction:!!source.maze.free!.moduleConstruction,ordinaryFormReplay:'passed',mapExport:'passed',librarySave:'passed',invalidEditRejected:'passed',undo:'passed',editorExport:'passed',pageErrors:errors};
+ await writeFile(join(output,'final-geometry-browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await browser.close();await rm(root,{recursive:true,force:true});}
