@@ -1,3 +1,4 @@
+import {densifyCourtyards} from './dense-courtyards';
 import {openSelectiveCourtyards} from './selective-courtyards';
 import type {Maze,Point} from '../core/maze';
 import {mazeDraft} from './json';
@@ -31,13 +32,20 @@ export function generateModuleCavityMaze(base:Maze,onProgress?:(s:string)=>void)
   draft=accepted;opened++;doors+=selectedDoors;owner.filledArea+=court.area;owner.cells++;owner.doors+=selectedDoors;owner.components.push({area:court.area,state:'filled',reason:`Открыт межмодульный двор; ${selectedDoors} выборочных дверей, новых самостоятельных стен нет.`});
  }
  let selective:{opened:number;area:number;spanArea:number;rejected:{area:number;reason:string}[]}|undefined;
- if(base.parameters.freeCourtyardPolicy==='selective-v2'){
+ if(base.parameters.freeCourtyardPolicy==='selective-v2'||base.parameters.freeCourtyardPolicy==='dense-v3'){
   const result=openSelectiveCourtyards(draft,base.parameters.seed+'-selective-v2',6,onProgress);draft=result.draft;
   selective={opened:result.opened.length,area:result.opened.reduce((s,c)=>s+c.area,0),spanArea:result.opened.reduce((s,c)=>s+c.spanArea,0),rejected:result.rejected};opened+=result.opened.length;doors+=2*result.opened.length;
   for(const court of result.opened){const owner=ledger.find(r=>court.polygon.every(v=>pointIn(v,r.polygon)));if(!owner)throw Error('Выборочный двор потерян в учёте полостей.');owner.filledArea+=court.area+court.spanArea;owner.cells++;owner.doors+=2;owner.components.push({area:court.area+court.spanArea,state:'filled',reason:`Открыт компактный двор${court.area.toFixed(2)}м² через2двери в существующих стенах; пролёт между имеющимися рамами${court.span.toFixed(2)}м, новые модули не нужны.`});}
  }
- for(const row of ledger){if(row.state!=='candidate'&&!row.filledArea)continue;row.filledArea=Math.min(row.area,row.filledArea);row.blockedArea=row.state==='candidate'?Math.max(0,row.area-row.filledArea):0;row.status=row.filledArea<1e-6?'blocked':row.filledArea<row.area-1e-6?'partial':'filled';if(row.state==='candidate'&&row.blockedArea>1e-6)row.components.push({area:row.blockedArea,state:'blocked',reason:base.parameters.freeCourtyardPolicy==='selective-v2'?'Остаток не открыт: не найдено допустимое замыкание с двумя безопасными дверями. Ограниченный поиск не доказывает геометрическую невозможность.':'Остаток не замкнут допустимыми модульными стенами; нужны дополнительные реальные рамы, отдельные стойки не заменяют их.'});}
+ let dense:{addedModules:number;opened:number;area:number;rejected:string[]}|undefined;
+ if(base.parameters.freeCourtyardPolicy==='dense-v3'){
+  const result=densifyCourtyards(draft,base.parameters.seed+'-dense-v3',onProgress);draft=result.draft;
+  dense={addedModules:result.additions.reduce((s,a)=>s+a.modules,0),opened:result.additions.filter(a=>a.doors>0).length,area:result.additions.reduce((s,a)=>s+a.area,0),rejected:result.rejected};
+  added+=dense.addedModules;opened+=dense.opened;doors+=2*dense.opened;
+  for(const item of result.additions){const owner=ledger.find(r=>item.polygon.every(v=>pointIn(v,r.polygon)));if(!owner)throw Error('Модульное уплотнение потеряно в учёте полостей.');owner.filledArea+=item.area;owner.cells+=item.modules+(item.doors?1:0);owner.doors+=item.doors;owner.components.push({area:item.area,state:'filled',reason:item.reason});}
+ }
+ for(const row of ledger){if(row.state!=='candidate'&&!row.filledArea)continue;row.filledArea=Math.min(row.area,row.filledArea);row.blockedArea=row.state==='candidate'?Math.max(0,row.area-row.filledArea):0;row.status=row.filledArea<1e-6?'blocked':row.filledArea<row.area-1e-6?'partial':'filled';if(row.state==='candidate'&&row.blockedArea>1e-6)row.components.push({area:row.blockedArea,state:'blocked',reason:base.parameters.freeCourtyardPolicy?'Остаток не открыт: не найдено допустимое замыкание с двумя безопасными дверями. Ограниченный поиск не доказывает геометрическую невозможность.':'Остаток не замкнут допустимыми модульными стенами; нужны дополнительные реальные рамы, отдельные стойки не заменяют их.'});}
  const audit=auditModuleWalls(draft.layout);if(audit.issues.length)throw Error(audit.issues[0]!.message);
- draft.layout.cavityReport={seed:base.parameters.seed,baseGeometry:frameworkGeometry,construction:{baseModules,addedModules:added,openedCourtyards:opened,certifiedWalls:audit.walls.length,...(selective?{selectiveCourtyards:selective}:{})},filledArea:ledger.reduce((s,r)=>s+r.filledArea,0),blockedArea:ledger.reduce((s,r)=>s+r.blockedArea,0),outsideArea:ledger.filter(r=>r.state!=='candidate').reduce((s,r)=>s+r.area-r.filledArea,0),regions:ledger.map(r=>({id:r.id,area:r.area,filledArea:r.filledArea,blockedArea:r.blockedArea,status:r.state==='candidate'||r.filledArea?r.status:r.state,reason:r.components.map(c=>c.reason).join(' ')||r.reason,cells:r.cells,doors:r.doors}))};
+ draft.layout.cavityReport={seed:base.parameters.seed,baseGeometry:frameworkGeometry,construction:{baseModules,addedModules:added,openedCourtyards:opened,certifiedWalls:audit.walls.length,...(selective?{selectiveCourtyards:selective}:{}),...(dense?{denseCourtyards:dense}:{})},filledArea:ledger.reduce((s,r)=>s+r.filledArea,0),blockedArea:ledger.reduce((s,r)=>s+r.blockedArea,0),outsideArea:ledger.filter(r=>r.state!=='candidate').reduce((s,r)=>s+r.area-r.filledArea,0),regions:ledger.map(r=>({id:r.id,area:r.area,filledArea:r.filledArea,blockedArea:r.blockedArea,status:r.state==='candidate'||r.filledArea?r.status:r.state,reason:r.components.map(c=>c.reason).join(' ')||r.reason,cells:r.cells,doors:r.doors}))};
  const maze=freeMaze(draft);return {maze,ledger,filledArea:ledger.reduce((s,r)=>s+r.filledArea,0),chambers:added+opened,externalDoors:doors,internalDoors:0,closedWalls:0};
 }

@@ -197,3 +197,17 @@
 редакторе. Регрессия на сохранённой native-геометрии проверяет компактные дворы
 4,45/4,83/7,29 м², выборочные двери, сохранение исходных рам и детерминированность
 без зависимости от времени выполнения: `tests/selective-courtyards.test.ts`.
+
+`freeCourtyardPolicy: 'dense-v3'` explicitly opts into a second, bounded
+constructive pass after `selective-v2`. It re-inventories the remaining bays
+on each of at most three passes, tries at most four internal regions per pass,
+and adds actual 2×2/2×6 frame routes between different existing branches.
+Each accepted connection still has real side spans ≤3m. Existing frame
+positions, portal locations and framework spacings are preserved. New frames
+subdivide large voids; resulting compact closed courts (2.8–24m²) receive
+exactly two selected doors in their existing supported boundaries. Full
+geometry, capsule connectivity, wall origins and whole-map8/16 are checked
+before accepting a court. Search failure is a bounded-search result, not a
+proof that the remaining area is unusable. The report accounts for all added
+frame/span floor and opened courts. Old recipes with `selective-v2` or no
+courtyard policy retain their original generation path.

@@ -41,7 +41,7 @@ export interface Parameters {
   /** Generate a seeded chamber maze inside organic negative spaces. */
   freeCavityMaze?:boolean;
   /** Versioned selective access to compact courts using existing frames. */
-  freeCourtyardPolicy?:'selective-v2';
+  freeCourtyardPolicy?:'selective-v2'|'dense-v3';
   freeRequiredBridgeCount?:number;
   freeRequireUnderpass?:boolean;
   freeZoneCount?:number;
@@ -129,7 +129,7 @@ export function validateParameters(p: Parameters): void {
   if(p.freeRoutePattern!==undefined&&!['organic','switchbacks'].includes(p.freeRoutePattern))throw Error('Неизвестный рисунок свободного маршрута.');
   if(p.freeSpanPolicy!==undefined&&(p.freeSpanPolicy!=='maximum'||p.placementMode!=='free'))throw Error('Максимальное разнесение доступно только для свободной планировки.');
   if(p.freeCavityMaze!==undefined&&typeof p.freeCavityMaze!=='boolean')throw Error('Некорректная настройка лабиринта в полостях.');
-  if(p.freeCourtyardPolicy!==undefined&&(p.freeCourtyardPolicy!=='selective-v2'||!p.freeCavityMaze))throw Error('Выборочные дворы доступны для гибридной свободной планировки.');
+  if(p.freeCourtyardPolicy!==undefined&&(!['selective-v2','dense-v3'].includes(p.freeCourtyardPolicy)||!p.freeCavityMaze))throw Error('Выборочные дворы доступны для гибридной свободной планировки.');
   if(p.freeCavityMaze&&(p.placementMode!=='free'||(p.freeBridgeCount??0)>0||p.freeRoutePattern==='switchbacks'))throw Error('Лабиринт в полостях доступен для органической свободной планировки без мостов.');
   if(p.freeInfillPassages!==undefined&&(!Number.isInteger(p.freeInfillPassages)||p.freeInfillPassages<0||p.freeInfillPassages>12))throw Error('Число поперечных связей: от 0 до 12.');
   if(p.freeInfillPassages&&(p.placementMode!=='free'||(p.freeBridgeCount??0)>0))throw Error('Связи в промежутках доступны для свободной планировки без мостов.');
