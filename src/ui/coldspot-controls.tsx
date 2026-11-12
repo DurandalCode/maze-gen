@@ -4,6 +4,7 @@ import { DEFAULT_ANALYSIS, type AnalysisOptions, type ColdspotAnalysis } from '.
 import { PROFILE_NAMES, type NavigationProfile } from '../analysis/navigation';
 import type { OptimizationMethod, OptimizationResult, OptimizationObjective } from '../analysis/optimize';
 import { PotentialPanel } from './potential-panel';
+import {metrics} from '../core/metrics';
 export type HeatLayer = 'probability' | 'visits';
 export interface HeatDisplay {
   analysis: ColdspotAnalysis;
@@ -21,7 +22,10 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
   const [enabled, setEnabled] = useState(false), [show, setShow] = useState(true);
   const [options, setOptions] = useState<AnalysisOptions>(DEFAULT_ANALYSIS);
   const [analysis, setAnalysis] = useState<ColdspotAnalysis | null>(null), [error, setError] = useState('');
+  const [detailRequest,setDetailRequest]=useState<{maze:Maze;options:AnalysisOptions}|null>(null);
+  const detailed=detailRequest?.maze===maze&&detailRequest.options===options;
   const [calculating, setCalculating] = useState(false), [optimizing, setOptimizing] = useState(false);
+  const [analysisAttempt,setAnalysisAttempt]=useState(0);
   const [layer, setLayer] = useState<HeatLayer>('probability'), [coldOnly, setColdOnly] = useState(false),[showDistricts,setShowDistricts]=useState(false);
   const [method, setMethod] = useState<OptimizationMethod>('seeds'), [attempts, setAttempts] = useState(32);
   const [objective, setObjective] = useState<OptimizationObjective>('exploration');
@@ -41,11 +45,16 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
       return;
     }
     setCalculating(true);
-    setAnalysis(null);
+    if(!detailed)setAnalysis(null);
     setError('');
-    onDisplay(null);
-    const worker = new Worker(new URL('../analysis/worker.ts', import.meta.url), { type: 'module' });
+    if(!detailed)onDisplay(null);
+    let active=true,worker:Worker|undefined;
+    // Sliders and quick edits form one request; no workers for intermediate values.
+    const timer=window.setTimeout(()=>{
+    worker = new Worker(new URL('../analysis/worker.ts', import.meta.url), { type: 'module' });
+    const job=worker;
     worker.onmessage = event => {
+      if(!active)return;
       if (event.data.kind === 'analysis') {
         setAnalysis(event.data.result);
         setCalculating(false);
@@ -54,12 +63,13 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
         setError(event.data.message);
         setCalculating(false);
       }
-      worker.terminate();
+      job.terminate();
     };
-    worker.onerror = () => { setError('Не удалось выполнить анализ.'); setCalculating(false); worker.terminate(); };
-    worker.postMessage({ kind: 'analyze', maze, options });
-    return () => worker.terminate();
-  }, [enabled, maze.parameters, maze.passages, maze.entrance, maze.exit, maze.wallHeight, maze.roof, maze.translucentFabric, maze.environment, options, onDisplay]);
+    worker.onerror = event => { event.preventDefault();if(!active)return;setError('Не удалось выполнить анализ.'); setCalculating(false); job.terminate(); };
+    worker.postMessage({ kind: 'analyze', maze, options, detailed });
+    },100);
+    return () => {active=false;window.clearTimeout(timer);worker?.terminate();};
+  }, [enabled, request, maze.free,maze.parameters, maze.passages, maze.entrance, maze.exit, maze.wallHeight, maze.roof, maze.translucentFabric, maze.environment, options, onDisplay,detailRequest,analysisAttempt]);
   useEffect(() => () => { optimizer.current?.terminate(); onDisplay(null); }, [onDisplay]);
   useEffect(() => { onDisplay(show && analysis ? { analysis, layer, coldOnly,showDistricts } : null); }, [analysis, show, layer, coldOnly,showDistricts, onDisplay]);
   const cancel = () => { optimizer.current?.terminate(); optimizer.current = null; setOptimizing(false); setProgress(''); setNotice('Оптимизация отменена.'); };
@@ -104,7 +114,7 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
         setNotice(`Проверено ${result.attempted} вариантов. Улучшения с сохранением ограничений не найдено.`);
     };
     worker.onerror = () => { if(optimizer.current!==worker)return;worker.terminate(); optimizer.current = null; setOptimizing(false); setError('Не удалось выполнить оптимизацию.'); };
-    worker.postMessage({ kind: 'optimize', maze, options, method:analysis?.potential?.cycles&&!maze.storeys?'walls':method, attempts, objective });
+    worker.postMessage({ kind: 'optimize', maze, options, method:metrics(maze).cycles&&!maze.storeys?'walls':method, attempts, objective });
   };
   return <section className="coldspot-controls" aria-label="Анализ колдспотов">
   <div className="section-label"><span>КОЛДСПОТЫ И СЛОЖНОСТЬ</span><span>◈</span></div>
@@ -123,10 +133,10 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
   </>}
   <label className="field"><span>Холодный участок · посещают менее {Math.round(options.threshold * 100)}%</span><input aria-label="Порог колдспота" type="range" min="5" max="50" step="5" value={options.threshold * 100} onChange={e => setOptions({ ...options, threshold: Number(e.target.value) / 100 })}/></label>
   </details>
-  {calculating && <div className="coldspot-progress" role="status">Считаем горячесть…<button type="button" onClick={() => setEnabled(false)}>Отменить анализ</button></div>}
-  {error && <p className="shape-error" role="alert">{error}</p>}
+  {calculating && <div className="coldspot-progress" role="status">{detailed?'Считаем подробную оценку…':'Считаем горячесть…'}<button type="button" onClick={() => {setDetailRequest(null);setEnabled(false);}}>Отменить анализ</button></div>}
+  {error && <div className="shape-error" role="alert"><p>{error}</p><button type="button" disabled={calculating} onClick={()=>{setEnabled(true);setAnalysisAttempt(n=>n+1);}}>Повторить анализ</button></div>}
   {analysis && <>
-  {(maze.version!==5&&maze.version!==7)&&<details className="analysis-options"><summary>Подробная оценка сложности</summary><PotentialPanel value={analysis.potential} onLimit={(key, value) => setOptions({ ...options, [key]: value })}/></details>}
+  {(maze.version!==5&&maze.version!==7)&&<details className="analysis-options"><summary>Подробная оценка сложности</summary>{!analysis.potential&&<button disabled={calculating} type="button" onClick={()=>setDetailRequest({maze,options})}>Рассчитать подробную оценку</button>}<PotentialPanel value={analysis.potential} onLimit={(key, value) => setOptions({ ...options, [key]: value })}/></details>}
   <label className="coldspot-check"><input aria-label="Горячесть на карте" type="checkbox" checked={show} onChange={e => setShow(e.target.checked)}/> Горячесть на карте</label>
   <label className="field"><span>Тепловой слой</span><select aria-label="Тепловой слой" value={layer} onChange={e => setLayer(e.target.value as HeatLayer)}><option value="probability">Вероятность посещения</option><option value="visits">Среднее число посещений</option></select></label>
   <label className="coldspot-check"><input aria-label="Только холодные участки" type="checkbox" checked={coldOnly} onChange={e => setColdOnly(e.target.checked)}/> Только холодные участки</label>

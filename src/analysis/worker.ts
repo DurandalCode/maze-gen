@@ -11,6 +11,7 @@ type Request = {
   kind: 'analyze';
   maze: Maze;
   options: AnalysisOptions;
+  detailed?:boolean;
 } | {
   kind: 'optimize';
   maze: Maze;
@@ -25,8 +26,9 @@ self.onmessage = (event: MessageEvent<Request>) => {
     if (request.kind === 'analyze') {
       if((request.maze.version===5||request.maze.version===7)){const result=freeHeatDisplay(request.maze,request.options);result.sideDistricts=sideDistricts(request.maze,result.probability,result.options.threshold);self.postMessage({kind:'analysis',result});return;}
       const result = analyzeColdspots(request.maze, request.options);
-      result.potential=analyzePotential(request.maze,request.maze.parameters.design?{...request.options,samples:2048}:request.options,result);
       result.sideDistricts=sideDistricts(request.maze,result.probability,result.options.threshold);
+      if(request.detailed){
+      result.potential=analyzePotential(request.maze,request.maze.parameters.design?{...request.options,samples:2048}:request.options,result);
       result.privacy = result.potential.privacy;
       if (request.maze.version!==4&&metrics(request.maze).cycles === 0)
         result.sideExploration = expectedExploration(request.maze, result.probability);
@@ -34,6 +36,7 @@ self.onmessage = (event: MessageEvent<Request>) => {
         result.decisions = decisionDifficulty(request.maze);
       result.explorerExpectedLength = request.options.profile === 'explorer' ? result.expectedLength :
         analyzeColdspots(request.maze, { ...request.options, profile: 'explorer' }).expectedLength;
+      }
       self.postMessage({ kind: 'analysis', result });
     }
     else
