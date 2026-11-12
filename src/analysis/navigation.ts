@@ -158,7 +158,19 @@ export function cellAtPoint(maze: Maze, point: Point): number | null {
 /** Snapshot the geometry once for repeated sight queries; legacy node indexing
  * remains confined to this coordinate adapter, not the ray traversal. */
 export function pointLocator(maze:Maze):(point:Point)=>number|null{
- if(maze.free||maze.storeys)return point=>cellAtPoint(maze,point);
+ if(maze.storeys)return point=>cellAtPoint(maze,point);
+ if(maze.free){
+  const r=freeRuntime(maze),size=4,padding=1e-6,ids=new Map(r.rooms.map((room,i)=>[room.id,i]));
+  type Entry={polygon:Point[];holes:Point[][];cell:number;loX:number;loZ:number;hiX:number;hiZ:number};
+  const buckets=new Map<string,Entry[]>();
+  const add=(polygon:Point[],holes:Point[][],cell:number)=>{const loX=Math.min(...polygon.map(p=>p.x))-padding,loZ=Math.min(...polygon.map(p=>p.z))-padding,hiX=Math.max(...polygon.map(p=>p.x))+padding,hiZ=Math.max(...polygon.map(p=>p.z))+padding,entry={polygon,holes,cell,loX,loZ,hiX,hiZ};for(let x=Math.floor(loX/size);x<=Math.floor(hiX/size);x++)for(let z=Math.floor(loZ/size);z<=Math.floor(hiZ/size);z++){const key=x+':'+z,list=buckets.get(key)??[];list.push(entry);buckets.set(key,list);}};
+  // Match cellAtPoint's exact precedence, including counterfactual extra rooms
+  // and coincident boundaries. Buckets are world metres, not maze topology.
+  r.rooms.forEach((room,i)=>{if(i>=r.analysisStart)add(room.polygon,[],i);});
+  r.rooms.forEach((room,i)=>add(room.polygon,room.holes,i));
+  for(const c of maze.free.connections)try{add(connectionGeometry(maze.free,c).polygon,[],ids.get(c.a.room)??-1);}catch{/* Same invalid-connection fallback as cellAtPoint. */}
+  return p=>{if(p.bridge!==undefined)return cellAtPoint(maze,p);for(const e of buckets.get(Math.floor(p.x/size)+':'+Math.floor(p.z/size))??[])if(p.x>=e.loX&&p.x<=e.hiX&&p.z>=e.loZ&&p.z<=e.hiZ&&pointIn(p,e.polygon)&&!e.holes.some(h=>pointIn(p,h,false)))return e.cell;return null;};
+ }
  if(maze.navigation){const locate=pointLocator(maze.navigation.source),mapping=maze.navigation.originalToRegion;return p=>{const c=locate(p);return c===null?null:mapping[c]!;};}
  const xs=axisBounds(maze,'x'),zs=axisBounds(maze,'z'),columns=routingSize(maze).columns,active=domainOf(maze).active;
  const index=(bounds:number[],v:number)=>{let lo=0,hi=bounds.length;while(lo<hi){const mid=(lo+hi)>>>1;if(bounds[mid]!<=v)lo=mid+1;else hi=mid;}return lo-1;};
