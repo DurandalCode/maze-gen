@@ -23,11 +23,15 @@ try{
  await page.getByLabel('Количество модулей',{exact:true}).filter({hasText:String(source.maze.free!.modules.length)}).waitFor();
  // Regenerate the exact saved recipe through the ordinary form. This proves
  // the bundled entry point, not merely the readability of a scripted card.
- await page.getByRole('button',{name:'Настройки',exact:true}).click();
- await page.getByRole('button',{name:'Сгенерировать',exact:true}).click();
- await page.waitForFunction(()=>!document.querySelector('.generate')?.hasAttribute('disabled'),{},{timeout:45000});
- await page.getByRole('button',{name:'Лабиринт',exact:true}).click();
- const exported=await download(page,'Сохранить');if(serialize(exported)!==serialize(source.maze))throw Error('Map export changed final geometry.');
+ const regenerate=async()=>{await page.getByRole('button',{name:'Настройки',exact:true}).click();await page.getByRole('button',{name:'Сгенерировать',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.generate')?.hasAttribute('disabled'),{},{timeout:45000});await page.getByRole('button',{name:'Лабиринт',exact:true}).click();return download(page,'Сохранить');};
+ const exported=await regenerate(),differences:unknown[]=[];let engineDelta=0;
+ // Bun/JSC and Chromium/V8 differ by a few ULPs in sin/cos. Require the same
+ // full structure and sub-nanometre numeric agreement across engines; require
+ // a byte-exact second replay inside the same browser below. Do not quantize
+ // production geometry or change existing saved identities to satisfy a test.
+ const compare=(a:any,b:any,path:string)=>{if(differences.length>=12||Object.is(a,b))return;if(typeof a==='number'&&typeof b==='number'){engineDelta=Math.max(engineDelta,Math.abs(a-b));if(Math.abs(a-b)<=1e-10)return;}if(a&&b&&typeof a==='object'&&typeof b==='object'){for(const key of new Set([...Object.keys(a),...Object.keys(b)]))compare(a[key],b[key],path+'.'+key);}else differences.push({path,expected:a,actual:b});};
+ compare(JSON.parse(serialize(source.maze)),JSON.parse(serialize(exported)),'maze');if(differences.length)throw Error('Map export changed final geometry: '+JSON.stringify(differences));
+ if(serialize(await regenerate())!==serialize(exported))throw Error('Same-browser seed replay changed the generated map.');
  const posted=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/api/mazes'));
  await page.getByRole('button',{name:'В библиотеку',exact:true}).click();if(!(await posted).ok())throw Error('Library save failed.');
  await page.getByRole('switch',{name:'Редактор свободного размещения',exact:true}).check();
@@ -37,9 +41,9 @@ try{
  if(!await page.getByRole('button',{name:'Сохранить карту',exact:true}).isDisabled())throw Error('Invalid geometry remained saveable.');
  await page.getByRole('button',{name:'Отменить правку',exact:true}).click();
  await page.getByText('Связность, пролёты, проёмы и физическая проходимость проверены.',{exact:true}).waitFor();
- const edited=await download(page,'Сохранить карту');if(serialize(edited)!==serialize(source.maze))throw Error('Undo/editor roundtrip changed geometry.');
+ const edited=await download(page,'Сохранить карту');if(serialize(edited)!==serialize(exported))throw Error('Undo/editor roundtrip changed geometry.');
  if(errors.length)throw Error(errors.join('\n'));
  const output=process.env.MAZE_OUTPUT_DIR??'test-results';await mkdir(output,{recursive:true});
- const report={id,modules:source.maze.free!.modules.length,moduleConstruction:!!source.maze.free!.moduleConstruction,ordinaryFormReplay:'passed',mapExport:'passed',librarySave:'passed',invalidEditRejected:'passed',undo:'passed',editorExport:'passed',pageErrors:errors};
+ const report={id,modules:source.maze.free!.modules.length,moduleConstruction:!!source.maze.free!.moduleConstruction,ordinaryFormReplay:'byte-exact within browser',crossEngineMaximumNumericDelta:engineDelta,mapExport:'passed',librarySave:'passed',invalidEditRejected:'passed',undo:'passed',editorExport:'passed',pageErrors:errors};
  await writeFile(join(output,'final-geometry-browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{await browser.close();await rm(root,{recursive:true,force:true});}
