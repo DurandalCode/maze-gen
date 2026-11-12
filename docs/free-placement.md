@@ -211,3 +211,16 @@ before accepting a court. Search failure is a bounded-search result, not a
 proof that the remaining area is unusable. The report accounts for all added
 frame/span floor and opened courts. Old recipes with `selective-v2` or no
 courtyard policy retain their original generation path.
+
+For `dense-v3`, a positive `routeTrapCount` is qualified after the dense
+construction rather than rejected on the unfinished organic base. A bounded
+sector pass can insert up to four native frames on a genuine uphill detour,
+then select supported doors to leave a long false continuation. Fixed graph
+cuts preserve every room's connection to entrance and exit. Long detours are
+repaired with bent two-room branches (2×2 followed by2×6), not shallow buds or
+fake graph vertices. Every returned map must still pass the unchanged
+`routeTraps`, exact trap overlay, wall-origin audit, physical capsule paths and
+whole-map8/16. The requested count is never silently lowered; failure reports
+the bounded construction's reason. Zero-count recipes keep their old path.
+New external sector floor is reported separately and is not labelled as
+additional filling of the original cavity inventory.
