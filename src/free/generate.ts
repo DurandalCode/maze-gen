@@ -1,4 +1,5 @@
 import {generateDenseGameplay} from './dense-gameplay';
+import {generateVortex} from './vortex';
 import {DEFAULT_DESIGN_LIMITS} from '../core/maze';
 import {generateCavityMaze} from './cavity-maze';
 import type { Maze, Parameters } from '../core/maze';
@@ -8,6 +9,7 @@ import {checkFreeQuality} from './quality';
 import {freeGroundLengths,freeLengthLimits} from './path-limits';
 /** All free placement is grown from world-space doorways, without a lattice. */
 export function generateFree(parameters: Parameters, previous?: Maze, onProgress?: (message: string) => void): Maze {
+  if(parameters.freeRoutePattern==='vortex')return generateVortex(parameters,previous,onProgress);
   if(parameters.freePassagePattern==='organic-sectors-v1'&&(parameters.loopTrapCount??0)>0)throw Error('Органические межсекторные связи пока поддерживают маршрутные Л без обязательного возвратного К.');
   const baseParameters=parameters.freeCavityMaze&&parameters.freeAngleSpread===0&&parameters.freeConnectionSpan===undefined&&parameters.freeSpanPolicy!=='maximum'?{...parameters,design:{...DEFAULT_DESIGN_LIMITS,...parameters.design,maxForcedStraight:Math.min(parameters.design?.maxForcedStraight??8,4),maxForcedRun:Math.min(parameters.design?.maxForcedRun??16,8)}}:parameters;
   const denseTraps=parameters.freeCavityMaze&&parameters.freeCourtyardPolicy==='dense-v3'&&(parameters.routeTrapCount??0)>0;

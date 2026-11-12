@@ -1,0 +1,10 @@
+import {resolve} from 'node:path';
+import {generateFree} from '../src/free/generate';
+import {vortexParameters} from '../src/free/vortex-parameters';
+import {freeGroundLengths} from '../src/free/path-limits';
+import {freeRuntime} from '../src/free/layout';
+import {serialize} from '../src/persistence/maze-json';
+import {FileStore} from '../server/store';
+const started=performance.now(),parameters=vortexParameters({columns:60,rows:60,corridorWidth:2,moduleSize:2,seed:'vortex-01',algorithm:'prim',extraConnections:0}),maze=generateFree(parameters,undefined,console.log),store=new FileStore(resolve('.local-data'));
+const record=await store.saveMaze(JSON.parse(serialize(maze)),'Вортекс · опыт01'),runtime=freeRuntime(maze),report={id:record.id,url:`http://127.0.0.1:1423/?maze=${record.id}&blind=1`,modules:maze.free!.modules.length,connections:maze.free!.connections.length,cycles:maze.free!.connections.length-maze.free!.modules.length+1,junctions:runtime.passages.filter(ns=>ns.length>=3).length,spiralArms:4,crossroads:maze.free!.connections.filter(c=>c.id.startsWith('cross-')).length,lengths:freeGroundLengths(maze),seconds:(performance.now()-started)/1000};
+const outputs=process.env.VORTEX_OUTPUT_DIR;if(outputs){await Bun.write(resolve(outputs,'vortex-01.json'),serialize(maze));await Bun.write(resolve(outputs,'vortex-01-report.json'),JSON.stringify(report,null,2));}console.log(JSON.stringify(report,null,2));

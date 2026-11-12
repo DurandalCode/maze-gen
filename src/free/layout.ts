@@ -288,8 +288,10 @@ export function buildNavigation(l: FreeLayout) {
     const g = connectionGeometry(l, c), a = rs.findIndex(r => r.id === c.a.room), b = rs.findIndex(r => r.id === c.b.room), inward = (p: typeof g.a) => ({ x: p.mid.x - p.normal.x * .35, z: p.mid.z - p.normal.z * .35 }), pa = inward(g.a), pb = inward(g.b), ra = localRoute(centers[a]!, pa, rs[a]!.polygon, rs[a]!.holes, phys.obstacles), rb = localRoute(pb, centers[b]!, rs[b]!.polygon, rs[b]!.holes, phys.obstacles);
     let route = ra && rb ? [...ra, g.a.mid, g.b.mid, ...rb] : null;
     if (route) {
-      const length = distance(pa, pb), steps = Math.max(1, Math.ceil(length / .025));
-      for (let i = 0; i <= steps; i++)if (phys.obstacles.some(w => wallDistance(lerp(pa, pb, i / steps), w) < .25 - EPS)) {
+      // localRoute has already swept both room interiors. The connector
+      // turns at the real gates: its pa→pb chord is a different path.
+      const legs=[pa,g.a.mid,g.b.mid,pb],box=bounds(legs),solids=phys.obstacles.filter(w=>{const h=.25+(w.thickness??.06)/2*Math.SQRT2+EPS;return Math.min(w.x1,w.x2)-h<=box.x2&&Math.max(w.x1,w.x2)+h>=box.x1&&Math.min(w.z1,w.z2)-h<=box.z2&&Math.max(w.z1,w.z2)+h>=box.z1;});
+      for (let i = 1; i < legs.length; i++)if (solids.some(w => movementClearance(legs[i-1]!, legs[i]!, w) < .25 - EPS)) {
         route = null;
         break;
       }

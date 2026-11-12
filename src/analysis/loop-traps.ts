@@ -29,9 +29,8 @@ export function loopTraps(maze:Maze):LoopTraps {
  for(let i=1;i<route.length-1;i++){
   const fork=route[i]!,previous=route[i-1]!,correct=route[i+1]!,choices=maze.passages[fork]!.filter(n=>n!==previous);
   if(choices.length<3)continue;
-  const features=choices.map(n=>model.features(fork,n,ctx.centers[previous],'outline'));
-  const plus=choiceProbabilities(features.map(f=>decisionScore(f,3,1,1.5,1))),minus=choiceProbabilities(features.map(f=>decisionScore(f,3,1,1.5,-1)));
-  const probability=(n:number)=>{const j=choices.indexOf(n);return (plus[j]!+minus[j]!)/2;};
+  const perception=()=>{const features=choices.map(n=>model.features(fork,n,ctx.centers[previous],'outline'));return {features,plus:choiceProbabilities(features.map(f=>decisionScore(f,3,1,1.5,1))),minus:choiceProbabilities(features.map(f=>decisionScore(f,3,1,1.5,-1)))};};
+  let perceived:ReturnType<typeof perception>|undefined;
   const checked=new Set<number>();
   for(const door of choices){
    if(door===correct||checked.has(door))continue;
@@ -50,6 +49,10 @@ export function loopTraps(maze:Maze):LoopTraps {
    const length=maze.navigation?points.slice(1).reduce((s,p,j)=>s+Math.hypot(p.x-points[j]!.x,p.z-points[j]!.z),0):loop.slice(1).reduce((s,c,j)=>s+edge(loop[j]!,c),0);
    let turns=0;for(let j=0;j<points.length-1;j++){const a=points[(j+points.length-2)%(points.length-1)]!,b=points[j]!,c=points[j+1]!;if(Math.abs((b.x-a.x)*(c.z-b.z)-(b.z-a.z)*(c.x-b.x))>1e-7)turns++;}
    const width=Math.max(...points.map(p=>p.x))-Math.min(...points.map(p=>p.x)),depth=Math.max(...points.map(p=>p.z))-Math.min(...points.map(p=>p.z));
+   // Most junctions belong to the main network, not a pendant return loop.
+   // Keep the exact scoring but postpone its rays until topology is eligible.
+   const {features,plus,minus}=perceived??=perception();
+   const probability=(n:number)=>{const j=choices.indexOf(n);return (plus[j]!+minus[j]!)/2;};
    const entryProbabilities:[number,number]=[probability(a),probability(b)],correctProbability=probability(correct);
    const geometryQualifies=length>=40&&turns>=4&&width>=6&&depth>=6&&Math.min(...entryProbabilities)>=.15&&correctProbability<=.4&&entryProbabilities[0]+entryProbabilities[1]>=.6&&!features[choices.indexOf(correct)]!.exitVisible;
    const credibility=loopCredibility(maze,route.slice(0,i+1),[a,b],correct,model),qualifies=geometryQualifies&&(maze.version!==4||credibility.credible);

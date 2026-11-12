@@ -1,0 +1,2 @@
+import{generate}from'../src/generators/generate';import{districtVortexParameters}from'../src/free/vortex-parameters';import{serialize}from'../src/persistence/maze-json';
+const parameters=districtVortexParameters({columns:70,rows:70,corridorWidth:2,moduleSize:2,seed:'vortex-chaotic-05',algorithm:'prim',extraConnections:0}),maze=generate(parameters,undefined,console.log);await Bun.write('/private/tmp/vortex-06-candidate.json',serialize(maze));console.log('CANDIDATE',maze.free!.modules.length);

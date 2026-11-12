@@ -8,15 +8,16 @@ import {random,shuffle} from '../core/random';
 import {CollisionWorld} from '../simulation/collisions';
 import {freeGroundLengths} from './path-limits';
 export interface CavityModuleGrowth {draft:FreeDraft;addedModules:number;addedConnections:number;loops:number;reason:string}
+export interface CavityGrowthOptions{root?:string;target?:string;deferLengthCheck?:boolean;minimumExitDistance?:number;exitPoint?:Point;minimumNewModules?:number;maxDepth?:number;diverse?:boolean;rootAnchors?:Anchor[];targetAnchors?:Anchor[];lateral?:boolean;maximumSpanFirst?:boolean;retainExcursion?:boolean;targetApproachDistance?:number;physicalExcursion?:boolean;throughRoutes?:boolean;minimumGraphSeparation?:number;limits?:{straight:number;run:number};excludeRooms?:ReadonlySet<string>;maximumSpans?:boolean;doorWidth?:number;acceptCandidate?:(draft:FreeDraft)=>boolean}
 interface Slot{anchor:Anchor;point:Point;normal:Point;degree:number}
 interface Node{draft:FreeDraft;root:string;last:string;count:number;score:number;peak?:number;centerPeak?:number}
 /** Native modules only. A failed search leaves the source draft untouched. */
-export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,budget:number,onProgress?:(s:string)=>void,options?:{root?:string;target?:string;deferLengthCheck?:boolean;minimumExitDistance?:number;exitPoint?:Point;minimumNewModules?:number;acceptCandidate?:(draft:FreeDraft)=>boolean;maxDepth?:number;diverse?:boolean;rootAnchors?:Anchor[];targetAnchors?:Anchor[];lateral?:boolean;maximumSpanFirst?:boolean;retainExcursion?:boolean;targetApproachDistance?:number;physicalExcursion?:boolean;throughRoutes?:boolean;minimumGraphSeparation?:number}):CavityModuleGrowth{
+export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,budget:number,onProgress?:(s:string)=>void,options?:CavityGrowthOptions):CavityModuleGrowth{
  const fail=(reason:string):CavityModuleGrowth=>({draft:source,addedModules:0,addedConnections:0,loops:0,reason});
  const depthLimit=Math.min(options?.maxDepth??4,Math.max(0,Math.floor(budget)));
  if(!depthLimit||!Number.isFinite(budget))return fail('Нет бюджета на полноценный модуль.');
  const contains=(p:Point)=>pointIn(p,polygon),boundary=edges(polygon),within=(poly:Point[])=>poly.every(contains)&&edges(poly).every(e=>segmentInside(...ends(e),contains,boundary));
- const width=Math.min(source.parameters.corridorWidth,1.4),rng=random(seed),reasons=new Set<string>();
+ const width=Math.min(source.parameters.corridorWidth,options?.doorWidth??1.4),rng=random(seed),reasons=new Set<string>();
  const focused=!!(options?.root&&options?.target&&options?.deferLengthCheck);
  const focusedFloor=new WeakMap<FreeLayout,Point[][]>();
  let serial=0,rawChecks=0,geometryChecks=0,completeChecks=0,exhausted=false;
@@ -37,6 +38,7 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
   });
  };
  const oldSlots=shuffle(slots(source.layout).filter(s=>{
+  if(options?.excludeRooms?.has(s.anchor.room))return false;
   const g=anchorGeometry(source.layout,s.anchor,width);
   return segmentInside(g.from,g.to,contains,boundary)&&contains({x:g.mid.x+g.normal.x*.12,z:g.mid.z+g.normal.z*.12});
  }),rng).sort((a,b)=>Number(b.degree>=2)-Number(a.degree>=2));
@@ -57,7 +59,7 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
   for(const path of [...r.edgePaths.values(),...r.portalPaths.values()])for(let i=1;i<path.length;i++){
    const a=path[i-1]!,b=path[i]!,p=world.move(a,{x:b.x-a.x,z:b.z-a.z});if(distance(p,b)>1e-5)return {reason:'Новый проход задевает стену или стойку.',length:false};
   }
-  const lengths=freeGroundLengths(maze);if(!options?.deferLengthCheck&&(lengths.straight>8+1e-7||lengths.run>16+1e-7))return {reason:`Замыкание создаёт слишком длинный проход: ${lengths.straight.toFixed(2)}/${lengths.run.toFixed(2)} м при8/16.`,length:true};
+  const lengths=freeGroundLengths(maze),limits=options?.limits??{straight:8,run:16};if(!options?.deferLengthCheck&&(lengths.straight>limits.straight+1e-7||lengths.run>limits.run+1e-7))return {reason:`Замыкание создаёт слишком длинный проход: ${lengths.straight.toFixed(2)}/${lengths.run.toFixed(2)} м при${limits.straight}/${limits.run}.`,length:true};
   return {reason:'',length:false};
  };
  const close=(node:Node):{result?:CavityModuleGrowth;lengthRejected:boolean}=>{
@@ -72,6 +74,7 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
    if(longest>3+1e-7||!within(g.polygon))continue;
    if(node.count<(options?.minimumNewModules??0))continue;
    if(options?.minimumExitDistance&&options.exitPoint&&(!node.draft.layout.modules.some(m=>!source.layout.modules.some(old=>old.id===m.id)&&distance(m,options.exitPoint!)>=options.minimumExitDistance!)||options.physicalExcursion&&Math.max(node.peak??0,distance(g.a.mid,options.exitPoint),distance(g.b.mid,options.exitPoint))<options.minimumExitDistance))continue;
+   if(options?.maximumSpans&&Math.min(segmentDistance(g.a.from,g.sides[0]!),segmentDistance(g.a.to,g.sides[1]!),segmentDistance(g.b.from,g.sides[1]!),segmentDistance(g.b.to,g.sides[0]!))<1-1e-7)continue;
    const next=structuredClone(node.draft);next.layout.connections.push({...connection,spanAudit:{desired:3,actual:longest,...(longest<3-1e-6?{reason:'Замыкание между фиксированными модульными проёмами полости.'}:{})}});
    if(completeChecks>=12){exhausted=true;return {lengthRejected};}
    completeChecks++;const issue=complete(next);if(issue.reason){reasons.add(issue.reason);lengthRejected ||= issue.length;continue;}
@@ -92,7 +95,7 @@ export function growCavityModules(source:FreeDraft,polygon:Point[],seed:string,b
     if(exhausted||depthChecks>=512||depthGeometry>=(focused?96:48))break placements;
     const a=anchorGeometry(node.draft.layout,start.anchor,width),normals=[-90,0,90,180],angle=((Math.atan2(-a.normal.z,-a.normal.x)*180/Math.PI+bend-normals[incoming]!)%360+360)%360;
     const module:FreeModule={id:id(),type,x:0,z:0,angle},anchor={room:module.id,edge:incoming,offset:0},gate=anchorGeometry({...emptyLayout(),modules:[module]},anchor,width);
-    const laterals=options?.lateral?[0,-.8,.8,-1.6,1.6,-2.2,2.2]:[0],spans=[3,2.5,2,1.5,1],placements=options?.maximumSpanFirst?spans.flatMap(span=>laterals.map(lateral=>({span,lateral}))):laterals.flatMap(lateral=>spans.map(span=>({span,lateral})));
+    const laterals=options?.lateral?[0,-.8,.8,-1.6,1.6,-2.2,2.2]:[0],spans=options?.maximumSpans?[3]:[3,2.5,2,1.5,1],placements=options?.maximumSpanFirst?spans.flatMap(span=>laterals.map(lateral=>({span,lateral}))):laterals.flatMap(lateral=>spans.map(span=>({span,lateral})));
     for(const {span,lateral}of placements){
      if(options?.maximumSpanFirst&&perStartRaw++>=48)continue starts;
      if(exhausted||depthChecks++>=512||depthGeometry>=(focused?96:48))break placements;rawChecks++;

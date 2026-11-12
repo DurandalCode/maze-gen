@@ -36,6 +36,10 @@ export function freeGrowthLengths(layout:FreeLayout,roomId:string){
  const near=new Set([...chain].flatMap(id=>[id,...adjacency.get(id)??[]]));
  const ids=new Set([...near].flatMap(id=>[id,...adjacency.get(id)??[]]));
  const local:FreeLayout={...layout,modules:layout.modules.filter(m=>ids.has(m.id)),spaces:layout.spaces.filter(s=>ids.has(s.id)),connections:layout.connections.filter(c=>ids.has(c.a.room)&&ids.has(c.b.room)),openings:layout.openings.filter(o=>ids.has(o.room))};
+ return freeLayoutLengths(local,roomId);
+}
+/** Geometry-only whole-layout lengths before constructing navigation caches. */
+export function freeLayoutLengths(local:FreeLayout,onlyStart?:string){
  const phys=physical(local),centers=phys.rooms.map(r=>centroid(r.polygon)),passages=phys.rooms.map(()=>[] as number[]);
  const links=local.connections.map(c=>{const g=connectionGeometry(local,c),a=phys.rooms.findIndex(r=>r.id===c.a.room),b=phys.rooms.findIndex(r=>r.id===c.b.room);
   passages[a]!.push(b);passages[b]!.push(a);
@@ -43,7 +47,7 @@ export function freeGrowthLengths(layout:FreeLayout,roomId:string){
   return {a,b,points:[inward(g.a),g.a.mid,g.b.mid,inward(g.b)]};
  });
  const portals=local.openings.map(o=>({cell:phys.rooms.findIndex(r=>r.id===o.room),point:anchorGeometry(local,o,o.width).mid}));
- return measure({...phys,centers,passages,links},portals,phys.rooms.findIndex(r=>r.id===roomId));
+ return measure({...phys,centers,passages,links},portals,onlyStart===undefined?undefined:phys.rooms.findIndex(r=>r.id===onlyStart));
 }
 /** Explicit user bounds (including disabled switches) override free defaults. */
 export function freeLengthLimits(p:Parameters){
