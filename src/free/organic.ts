@@ -33,7 +33,9 @@ export function generateOrganic(parameters: Parameters, previous?: Maze, onProgr
   // Keep explicit orthogonal cards reproducible. Rotated cavity bases retain
   // the same substantial branching without inheriting the compact 4/8 gaps.
   const variedCavity=guardGrowth&&!!parameters.freeCavityMaze&&(parameters.freeAngleSpread??100)>0;
-  const branchedGrowth=shortDecisions||variedCavity||maximumSpans;
+  // A zero-bend five-way hub needs complete side forks: a single shallow
+  // bud cannot break its forced chain and repeatedly fails the length guard.
+  const branchedGrowth=shortDecisions||variedCavity||maximumSpans||(guardGrowth&&requestedDegree===5&&spread===0);
   let last = 'На площадке не помещается выбранный перекрёсток.';
   for (let attempt = 0; attempt < 96 && performance.now() < deadline; attempt++) {
     onProgress?.(`Свободная сеть: кандидат ${attempt + 1}/96 · узел ${requestedDegree}`);

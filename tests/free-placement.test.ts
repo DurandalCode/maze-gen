@@ -5,6 +5,7 @@ import { emptyLayout, type FreeDraft } from '../src/free/model';
 import { anchorGeometry, connectionGeometry, freeMaze, freeRuntime, modulePolygon, validateFree, freeRay, physical } from '../src/free/layout';
 import { distance, movementClearance, wallDistance } from '../src/free/geometry';
 import { generate } from '../src/generators/generate';
+import {freeGroundLengths} from '../src/free/path-limits';
 import { serialize, deserialize } from '../src/persistence/maze-json';
 import { decodeDraft, encodeDraft, mazeDraft } from '../src/free/json';
 import { convertToFree } from '../src/free/convert';
@@ -299,7 +300,13 @@ describe('strongly non-orthogonal junctions', () => {
     })).toBe(true);
   });
   test('spread control changes geometry and invalid junction settings reject explicitly', () => {
-    const m = generate({ ...base, extraConnections: 0, freeAngleSpread: 0, freeJunctionDegree: 5 });
+    const parameters={ ...base, extraConnections: 0, freeAngleSpread: 0, freeJunctionDegree: 5 as const };
+    const m = generate(parameters);
+    expect(m.free!.modules).toHaveLength(17);
+    const physicalLengths=freeGroundLengths(m);
+    expect(physicalLengths.straight).toBeLessThanOrEqual(8+1e-7);
+    expect(physicalLengths.run).toBeLessThanOrEqual(16+1e-7);
+    expect(serialize(generate(parameters))).toBe(serialize(m));
     for (const c of m.free!.connections) {
       const g = connectionGeometry(m.free!, c);
       expect(g.a.normal.x * g.b.normal.x + g.a.normal.z * g.b.normal.z).toBeCloseTo(-1, 6);
