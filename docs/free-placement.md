@@ -224,3 +224,38 @@ whole-map8/16. The requested count is never silently lowered; failure reports
 the bounded construction's reason. Zero-count recipes keep their old path.
 New external sector floor is reported separately and is not labelled as
 additional filling of the original cavity inventory.
+
+Requesting two route traps adds a second bounded, gate-relative sector to
+the same dense base. It retains the original frame poses and court polygons;
+only newly added auxiliary long frames may be replaced by three supported
+2×2 frames with physical offset doorways. These doorways obstruct a straight
+capsule trajectory, and genuine two-room branches provide choices along the
+detour. Qualification counts distinct forks, not multiple dead ends at one
+fork. The regression fixture checks both qualified forks, the unchanged
+base construction, actual collider baffles, and the final8/16 limits.
+A requested return trap is an additional acceptance condition: a geometrical
+cycle alone does not satisfy it, and an intermediate two-trap map is labelled
+Л2/К0 until the unchanged return-trap analysis confirms К1.
+
+The return-sector repair also inspects nearby unused native gates when a
+two-room branch cannot fit. A crosslink must retain every protected trap
+fork on the route, add no unsupported panels, and keep both real side spans
+within3m. It has a fixed2048 gate-pair/12 full-check budget. A successful
+crosslink only resolves its measured witness; the independent straight and
+no-choice limits are checked again before a map can be returned.
+
+For a two-route-trap/one-return-trap request, the second sector reserves a
+goal-facing native corner before constructing the return. At most two newly
+added auxiliary two-room arms may be replaced if they occupy that sector;
+original dense frames, courts and qualified false paths are protected.
+New internal return-frame doorways may use real opposing offsets: the side
+panels stay within3m and physical posts prevent a common radius-clear
+straight trajectory. These screens accompany real branches and crosslinks;
+they do not create artificial graph choices. Return repair is bounded to six
+constructive passes. Both route traps and the return trap must qualify again
+after repair, followed by the public whole-map geometry and length checks.
+This mode can fail explicitly on an unsuitable composition; a cycle or an
+unfinished intermediate detour is never returned as a qualified return trap.
+The public recipe must also allocate one `extraConnections` for each
+requested return. That budget is reserved for the dense return pass and is
+subtracted from the organic base's cycle budget; it is not spent twice.

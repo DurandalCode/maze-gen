@@ -1,4 +1,4 @@
-import {generateDenseTraps} from './dense-traps';
+import {generateDenseGameplay} from './dense-gameplay';
 import {DEFAULT_DESIGN_LIMITS} from '../core/maze';
 import {generateCavityMaze} from './cavity-maze';
 import type { Maze, Parameters } from '../core/maze';
@@ -10,7 +10,9 @@ import {freeGroundLengths,freeLengthLimits} from './path-limits';
 export function generateFree(parameters: Parameters, previous?: Maze, onProgress?: (message: string) => void): Maze {
   const baseParameters=parameters.freeCavityMaze&&parameters.freeAngleSpread===0&&parameters.freeConnectionSpan===undefined&&parameters.freeSpanPolicy!=='maximum'?{...parameters,design:{...DEFAULT_DESIGN_LIMITS,...parameters.design,maxForcedStraight:Math.min(parameters.design?.maxForcedStraight??8,4),maxForcedRun:Math.min(parameters.design?.maxForcedRun??16,8)}}:parameters;
   const denseTraps=parameters.freeCavityMaze&&parameters.freeCourtyardPolicy==='dense-v3'&&(parameters.routeTrapCount??0)>0;
-  let base=generateOrganic(denseTraps?{...baseParameters,routeTrapCount:0}:baseParameters,previous,onProgress);
+  // Requested return loops consume their cycle budget in the dense feature
+  // pass. Reserving it here keeps the organic composition reproducible.
+  let base=generateOrganic(denseTraps?{...baseParameters,extraConnections:Math.max(0,baseParameters.extraConnections-(parameters.loopTrapCount??0)),routeTrapCount:0,loopTrapCount:0}:baseParameters,previous,onProgress);
   if(parameters.freeInfillPassages){
     const physicalLimits=freeLengthLimits(parameters);
     const limits=parameters.freeRoutePattern==='switchbacks'?{maxStraight:8,maxRun:16,allowEmpty:true,maxCandidates:24}:parameters.generationType!=='living'?{maxStraight:physicalLimits.straight,maxRun:physicalLimits.run,maxCandidates:24}:undefined;
@@ -18,7 +20,7 @@ export function generateFree(parameters: Parameters, previous?: Maze, onProgress
     onProgress?.(`Поперечные связи: ${result.addedPassages}/${parameters.freeInfillPassages}.`);
   }
   if(parameters.freeCavityMaze){const result=generateCavityMaze(base,onProgress);base=result.maze;onProgress?.(base.free!.cavityReport?.construction?`Модульное заполнение: добавлено ${base.free!.cavityReport.construction.addedModules} настоящих модулей, открыто ${base.free!.cavityReport.construction.openedCourtyards} дворов.`:`В пустотах: ${result.chambers} камер, ${result.externalDoors} выборочных входов; ${result.closedWalls} смежностей остались стенами.`);}
-  if(denseTraps)base=generateDenseTraps(base,parameters.routeTrapCount!,onProgress);
+  if(denseTraps)base=generateDenseGameplay(base,parameters,onProgress);
   if(parameters.freeCavityMaze){const limits=freeLengthLimits(parameters),lengths=freeGroundLengths(base);if(lengths.straight>limits.straight+1e-7||lengths.run>limits.run+1e-7)throw Error(`Длины всего лабиринта с камерами: ${lengths.straight.toFixed(2)}/${lengths.run.toFixed(2)} м превышают заданные пределы.`);}
   // Parameters remain the reproducible inputs. The cavity option separately
   // carves its selected internal tree/loop graph after the short organic base.

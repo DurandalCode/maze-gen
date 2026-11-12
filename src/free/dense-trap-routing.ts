@@ -29,7 +29,7 @@ function waypointCut(edges:Edge[],n:number,waypoint:number,sources:number[],targ
  * first. Existing supported doors then select a long blind continuation while
  * the correct sector route retreats from the exit landmark. No room/floor is
  * removed, and the ordinary trap qualification remains the final authority. */
-export function routeDenseTraps(source:Maze,requested:number,onProgress?:(s:string)=>void):Maze{
+export function routeDenseTraps(source:Maze,requested:number,onProgress?:(s:string)=>void,pendingReturnLoop=false):Maze{
  const original=mazeDraft(source),runtime=freeRuntime(source),context=prepareNavigation(source);prepareOutline(source,context);const outline=context.outlineDistances!,n=runtime.rooms.length,index=new Map(runtime.rooms.map((r,i)=>[r.id,i])),width=Math.min(1.2,source.parameters.corridorWidth);
  const baseEdges:Edge[]=original.layout.connections.map(c=>{const a=index.get(c.a.room)!,b=index.get(c.b.room)!,points=runtime.edgePaths.get(a+':'+b)!;return {a,b,id:c.id,weight:points.slice(1).reduce((s,p,i)=>s+distance(p,points[i]!),0)};});
  const used=[...original.layout.connections.flatMap(c=>[{...c.a,width:c.width},{...c.b,width:c.width}]),...original.layout.openings],slots:Anchor[]=[];
@@ -37,7 +37,8 @@ export function routeDenseTraps(source:Maze,requested:number,onProgress?:(s:stri
  const candidates:{a:Anchor;b:Anchor;length:number;separation:number}[]=[];
  for(let i=0;i<slots.length;i++)for(let j=i+1;j<slots.length;j++){const a=slots[i]!,b=slots[j]!;if(a.room===b.room)continue;const ga=anchorGeometry(original.layout,a,width),gb=anchorGeometry(original.layout,b,width),length=distance(ga.mid,gb.mid);if(length<.15||length>3.2)continue;const dx=(gb.mid.x-ga.mid.x)/length,dz=(gb.mid.z-ga.mid.z)/length;if(ga.normal.x*dx+ga.normal.z*dz<=0||-gb.normal.x*dx-gb.normal.z*dz<=0)continue;const g=connectionGeometry(original.layout,{id:'probe',a,b,width});if(g.sides.some(w=>distance(...ends(w))>3+1e-7))continue;const between=path(baseEdges,n,index.get(a.room)!,index.get(b.room)!);if(between.length<8)continue;candidates.push({a,b,length,separation:between.length});}
  candidates.sort((a,b)=>b.separation-a.separation||a.length-b.length);
- let fullChecks=0,geometryChecks=0,repairs=0,best=source,bestCount=routeTraps(source).qualifiedCount;const failures=new Set<string>();
+ const originalTraps=routeTraps(source),qualifiedForks=new Set(originalTraps.candidates.filter(t=>t.qualifies).map(t=>t.fork));
+ let fullChecks=0,geometryChecks=0,repairs=0,best=source,bestCount=originalTraps.qualifiedCount;const failures=new Set<string>();
  for(const candidate of [undefined,...candidates.slice(0,16)]){
   const draft=structuredClone(original),link=candidate?{id:'dense-trap-sector-span',a:candidate.a,b:candidate.b,width}:undefined;if(link){draft.layout.connections.push(link);draft.layout.moduleConstruction!.spans.push(structuredClone(link));}geometryChecks++;
   if(validateFree(draft,false).length)continue;
@@ -45,7 +46,7 @@ export function routeDenseTraps(source:Maze,requested:number,onProgress?:(s:stri
   const forks=Array.from({length:n},(_,i)=>i).filter(i=>all.filter(e=>e.a===i||e.b===i).length>=3);
   let branchVisits=0;const branches:{fork:number;nodes:number[];length:number;approach:number}[]=[];
   for(const fork of forks){
-   if(outline[fork]!<10)continue;
+   if(outline[fork]!<10||qualifiedForks.has(fork))continue;
    const visit=(nodes:number[],length:number)=>{if(branchVisits++>=2048)return;const last=nodes.at(-1)!,approach=outline[fork]!-outline[last]!;if(length>=10&&approach>=6){branches.push({fork,nodes,length,approach});return;}if(nodes.length>=12||length>24)return;for(const e of all){const next=e.a===last?e.b:e.b===last?e.a:-1;if(next<0||nodes.includes(next)||next===source.exit.cell||next===source.entrance.cell||outline[next]!>outline[last]!+.2)continue;visit([...nodes,next],length+e.weight);}};
    visit([fork],0);
   }
@@ -79,8 +80,8 @@ export function routeDenseTraps(source:Maze,requested:number,onProgress?:(s:stri
    let lengths=freeGroundLengths(maze);
    if(lengths.straight>8+1e-7||lengths.run>16+1e-7){
     if(repairs++>=2){failures.add('Исчерпан бюджет двух конструктивных исправлений длинного обхода.');continue;}
-    try{maze=branchLongRoute(maze,source.parameters.seed+'-route-arms-v1',onProgress);analysis=routeTraps(maze);lengths=freeGroundLengths(maze);}catch(error){failures.add(String((error as Error).message));continue;}
-    if(analysis.qualifiedCount<=bestCount||lengths.straight>8+1e-7||lengths.run>16+1e-7)continue;
+    try{maze=branchLongRoute(maze,source.parameters.seed+'-route-arms-v1',onProgress,pendingReturnLoop);analysis=routeTraps(maze);lengths=freeGroundLengths(maze);}catch(error){failures.add(String((error as Error).message));continue;}
+    if(analysis.qualifiedCount<=bestCount||lengths.straight>8+1e-7||(!pendingReturnLoop&&lengths.run>16+1e-7))continue;
    }
    if(auditModuleWalls(maze.free!).issues.length)continue;
    best=maze;bestCount=analysis.qualifiedCount;onProgress?.(`Плотная маршрутизация: Л${bestCount}, выбранных закрытых дверей${removed.size}, новая межсекторная связь.`);

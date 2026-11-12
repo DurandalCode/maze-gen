@@ -17,6 +17,11 @@ export function freeGroundRunWitness(maze:Maze){
  const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];let best={length:0,rooms:[] as string[],points:[] as Point[]};
  measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(length,chain,points)=>{if(length>best.length)best={length,rooms:chain.map(i=>r.rooms[i]!.id),points};});return best;
 }
+/** Directed chain containing the longest physical straight ground segment. */
+export function freeGroundStraightWitness(maze:Maze){
+ const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];let best={length:0,rooms:[] as string[],points:[] as Point[]};
+ measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(_length,chain,points,straight)=>{if(straight>best.length)best={length:straight,rooms:chain.map(i=>r.rooms[i]!.id),points};});return best;
+}
 /** Geometry-only growth guard: no simulation, whole-maze navigation or scoring.
  * Only chains changed by the new leaf need checking; final portals are checked later. */
 export function freeGrowthLengths(layout:FreeLayout,roomId:string){
@@ -45,7 +50,7 @@ export function freeLengthLimits(p:Parameters){
  const value=(key:'maxForcedStraight'|'maxForcedRun',fallback:number)=>p.design?.disabledLimits?.includes(key)?Infinity:p.design?.[key]??fallback;
  return {straight:value('maxForcedStraight',8),run:value('maxForcedRun',16)};
 }
-function measure(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'centers'|'passages'|'obstacles'> & {links:{a:number;b:number;points:Point[]}[]},portals:{cell:number;point:Point}[],onlyStart?:number,witness?:(length:number,chain:number[],points:Point[])=>void){
+function measure(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'centers'|'passages'|'obstacles'> & {links:{a:number;b:number;points:Point[]}[]},portals:{cell:number;point:Point}[],onlyStart?:number,witness?:(length:number,chain:number[],points:Point[],straight:number)=>void){
  let straight=0,run=0;
  const terminalRooms=new Set(portals.map(p=>p.cell));
  const cached=new Map<string,Point[]|null>();
@@ -60,15 +65,15 @@ function measure(r:Pick<ReturnType<typeof freeRuntime>,'rooms'|'centers'|'passag
    if(!route)throw Error('Не удалось проверить физический проход.');points.push(...route.slice(1),...directed.slice(1));
   }
   const tail=inside(at,points.at(-1)!,end?end.point:r.centers[at]!);if(!tail)throw Error('Не удалось проверить окончание прохода.');points.push(...tail.slice(1));
-  let distance=0,line=0,dx=0,dz=0,chainRun=0;
+  let distance=0,line=0,dx=0,dz=0,chainRun=0,chainStraight=0;
   for(let i=1;i<points.length;i++){
    const a=points[i-1]!,b=points[i]!;
    if(a.bridge||b.bridge||(a.y??0)>.001||(b.y??0)>.001){distance=0;line=0;dx=0;dz=0;continue;}
    const x=b.x-a.x,z=b.z-a.z,len=Math.hypot(x,z);if(len<1e-8)continue;
    distance+=len;run=Math.max(run,distance);chainRun=Math.max(chainRun,distance);
-   line=dx*x/len+dz*z/len>.999?line+len:len;dx=x/len;dz=z/len;straight=Math.max(straight,line);
+   line=dx*x/len+dz*z/len>.999?line+len:len;dx=x/len;dz=z/len;straight=Math.max(straight,line);chainStraight=Math.max(chainStraight,line);
   }
-  witness?.(chainRun,chain,points);
+  witness?.(chainRun,chain,points,chainStraight);
  }
  return {straight,run};
 }
