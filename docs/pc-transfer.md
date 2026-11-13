@@ -111,3 +111,47 @@ $env:MAZE_BROWSER = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.ex
 
 Windows-сборка в этой поставке не выполнялась: проверены переносимые команды
 и пути в коде, но физического Windows-ПК в текущей сессии не было.
+
+## Полная резервная копия этой сессии
+
+Локальный архив `maze-gen-pc-transfer-20261113.tar.gz` передаётся отдельно от
+GitHub: он содержит личные записи и F-метки. Он сохраняет исходные библиотеки
+**раздельно**, вместе с `manifest.json`, контрольными суммами и `RESTORE.md`.
+Не публикуйте архив и его распакованные данные в репозитории.
+
+Основная последняя библиотека находится в
+`maze-gen-pc-transfer-20261113/libraries/live-1428-direction-markers`.
+Чтобы получить точное состояние рабочего1428, остановите сервер, распакуйте
+архив вне checkout и скопируйте её папки `mazes` и `walks` в **новый пустой**
+`MAZE_DATA_DIR`. Например, в PowerShell после копирования архива в Downloads:
+
+```powershell
+$backupRoot = Join-Path $env:USERPROFILE 'maze-gen-backup'
+New-Item -ItemType Directory -Force $backupRoot | Out-Null
+tar -xzf (Join-Path $env:USERPROFILE 'Downloads\maze-gen-pc-transfer-20261113.tar.gz') -C $backupRoot
+$source = Join-Path $backupRoot 'maze-gen-pc-transfer-20261113\libraries\live-1428-direction-markers'
+$env:MAZE_DATA_DIR = Join-Path $PWD '.local-data'
+New-Item -ItemType Directory -Force $env:MAZE_DATA_DIR | Out-Null
+Copy-Item (Join-Path $source 'mazes') $env:MAZE_DATA_DIR -Recurse
+Copy-Item (Join-Path $source 'walks') $env:MAZE_DATA_DIR -Recurse
+bun run serve
+```
+
+Этот пример предполагает, что `.local-data` ещё не содержит других данных.
+Не копируйте сырые папки поверх существующей библиотеки: сначала сделайте её
+копию либо выберите новый `MAZE_DATA_DIR`. На macOS/Linux распаковка обычным
+`tar -xzf` и копирование тех же двух папок даёт такой же файловый формат.
+
+Для добавления карт/записей из **остальных** исходных библиотек используйте их
+отдельные `library-export.json`: UI «Импортировать записи» либо описанный выше
+`bun scripts/import-library.ts --check <путь>` и затем импорт. Не объединяйте
+сырые каталоги молча: одинаковый ID в двух источниках может представлять
+разные по времени снимки. Импорт применяет штатные правила сохранения более
+новых/завершённых записей и явно отклоняет конфликтующие карты/ID. Исходные
+снимки архива остаются самостоятельной резервной копией. Сырые папки точнее
+сохраняют административные статусы карт; JSON-обмен переносит карты и записи.
+
+Резервная копия собирается из файловых библиотек сервера. Отдельные
+браузерные IndexedDB/localStorage и ещё не отправленные оттуда записи в неё
+не попадают: для них перед переездом дополнительно нужен UI-экспорт именно
+из соответствующего браузера/офлайн-режима.
