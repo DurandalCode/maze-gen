@@ -1,3 +1,4 @@
+import {markerDirection,type DirectionMarker} from '../simulation/direction-markers';
 import {bridgeGeometry} from '../free/bridges';
 import {storeyView,floorOf,stairAt} from '../core/two-storey';
 import {freeRuntime} from '../free/layout';
@@ -38,6 +39,8 @@ export class MapView {
   criticalWalls:readonly CriticalWall[]=[];
   showRoute = false;
   trajectory: readonly Point[] = [];
+  directionMarkers:readonly DirectionMarker[]=[];
+  selectedDirectionMarker=-1;
   onPlacePortal: ((portal: Portal | null) => void) | null = null;
   onEnvironmentChange: ((environment: Environment) => void) | null = null;
 
@@ -236,6 +239,15 @@ export class MapView {
       const domain=domainOf(maze),columns=routingSize(maze).columns;ctx.save();ctx.strokeStyle='#ee86ac';ctx.fillStyle='#ee86ac22';ctx.lineWidth=2;ctx.setLineDash([5,3]);
       for(const district of this.heat.analysis.sideDistricts?.districts??[])if(district.problematic){const cells=new Set(district.cells);ctx.beginPath();for(const c of cells){if(maze.storeys&&floorOf(maze,c)!==this.floor)continue;const r=domain.rectangles[c];if(!r)continue;ctx.fillRect(px(r.x1),py(r.z1),(r.x2-r.x1)*s,(r.z2-r.z1)*s);for(const [n,x1,z1,x2,z2]of [[c-columns,r.x1,r.z1,r.x2,r.z1],[c+columns,r.x1,r.z2,r.x2,r.z2],[c%columns?c-1:-1,r.x1,r.z1,r.x1,r.z2],[c%columns<columns-1?c+1:-1,r.x2,r.z1,r.x2,r.z2]])if(!cells.has(n!)){ctx.moveTo(px(x1!),py(z1!));ctx.lineTo(px(x2!),py(z2!));}}ctx.stroke();}
       ctx.restore();
+    }
+    for(const [index,marker] of this.directionMarkers.entries()){
+      if(maze.storeys&&(marker.floor??0)!==this.floor)continue;
+      const d=markerDirection(marker.yaw),length=Math.max(16,Math.min(36,1.4*s)),x=px(marker.x),y=py(marker.z),ex=x+d.x*length,ey=y+d.z*length,selected=index===this.selectedDirectionMarker;
+      ctx.save();ctx.strokeStyle='#69d3ff';ctx.fillStyle='#69d3ff';ctx.lineWidth=selected?4:2.5;ctx.setLineDash([4,3]);
+      if(selected){ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fillStyle='#69d3ff44';ctx.fill();ctx.fillStyle='#69d3ff';}
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ex,ey);ctx.stroke();ctx.setLineDash([]);
+      ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-d.x*8-d.z*4,ey-d.z*8+d.x*4);ctx.lineTo(ex-d.x*8+d.z*4,ey-d.z*8-d.x*4);ctx.closePath();ctx.fill();
+      ctx.font='11px sans-serif';ctx.fillText(String(index+1),x+5,y-6);ctx.restore();
     }
     ctx.save();
     ctx.strokeStyle='#ffda75';ctx.lineWidth=Math.max(2.5,Math.min(4,cell*s*.12));

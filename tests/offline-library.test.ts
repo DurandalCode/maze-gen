@@ -198,3 +198,24 @@ test('offline corridor v4 restores explicit supports and exports without navigat
  const exported=await buildLibraryExport(),wire=JSON.parse(recordJson(exported)),entry=wire.mazes.find((r:any)=>r.title==='Corridor offline QA');expect(entry.maze.version).toBe(4);expect(entry.maze.passages).toBeUndefined();expect(entry.maze.supports.length).toBeGreaterThan(0);
  const restored=validateLibraryExport(wire).mazes.find(r=>r.title==='Corridor offline QA')!;expect(restored.maze.passages).toEqual(maze.passages);expect(await browserTopologyId(restored.maze)).toBe(topologyId(maze));
 }, 60_000);
+
+test('direction markers survive offline, file storage, equal-time checkpoints and library JSON export',async()=>{
+ const {maze,early}=fixture('direction-marker-storage');const recorder=restoreRecorder(early.recording);
+ recorder.markDirection(recorder.samples.at(-1)!,.77,recorder.elapsed);
+ const marked=makeWalkData(maze,recorder,'direction-marker-storage',false,'in-progress');
+ await saveOfflineWalk(marked);await saveOfflineWalk(early);
+ expect((await storedWalk(marked.id)).walk.recording.markers).toEqual(marked.recording.markers);
+ const root=await mkdtemp(join(tmpdir(),'maze-marker-store-'));roots.push(root);const store=new FileStore(root);
+ await store.saveWalk(marked);await store.saveWalk(early);
+ expect((await store.getWalk(marked.id))!.walk.recording.markers).toEqual(marked.recording.markers);
+ const exported=validateLibraryExport(JSON.parse(JSON.stringify(await buildLibraryExport())));
+ expect(exported.walks.find(w=>w.id===marked.id)!.recording.markers).toEqual(marked.recording.markers);
+},60_000);
+
+test('pending marker checkpoint survives quota failure and exports before retry',async()=>{
+ const {maze,early}=fixture('pending-direction-marker');const recorder=restoreRecorder(early.recording);recorder.markDirection(recorder.samples.at(-1)!,1.2,1);
+ const marked=makeWalkData(maze,recorder,'pending-direction-marker',false,'in-progress');const original=IDBObjectStore.prototype.put;
+ const put=spyOn(IDBObjectStore.prototype,'put').mockImplementation(function(this:IDBObjectStore,value:unknown,key?:IDBValidKey){if(this.name==='walks')throw new DOMException('quota','QuotaExceededError');return original.call(this,value,key);});
+ try{expect(await saveLibraryWalk(marked)).toEqual({saved:false,queued:true});expect((await buildLibraryExport()).walks.find(w=>w.id===marked.id)!.recording.markers).toEqual(marked.recording.markers);}finally{put.mockRestore();}
+ expect(await saveLibraryWalk(marked)).toEqual({saved:true,queued:false});expect((await storedWalk(marked.id)).walk.recording.markers).toEqual(marked.recording.markers);
+},60_000);

@@ -51,6 +51,7 @@ export async function saveOfflineWalk(raw:unknown):Promise<SavedWalk>{
  const walk=validateWalk(raw),maze=await saveOfflineMaze(walk.maze),now=new Date().toISOString(),assessment=assessWalk(walk.maze,walk.recording.samples,walk.recording.distance,walk.finished),physicalId=await browserTopologyId(walk.maze);
  return update<SavedWalk>('walks',walk.id,old=>{
   if(old&&old.mazeId!==maze.id)throw new Error('Запись относится к другой карте.');
+  if(old&&old.walk.recording.elapsed===walk.recording.elapsed&&(old.walk.recording.markers?.length??0)>(walk.recording.markers?.length??0))return old;
   if(old&&(old.walk.finished||old.walk.recording.elapsed>walk.recording.elapsed||(old.walk.status==='stopped'&&walk.status==='in-progress'&&old.walk.recording.elapsed>=walk.recording.elapsed)))return old;
   return {id:walk.id,mazeId:maze.id,createdAt:old?.createdAt??now,updatedAt:now,walk,assessment,topologyId:physicalId};
  });

@@ -85,6 +85,7 @@ export class FileStore {
     return this.locked('walk:'+walk.id,async()=> {
       const previous=await this.getWalk(walk.id);
       if(previous&&previous.mazeId!==maze.id)throw new Error('Запись относится к другому лабиринту.');
+      if(previous&&previous.walk.recording.elapsed===walk.recording.elapsed&&(previous.walk.recording.markers?.length??0)>(walk.recording.markers?.length??0))return previous;
       if(previous&&(previous.walk.finished || previous.walk.recording.elapsed>walk.recording.elapsed ||
         (previous.walk.status==='stopped'&&walk.status==='in-progress'&&previous.walk.recording.elapsed>=walk.recording.elapsed)))return previous;
       const now=new Date().toISOString();

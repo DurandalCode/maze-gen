@@ -4,6 +4,7 @@ import type {WalkData} from './walk-json';
 export function preferWalk(old:WalkData|undefined|null,incoming:WalkData):WalkData{
  if(!old)return incoming;
  if(old.id!==incoming.id||canonical(old.maze)!==canonical(incoming.maze))throw new Error('Одинаковый идентификатор относится к разным прохождениям.');
+ if(old.recording.elapsed===incoming.recording.elapsed&&(old.recording.markers?.length??0)>(incoming.recording.markers?.length??0))return old;
  if(old.finished||old.recording.elapsed>incoming.recording.elapsed||(old.status==='stopped'&&incoming.status==='in-progress'&&old.recording.elapsed>=incoming.recording.elapsed))return old;
  return incoming;
 }

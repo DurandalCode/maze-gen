@@ -1,3 +1,6 @@
+import {DirectionMarkerPanel} from '../ui/direction-marker-panel';
+import {analyseDirectionMarkers} from '../analysis/direction-markers';
+import {markerDirection} from '../simulation/direction-markers';
 import {multiBandVortexParameters,deepHybridVortexParameters,hybridVortexParameters,leaveContinuousVortex,continuousVortexParameters,districtVortexParameters,chaoticVortexParameters,knottedVortexParameters,centralVortexParameters,vortexParameters} from './vortex-parameters';
 import {maximumSpacingParameters} from './maximum-settings';
 import {bridgeGeometry} from './bridges';
@@ -36,6 +39,8 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
   const worker = useRef<Worker | null>(null), svg = useRef<SVGSVGElement | null>(null), drag = useRef<{ id: string; start: Point; module: FreeModule; draft: FreeDraft } | null>(null), [preview, setPreview] = useState<FreeDraft | null>(null), [connectionPreview, setConnectionPreview] = useState<{ draft: FreeDraft; id: string } | null>(null), [view, setView] = useState({ x: -1, z: -1, width: d.parameters.columns + 2, height: d.parameters.rows + 2 });
   const current = preview ?? connectionPreview?.draft ?? d, phys = useMemo(() => physical(current.layout), [current]), issues = useMemo(() => validateFree(current), [current]), issueIds = new Set(issues.flatMap(i => i.ids)), ready = useMemo(() => issues.length || connectionPreview ? null : freeMaze(d, false), [d, issues.length, connectionPreview]), stats = useMemo(() => ready ? metrics(ready) : null, [ready]), materials = useMemo(() => ready ? materialEstimate(ready) : null, [ready]);
   const [inspection,setInspection]=useState(false);
+  const [showDirectionMarks,setShowDirectionMarks]=useState(true),[selectedDirectionMark,setSelectedDirectionMark]=useState(-1);
+  const directionRows=useMemo(()=>ready&&result?analyseDirectionMarkers(ready,result.recorder.markers,result.recorder.samples):[],[ready,result]);
   const update = (draft: FreeDraft) => {
     if (worker.current) {
       worker.current.terminate();
@@ -264,7 +269,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
     }
   };
   const saveRun = useCallback((value: WalkResult, status: 'in-progress' | 'stopped' | 'finished') => {
-    if (!walk || value.recorder.distance <= .01) return;
+    if (!walk || value.recorder.distance <= .01&&!value.recorder.markers.length) return;
     void captureWalk(walk, value.recorder, value.id ?? crypto.randomUUID(), value.finished, status).then(() => setRevision(n => n + 1)).catch(e => setNotice(String(e)));
   },[walk]);
   const onWalkCancel=useCallback(()=>setWalk(null),[]);
@@ -326,7 +331,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
     {bridge&&<fieldset><legend>Крытый мост</legend>{numberField('Высота настила, м',bridge.rise,v=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.rise=v),.1,2.2,12)}{numberField('Длина лестницы, м',bridge.stairRun,v=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.stairRun=v),.1,1,30)}{numberField('Ширина моста, м',bridge.width,v=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.width=v),.1,1,3)}<p>Первый проём</p>{anchorOptions(bridge.a,a=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.a=a))}<p>Второй проём</p>{anchorOptions(bridge.b,a=>mutate(n=>n.layout.bridges!.find(b=>b.id===bridge.id)!.b=a))}</fieldset>}
     {o && <fieldset><legend>Проём</legend>{anchorOptions(o, a => mutate(n => Object.assign(n.layout.openings.find(x => x.id === o.id)!, a)))}{numberField('Ширина проёма, м', o.width, v => mutate(n => n.layout.openings.find(x => x.id === o.id)!.width = v), .1, 1, 3)}<button onClick={() => mutate(n => n.layout.entrance = o.id)}>Сделать входом</button><button onClick={() => mutate(n => n.layout.exit = o.id)}>Сделать выходом</button></fieldset>}
     <label className="field">Выбрать объект<select aria-label="Выбрать объект" value={selected} onChange={e => setSelected(e.target.value)}><option value="">Нет</option>{[...l.modules, ...l.spaces, ...l.connections, ...l.openings, ...l.walls, ...l.bridges??[]].map(v => <option key={v.id} value={v.id}>{v.id}</option>)}</select></label><button disabled={!selected} onClick={remove}>Удалить выбранное</button>{ready && <EnvironmentControls maze={ready} onChange={environment => mutate(n => n.environment = environment)} />}<ConstructionControls value={d.construction} onChange={p => mutate(n => Object.assign(n.construction, p))} /></aside>
-    <main className="free-workspace">{connectionPreview && <div className="free-notice">Предварительное соединение · проверьте пролёты на карте. <button disabled={issues.some(i => i.ids.includes(connectionPreview.id))} onClick={() => {
+    <main className="free-workspace"><DirectionMarkerPanel rows={directionRows} visible={showDirectionMarks} onVisible={setShowDirectionMarks} selected={selectedDirectionMark} onSelect={setSelectedDirectionMark}/>{connectionPreview && <div className="free-notice">Предварительное соединение · проверьте пролёты на карте. <button disabled={issues.some(i => i.ids.includes(connectionPreview.id))} onClick={() => {
       const candidate = connectionPreview;
       const next=structuredClone(candidate.draft);delete next.layout.cavityReport;update(next);
       setSelected(candidate.id);
@@ -411,7 +416,7 @@ export function FreeEditor({ initial, initialResult=null, onClose }: { initial: 
           const p = centroid(room.polygon);
           return <g key={`junction-${room.id}`} role="img" aria-label={`Перекрёсток: ${count} проходов`}><circle cx={p.x} cy={p.z} r=".33" fill={count >= 5 ? '#efb66f' : '#b7dc7d'} stroke="#10180d" strokeWidth=".04" /><text x={p.x} y={p.z + .11} fontSize=".32" textAnchor="middle" fill="#10180d" fontWeight="bold">{count}</text></g>;
         })}
-        {showRoute && ready && <polyline points={points(routePoints(ready))} fill="none" stroke="#c7f88f" strokeWidth=".08" />}{result && <polyline points={points([...result.recorder.samples])} fill="none" stroke="#8ed5ed" strokeWidth=".07" />}</svg>}
+        {showRoute && ready && <polyline points={points(routePoints(ready))} fill="none" stroke="#c7f88f" strokeWidth=".08" />}{result && <polyline points={points([...result.recorder.samples])} fill="none" stroke="#8ed5ed" strokeWidth=".07" />}{showDirectionMarks&&result?.recorder.markers.map((m,index)=>{const d=markerDirection(m.yaw),x=m.x+d.x*1.3,z=m.z+d.z*1.3;return <g key={index} aria-label={`Метка ощущения выхода ${index+1}`} stroke="#69d3ff" fill="#69d3ff" strokeWidth={selectedDirectionMark===index ? .12 : .07}><line x1={m.x} y1={m.z} x2={x} y2={z} strokeDasharray=".16 .1"/><polygon points={`${x},${z} ${x-d.x*.3-d.z*.14},${z-d.z*.3+d.x*.14} ${x-d.x*.3+d.z*.14},${z-d.z*.3-d.x*.14}`}/><text x={m.x+.15} y={m.z-.15} fontSize=".35" stroke="none">{index+1}</text></g>;})}</svg>}
       <section className="free-validation" aria-label="Проверка конструкции"><h3>Проверка конструкции</h3>{issues.length ? <ul>{issues.slice(0, 30).map((i, n) => <li key={n}><button onClick={() => setSelected(i.ids[0] ?? '')}>{i.message}</button></li>)}</ul> : <p>Связность, пролёты, проёмы и физическая проходимость проверены.</p>}</section>
       {stats && <p>Модулей: {l.modules.length} · 2×2: {l.modules.filter(m => m.type === '2x2').length} · 2×6: {l.modules.filter(m => m.type === '2x6').length} · циклов: {stats.cycles} · площадь: {stats.area.toFixed(1)} м² · маршрут: {stats.optimalLength.toFixed(1)} м</p>}{materials && <p>Стоек: {materials.posts} · ткани: {materials.fabricSquareMetres.toFixed(1)} м² · обвязки: {(materials.upperMetres + materials.lowerMetres).toFixed(1)} м. Раскрой и отходы не учитываются.</p>}
       <div className="free-tools"><label>Модель поиска<select value={profile} onChange={e => setProfile(e.target.value as typeof profile)}><option value="explorer">Без направления</option><option value="compass">Знает направление</option><option value="outline">Знает направление и контур</option></select></label><button disabled={!ready || busy} onClick={() => run('analyze')}>Проанализировать</button></div>{analysis && <p>Холодная площадь: {(analysis.coldAreaRatio * 100).toFixed(1)}% · крупнейшая область: {analysis.largestColdArea.toFixed(1)} м² · средний путь поиска: {analysis.expectedLength.toFixed(1)} м · завершено симуляций: {(analysis.finishedRatio * 100).toFixed(1)}% из {analysis.samples}. Тепло показано на пространствах и соединениях.</p>}

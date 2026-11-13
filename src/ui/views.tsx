@@ -1,3 +1,6 @@
+import {analyseDirectionMarkers} from '../analysis/direction-markers';
+import {DirectionMarkerPanel} from './direction-marker-panel';
+import {directionMarkerShortcut} from '../simulation/direction-markers';
 import {bridgeInspectionSolids} from '../free/bridges';
 import {floorOf} from '../core/two-storey';
 import type { HeatDisplay } from './coldspot-controls';
@@ -21,6 +24,8 @@ export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePort
   floor?:number;maze: Maze; heat?: HeatDisplay|null; showRoute: boolean; recorder: Recorder | null; onPlacePortal?: (portal: Portal | null) => void;
   onEnvironmentChange?: (environment: Environment) => void;
 }) {
+  const [showMarkers,setShowMarkers]=useState(true),[selectedMarker,setSelectedMarker]=useState(-1);
+  const markerRows=useMemo(()=>recorder?analyseDirectionMarkers(maze,recorder.markers,recorder.samples):[],[maze,recorder]);
   const [hover,setHover]=useState<{x:number;y:number;text:string}|null>(null);
   const [trapState,setTrapState]=useState<{maze:Maze|null;show:boolean;critical:boolean;selected:string}>({maze:null,show:false,critical:false,selected:'all'});
   const showTraps=trapState.maze===maze&&trapState.show,selected=trapState.maze===maze?trapState.selected:'all';
@@ -62,6 +67,7 @@ export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePort
     if (!view.current) return;
     view.current.showRoute = showRoute; view.current.trajectory = recorder?.samples ?? []; view.current.draw();
   }, [maze, showRoute, recorder]);
+  useEffect(()=>{if(view.current){view.current.directionMarkers=showMarkers?(recorder?.markers??[]):[];view.current.selectedDirectionMarker=selectedMarker;view.current.draw();}},[maze,recorder,showMarkers,selectedMarker]);
   useEffect(()=> {
     if(view.current) {view.current.heat=heat??null;view.current.draw();}setHover(null);
   },[maze,heat]);
@@ -93,6 +99,7 @@ export function MapCanvas({ maze,floor=0, heat, showRoute, recorder, onPlacePort
       <span />
       <button title="Вписать в экран" aria-label="Вписать в экран" onClick={() => view.current?.fit()}>⌖</button>
     </div>
+    <DirectionMarkerPanel rows={markerRows} visible={showMarkers} onVisible={setShowMarkers} selected={selectedMarker} onSelect={setSelectedMarker}/>
     <div className="map-hint">КОЛЕСО · МАСШТАБ <span /> ТЯНИТЕ КАРТУ ИЛИ ОРИЕНТИР</div>
   </>;
 }
@@ -123,6 +130,8 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
     if (document.pointerLockElement === canvas.current) document.exitPointerLock();
   };
   const [stats, setStats] = useState({ distance: 0, elapsed: 0 });
+  const [markerNotice,setMarkerNotice]=useState('');
+  const markerUntil=useRef(0);
   const [lockError, setLockError] = useState('');
   const lock = async () => {
     if (endedRef.current) return;
@@ -147,6 +156,15 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
     playerRef.current = player;
     const keys = new Set<string>();
     const keyDown = (event: KeyboardEvent) => {
+      const markerKey=directionMarkerShortcut(event,activeRef.current&&!endedRef.current&&!player.finished&&!document.hidden,inspection,!!document.querySelector('[aria-modal="true"],[role="dialog"]'));
+      if(markerKey){
+        event.preventDefault();if(markerKey==='repeat')return;
+        const now=performance.now(),remainder=(now-previous)/1000,time=player.recorder.elapsed+(remainder>=0&&remainder<.25?remainder:0);
+        if(player.recorder.markDirection(player.position,player.yaw,time)){
+          setMarkerNotice('Направление предполагаемого выхода записано');markerUntil.current=now+1800;checkpoint();
+        }else{setMarkerNotice('Достигнут предел меток в записи');markerUntil.current=now+1800;}
+        return;
+      }
       if (document.pointerLockElement !== element) return;
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(event.code)) { event.preventDefault(); keys.add(event.code); }
     };
@@ -165,7 +183,7 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
     window.addEventListener('blur', suspend);
     window.addEventListener('maze:native-pause', suspend);
     document.addEventListener('visibilitychange', visibility);
-    let frame = 0, previous = performance.now(), lastStats = previous, lastCheckpoint=previous, savedDistance=0, stopped = false;
+    let frame = 0, previous = performance.now(), lastStats = previous, lastCheckpoint=previous, savedDistance=0,savedMarkers=0, stopped = false;
     const loop = (now: number) => {
       if (stopped || endedRef.current) return;
       const dt = (now-previous)/1000; previous = now;
@@ -177,9 +195,10 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
         } else player.update(dt, keys);
       }
       scene.render(player);
+      if(markerUntil.current&&now>=markerUntil.current){markerUntil.current=0;setMarkerNotice('');}
       if (now-lastStats > 100) { setStats({ distance: player.recorder.distance, elapsed: player.recorder.elapsed }); lastStats = now; }
-      if(!inspection&&now-lastCheckpoint>10_000 && player.recorder.distance>savedDistance+.01) {
-        onCheckpoint?.({id:runId.current,recorder:player.recorder,finished:false});lastCheckpoint=now;savedDistance=player.recorder.distance;
+      if(!inspection&&now-lastCheckpoint>10_000 && (player.recorder.distance>savedDistance+.01||player.recorder.markers.length>savedMarkers)) {
+        onCheckpoint?.({id:runId.current,recorder:player.recorder,finished:false});lastCheckpoint=now;savedDistance=player.recorder.distance;savedMarkers=player.recorder.markers.length;
       }
       if (player.finished) { endedRef.current = true; suspend(); onEnd({ id:runId.current,recorder: player.recorder, finished: true }); return; }
       frame = requestAnimationFrame(loop);
@@ -187,9 +206,9 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
     function checkpoint() {
       // Native backgrounding can happen before the periodic save or pagehide.
       // Never create idle runs or emit an in-progress save after a terminal result.
-      if (inspection || endedRef.current || player.recorder.distance <= .01 || player.recorder.distance <= savedDistance) return;
+      if (inspection || endedRef.current || (player.recorder.distance <= .01&&!player.recorder.markers.length) || (player.recorder.distance <= savedDistance&&player.recorder.markers.length<=savedMarkers)) return;
       onCheckpoint?.({ id: runId.current, recorder: player.recorder, finished: false });
-      savedDistance = player.recorder.distance; lastCheckpoint = performance.now();
+      savedDistance = player.recorder.distance;savedMarkers=player.recorder.markers.length; lastCheckpoint = performance.now();
     }
     window.addEventListener('pagehide',checkpoint);
     frame = requestAnimationFrame(loop);
@@ -209,13 +228,14 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
     endedRef.current = true; pause();
     // Previewing the start screen is not a stopped attempt. Cancellation also
     // works while the lazy scene is still loading and preserves earlier results.
-    if (!player || inspection || player.recorder.elapsed === 0) { onCancel(); return; }
-    if (player.recorder.distance > 0) player.recorder.record(player.position, player.recorder.elapsed, true);
+    if (!player || inspection || player.recorder.elapsed === 0&&!player.recorder.markers.length) { onCancel(); return; }
+    if (player.recorder.distance > 0||player.recorder.markers.length) player.recorder.record(player.position, Math.max(player.recorder.elapsed,player.recorder.markers.at(-1)?.time??0), true);
     onEnd({ id:runId.current,recorder: player.recorder, finished: false });
   };
   return <div className={`walk-view ${touch ? 'touch-walk' : ''}`}>
     <canvas ref={canvas} className="walk-canvas" aria-label={inspection?'Осмотр сооружения снаружи':'Лабиринт от первого лица'} onClick={() => { if (!locked && !touch) void lock(); }} />
     <div className="walk-hud">{inspection?<span><i className="live-dot" /> ОСМОТР · БЕЗ ЗАПИСИ ПРОХОЖДЕНИЯ</span>:<><span><i className="live-dot" /> СТАРТ {startNumber} → ФИНИШ {finishNumber}</span><strong>{formatTime(stats.elapsed)}</strong><strong>{stats.distance.toFixed(1)} <small>м</small></strong></>}</div>
+    {markerNotice&&<div className="direction-marker-notice" role="status">{markerNotice}</div>}
     <button className="back-map" onClick={stop}>← Вернуться к карте</button>
     {locked && <div className="crosshair">+</div>}
     {locked && touch && <><button className="walk-pause" onClick={pause}>Ⅱ Пауза</button><TouchControls onMove={setMove} onLook={setLook} onError={onError} /></>}
@@ -225,6 +245,7 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
       {inspection?<p>Обойди сооружение и осмотри каркас. Стены остаются препятствиями.<br />Осмотр не записывается как прохождение.</p>:<p>Вход {startNumber} → выход {finishNumber}. Найди выбранный выход.<br />После прохождения сравним твой путь с кратчайшим.</p>}
       <p>Ориентир выхода — А-образная башня высотой 6 м. Крыша и стены могут закрывать её изнутри.</p>
       {touch ? <div className="key-guide touch-guide"><span>ЛЕВЫЙ · ходьба / бег</span><span>ПРАВЫЙ · обзор</span></div> : <div className="key-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> движение</span><span><kbd>⇧</kbd> быстрее</span><span>МЫШЬ · обзор</span></div>}
+      {!inspection&&<p className="direction-marker-help"><kbd>F</kbd> — отметить взглядом, где, как кажется, выход. Стрелки и сравнение появятся после возвращения к карте.</p>}
       <label className="walk-touch-choice"><input type="checkbox" checked={touch} onChange={event => { clearTouch(); setTouch(event.target.checked); }} /> Управление двумя джойстиками</label>
       <button className="primary" onClick={() => void lock()}>{inspection?'Начать осмотр':stats.elapsed > 0 ? 'Продолжить' : 'Начать прохождение'} <span>↗</span></button>
       <small>{touch ? 'Чем сильнее отклонён левый джойстик, тем быстрее движение: у края — бег. Кнопка «Пауза» останавливает таймер.' : 'Esc — пауза и освобождение курсора. Таймер на паузе не идёт.'}</small>

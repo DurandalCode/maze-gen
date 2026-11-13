@@ -1,3 +1,4 @@
+import {DIRECTION_MARKER_LIMIT,type DirectionMarker} from '../simulation/direction-markers';
 import {bridgeSurface} from '../free/bridges';
 import {storeyWire} from './two-storey-json';
 import {spatialDistance,stairAt,stairProgress} from '../core/two-storey';
@@ -6,7 +7,7 @@ import { domainOf } from '../core/domain';
 import { deserialize } from './maze-json';
 import { Recorder,type Sample } from '../simulation/recorder';
 
-export interface WalkRecording {samples:Sample[];distance:number;elapsed:number}
+export interface WalkRecording {samples:Sample[];distance:number;elapsed:number;markers?:DirectionMarker[]}
 export interface WalkData {kind:'maze-lab-walk';version:1|2;id:string;maze:Maze;finished:boolean;status:'in-progress'|'stopped'|'finished';recording:WalkRecording}
 export const WALK_LIMIT=12_000_000;
 export function validateWalk(value:unknown):WalkData {
@@ -36,9 +37,23 @@ export function validateWalk(value:unknown):WalkData {
     if(i>0) {const a=recording.samples[i-1]!,length=spatialDistance(a,sample);if(length>5)return fail();if(maze.free?.bridges?.length&&a.bridge!==sample.bridge){if(a.bridge!==undefined&&sample.bridge!==undefined)return fail();if((a.y??0)>.15||(sample.y??0)>.15)return fail();}if(maze.storeys){if(a.stair===undefined&&sample.stair===undefined&&a.floor!==sample.floor)return fail();if(a.stair!==undefined&&sample.stair!==undefined&&a.stair!==sample.stair)return fail();}polyline+=length;}
     time=sample.time;return {x:sample.x,z:sample.z,time:sample.time,...((maze.storeys||maze.free?.bridges?.length)?{y:sample.y,floor:sample.floor,...(sample.bridge===undefined?{}:{bridge:sample.bridge}),...(sample.stair===undefined?{}:{stair:sample.stair})}:{})};
   });
+  let markerTime=0;
+  if(recording.markers!==undefined&&(!Array.isArray(recording.markers)||recording.markers.length>DIRECTION_MARKER_LIMIT))return fail();
+  const markers=recording.markers?.map(marker=>{
+    if(!marker||marker.version!==1||marker.kind!=='perceived-exit'||![marker.x,marker.z,marker.time,marker.yaw].every(Number.isFinite)||marker.time<markerTime||marker.time>recording.elapsed+1e-6||!domain.contains(marker)||marker.floor!==undefined&&![0,1].includes(marker.floor))return fail();
+    if(marker.y!==undefined&&(!Number.isFinite(marker.y)||marker.y<0||marker.y>100))return fail();
+    if(maze.storeys||maze.free?.bridges?.length){
+      if(!Number.isFinite(marker.y)||![0,1].includes(marker.floor!))return fail();
+      if(maze.storeys){if(marker.stair!==undefined){const stair=stairAt(maze,marker);if(!stair||stair.id!==marker.stair||marker.floor!==(stairProgress(stair,marker)<.5?0:1)||Math.abs(stairProgress(stair,marker)*maze.storeys.floorHeight-marker.y!)>1e-5)return fail();}else if(Math.abs(marker.y!-marker.floor!*maze.storeys.floorHeight)>1e-5)return fail();}
+      else if(marker.bridge!==undefined){const surface=bridgeSurface(maze.free!,marker);if(!surface||surface.floor!==marker.floor||Math.abs(surface.y!-marker.y!)>1e-5)return fail();}else if(marker.y!==0||marker.floor!==0)return fail();
+    }
+    if(!maze.storeys&&!maze.free?.bridges?.length&&((marker.y??0)!==0||(marker.floor??0)!==0||marker.stair!==undefined||marker.bridge!==undefined))return fail();
+    markerTime=marker.time;
+    return {version:1 as const,kind:'perceived-exit' as const,x:marker.x,z:marker.z,time:marker.time,yaw:marker.yaw,...(marker.floor===undefined?{}:{floor:marker.floor}),...(marker.y===undefined?{}:{y:marker.y}),...(marker.stair===undefined?{}:{stair:marker.stair}),...(marker.bridge===undefined?{}:{bridge:marker.bridge})};
+  });
   if(polyline>recording.distance+.01)return fail();
   return {kind:'maze-lab-walk',version:raw.version,id:raw.id,maze,finished:raw.finished,status:raw.status,
-    recording:{samples,distance:recording.distance,elapsed:recording.elapsed}};
+    recording:{samples,distance:recording.distance,elapsed:recording.elapsed,...(markers===undefined?{}:{markers})}};
 }
 export function deserializeWalk(text:string):WalkData {
   if(text.length>WALK_LIMIT)throw new Error('Запись прохождения больше 12 МБ.');
@@ -48,8 +63,9 @@ export function restoreRecorder(data:WalkRecording):Recorder {
   const recorder=new Recorder(data.samples[0]!);
   for(let i=1;i<data.samples.length;i++)recorder.record(data.samples[i]!,data.samples[i]!.time,true);
   recorder.distance=data.distance;recorder.elapsed=data.elapsed;
+  recorder.markers.push(...structuredClone(data.markers??[]));
   return recorder;
 }
 export function makeWalkData(maze:Maze,recorder:Recorder,id:string,finished:boolean,status:WalkData['status']):WalkData {
-  return {kind:'maze-lab-walk',version:maze.storeys||maze.free?.bridges?.length?2:1,id,maze,finished,status,recording:{samples:[...recorder.samples],distance:recorder.distance,elapsed:recorder.elapsed}};
+  return {kind:'maze-lab-walk',version:maze.storeys||maze.free?.bridges?.length?2:1,id,maze,finished,status,recording:{samples:[...recorder.samples],distance:recorder.distance,elapsed:Math.max(recorder.elapsed,recorder.markers.at(-1)?.time??0),...(recorder.markers.length?{markers:structuredClone(recorder.markers)}:{})}};
 }
