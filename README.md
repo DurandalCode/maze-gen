@@ -174,12 +174,13 @@ bun run dev
 bun run tauri dev
 ```
 
-Если Bun ещё не добавлен в PATH, в этой рабочей копии скачан локальный экземпляр (в Git не входит). PowerShell:
+## Перенос на другой ПК
 
-```powershell
-$env:Path = "$PWD\.tools\bun-windows-x64;$env:Path"
-bun run dev
-```
+Для веб-версии нужны Git и Bun; Rust/Tauri не требуются. В новом checkout выполните `bun install --frozen-lockfile`, `bun run build`, затем `bun run serve` и откройте `http://127.0.0.1:1420`.
+
+Точная одобренная концовка с коротким кольцом — [`examples/maps/approved-vortex-ending-ring.json`](examples/maps/approved-vortex-ending-ring.json). Откройте этот JSON, не заменяйте его новой генерацией по seed. Личные карты, прохождения и F-метки переносятся отдельным экспортом библиотеки; Git их не содержит.
+
+[Пошаговые команды для Windows PowerShell и macOS/Linux, перенос библиотеки и проверка импорта](docs/pc-transfer.md).
 
 ## Системные зависимости desktop
 

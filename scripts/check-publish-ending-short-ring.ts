@@ -14,7 +14,7 @@ import {CollisionWorld} from '../src/simulation/collisions';
 import {Player} from '../src/simulation/player';
 import {Recorder} from '../src/simulation/recorder';
 import {makeWalkData,validateWalk} from '../src/persistence/walk-json';
-const row=await Bun.file(process.env.ENDING_RING_SOURCE??'/private/tmp/ending-ring-source-row.json').json(),source=deserialize(JSON.stringify(row.maze)),snapshot=serialize(source),m=addEndingShortRing(source),old=freeRuntime(source),r=freeRuntime(m),world=new CollisionWorld([...walls(m),...supportColliders(m)]);
+const row=await Bun.file(process.env.ENDING_RING_SOURCE??resolve('test-results/ending-ring-source-row.json')).json(),source=deserialize(JSON.stringify(row.maze)),snapshot=serialize(source),m=addEndingShortRing(source),old=freeRuntime(source),r=freeRuntime(m),world=new CollisionWorld([...walls(m),...supportColliders(m)]);
 if(row.id!=='fe439a2a8187852f5c730a2f')throw Error('Use the exact saved fe439 source');
 if(serialize(source)!==snapshot||JSON.stringify(m.free!.modules.slice(0,source.free!.modules.length))!==JSON.stringify(source.free!.modules)||JSON.stringify(m.free!.spaces)!==JSON.stringify(source.free!.spaces)||JSON.stringify(m.free!.openings)!==JSON.stringify(source.free!.openings)||JSON.stringify(m.free!.connections.slice(0,source.free!.connections.length))!==JSON.stringify(source.free!.connections))throw Error('Source structure changed');
 const oldRoute=shortestPath(source).map(i=>old.rooms[i]!.id),route=shortestPath(m).map(i=>r.rooms[i]!.id);if(JSON.stringify(oldRoute)!==JSON.stringify(route))throw Error('Correct finish approach changed');
