@@ -1,0 +1,2 @@
+# Keep the byte-exact approved export identical on every checkout platform.
+examples/maps/approved-vortex-hybrid09.json text eol=lf
