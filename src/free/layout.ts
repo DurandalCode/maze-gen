@@ -284,8 +284,19 @@ export interface FreeNavigationLink {a:number;b:number;from:Point;to:Point;point
 export function buildNavigation(l: FreeLayout) {
   const links:FreeNavigationLink[]=[];
   const phys = physical(l), rs = phys.rooms, centers = rs.map(r => navigationCenter(r, phys.obstacles)), passages = rs.map(() => [] as number[]), paths: (Point[] | null)[] = [], edgePaths = new Map<string, Point[]>();
+  const corridorRooms=new Set(l.spaces.filter(s=>s.kind==='corridor').map(s=>s.id));
+  const seat=(room:number,gate:ReturnType<typeof anchorGeometry>)=>{
+    const preferred={x:gate.mid.x-gate.normal.x*.35,z:gate.mid.z-gate.normal.z*.35};
+    if(!corridorRooms.has(rs[room]!.id))return preferred;
+    const clear=(p:Point)=>phys.obstacles.every(w=>movementClearance(p,gate.mid,w)>=.25-EPS)&&localRoute(centers[room]!,p,rs[room]!.polygon,rs[room]!.holes,phys.obstacles)!==null;
+    if(clear(preferred))return preferred;
+    // An acute promoted span can pinch its inward normal against a jamb.
+    // Keep the real gate; approach it from its radius-clear interior instead.
+    const center=centers[room]!,length=distance(gate.mid,center),toward=lerp(gate.mid,center,length>EPS?Math.min(1,.35/length):0);
+    return clear(toward)?toward:preferred;
+  };
   for (const c of l.connections) try {
-    const g = connectionGeometry(l, c), a = rs.findIndex(r => r.id === c.a.room), b = rs.findIndex(r => r.id === c.b.room), inward = (p: typeof g.a) => ({ x: p.mid.x - p.normal.x * .35, z: p.mid.z - p.normal.z * .35 }), pa = inward(g.a), pb = inward(g.b), ra = localRoute(centers[a]!, pa, rs[a]!.polygon, rs[a]!.holes, phys.obstacles), rb = localRoute(pb, centers[b]!, rs[b]!.polygon, rs[b]!.holes, phys.obstacles);
+    const g = connectionGeometry(l, c), a = rs.findIndex(r => r.id === c.a.room), b = rs.findIndex(r => r.id === c.b.room), pa = seat(a,g.a), pb = seat(b,g.b), ra = localRoute(centers[a]!, pa, rs[a]!.polygon, rs[a]!.holes, phys.obstacles), rb = localRoute(pb, centers[b]!, rs[b]!.polygon, rs[b]!.holes, phys.obstacles);
     let route = ra && rb ? [...ra, g.a.mid, g.b.mid, ...rb] : null;
     if (route) {
       // localRoute has already swept both room interiors. The connector
