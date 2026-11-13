@@ -42,6 +42,8 @@ export interface Parameters {
   freeVortexContinuous?:boolean;
   freeVortexHybrid?:boolean;
   freeVortexHybridDeep?:boolean;
+  freeVortexHybridRevision?:'atomic-turns-v2';
+  freeVortexBaseSeed?:string;
   freeVortexMultiBand?:boolean;
   freeVortexKnots?:boolean;
   /** Additional native crosslinks through suitable interior gaps, up to this budget. */
@@ -135,6 +137,8 @@ export function validateParameters(p: Parameters): void {
   if(p.freeRequiredBridgeCount!==undefined&&(!Number.isInteger(p.freeRequiredBridgeCount)||p.freeRequiredBridgeCount<0||p.freeRequiredBridgeCount>(p.freeBridgeCount??0)))throw Error('Обязательных мостов должно быть от 0 до общего числа мостов.');
   if(p.freeModuleTarget!==undefined&&(!Number.isInteger(p.freeModuleTarget)||p.freeModuleTarget<8||p.freeModuleTarget>250))throw Error('Целевое число свободных модулей: от 8 до 250.');
   if(p.freeConnectionSpan!==undefined&&(!Number.isFinite(p.freeConnectionSpan)||p.freeConnectionSpan<1||p.freeConnectionSpan>3))throw Error('Пролёт свободного соединения должен быть от 1 до 3 м.');
+  if(p.freeVortexBaseSeed!==undefined&&(typeof p.freeVortexBaseSeed!=='string'||p.freeVortexBaseSeed.length<1||p.freeVortexBaseSeed.length>128||!p.freeVortexHybrid))throw Error('Seed спиральной основы доступен для межспирального гибрида (1–128 символов).');
+  if(p.freeVortexHybridRevision!==undefined&&(p.freeVortexHybridRevision!=='atomic-turns-v2'||!p.freeVortexHybridDeep))throw Error('Новая сборка поворотов требует глубокий вортексный гибрид.');
   if(p.freeVortexHybridDeep!==undefined&&typeof p.freeVortexHybridDeep!=='boolean')throw Error('Некорректное резервирование глубокого возврата.');
   if(p.freeVortexHybridDeep&&!p.freeVortexHybrid)throw Error('Глубокий возврат требует межспиральный гибрид.');
   if(p.freeVortexHybrid!==undefined&&typeof p.freeVortexHybrid!=='boolean')throw Error('Некорректные межспиральные дворы.');

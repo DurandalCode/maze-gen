@@ -13,3 +13,27 @@
 Новая резервация оставляет меньше места для прежнего заполнения: в первом опыте добавлено 242 м² вместо 400 м² у предыдущего гибрида, общий пол — 852 вместо 958 м². Связность сохранена, но субъективную запутанность должен оценить игрок. Старые карты не переписываются.
 
 Проверены физические капсульные пути, полный Player-маршрут через обе ловушки и оба возврата до выхода, JSON, модульное происхождение стен, противоположные внешние порталы, загрузка/движение/пауза/overlay/редактор в браузере. Полный набор тестов проекта и Android в этой итерации не запускались.
+
+### Reusing a spiral style with a new interstitial layout
+
+`freeVortexBaseSeed` optionally fixes only the chaotic spiral scaffold. The
+ordinary `seed` still drives the new interspiral frames, courtyards and selective
+connections. The two values are stored in native JSON and shown in the editor;
+an omitted base seed preserves the old behavior. This is a variation of the
+same spiral composition, not a claim of a completely new underlying scaffold.
+
+The optional `freeVortexHybridRevision: 'atomic-turns-v2'` assembles final 2×6
+turning frames before checking the finished reservation. Temporary 2×2 links
+which the final frames replace need not exist as a playable intermediate maze.
+All final spans and capsule paths still pass the same physical checks. This
+revision also preserves the immediate main-route approach/continuation of each
+protected fork. At the finite fill-stage boundaries it rejects an entire new
+region if its added geometry loses the requested qualified Л/К. It does not
+change any trap formula or old saved profile.
+
+Example preparation:
+
+```sh
+MAZE_SEED=vortex-hybrid-next-10 VORTEX_BASE_SEED=vortex-chaotic-05 \
+VORTEX_ATOMIC_TURNS=1 bun scripts/prepare-vortex-hybrid-deep.ts
+```
