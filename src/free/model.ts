@@ -13,8 +13,10 @@ export interface FreeConnection {
 }
 export interface FreeBridge extends FreeConnection {rise:number;stairRun:number}
 export interface FreeZone {id:string;title:string;style:'branching'|'braided'|'winding'}
-export interface CavityReport {construction?:{reservedReturnFork?:string;baseModules:number;addedModules:number;openedCourtyards:number;certifiedWalls:number;denseCourtyards?:{addedModules:number;opened:number;area:number;rejected:string[]};selectiveCourtyards?:{opened:number;area:number;spanArea:number;rejected:{area:number;reason:string}[]}};baseGeometry?:OrganicCharacter;seed:string;filledArea:number;blockedArea:number;outsideArea:number;regions:{id:string;area:number;filledArea:number;blockedArea:number;status:string;reason:string;cells:number;doors:number}[]}
+export interface CavityReport {postRoute?:{version:1;beforeNegativeArea:number;afterNegativeArea:number;beforeClosedArea:number;afterClosedArea:number;addedFloorArea:number;addedModules:number;openedCourts:number;checks:number;remaining:{id:string;area:number;state:string;reason:string}[]};construction?:{reservedReturnFork?:string;baseModules:number;addedModules:number;openedCourtyards:number;certifiedWalls:number;denseCourtyards?:{addedModules:number;opened:number;area:number;rejected:string[]};selectiveCourtyards?:{opened:number;area:number;spanArea:number;rejected:{area:number;reason:string}[]}};baseGeometry?:OrganicCharacter;seed:string;filledArea:number;blockedArea:number;outsideArea:number;regions:{id:string;area:number;filledArea:number;blockedArea:number;status:string;reason:string;cells:number;doors:number}[]}
 export interface FreeLayout {
+  /** Frozen input of the versioned post-route generator; not physical geometry. */
+  postRouteSource?:FreeDraft;
   /** Generated module-backed construction; old free-form/imported maps remain readable. */
   moduleConstruction?:{version:1;spans:FreeConnection[]};
   cavityReport?:CavityReport;

@@ -1,3 +1,6 @@
+import {mazeDraft} from './json';
+import {freeMaze} from './layout';
+import {completeRouteCourtyards} from './post-route-courtyards';
 import {generateDenseGameplay} from './dense-gameplay';
 import {generateVortex} from './vortex';
 import {DEFAULT_DESIGN_LIMITS} from '../core/maze';
@@ -10,6 +13,16 @@ import {freeGroundLengths,freeLengthLimits} from './path-limits';
 /** All free placement is grown from world-space doorways, without a lattice. */
 export function generateFree(parameters: Parameters, previous?: Maze, onProgress?: (message: string) => void): Maze {
   if(parameters.freeRoutePattern==='vortex')return generateVortex(parameters,previous,onProgress);
+  if(parameters.freePassagePattern==='organic-sectors-v2'){
+    if((parameters.loopTrapCount??0)>0)throw Error('Финальное заполнение пока не поддерживает обязательное возвратное К.');
+    if(!parameters.freeCavityMaze||parameters.freeCourtyardPolicy!=='dense-v3')throw Error('Финальное заполнение требует плотный свободный гибрид.');
+    const candidate=previous?.free?.postRouteSource??(previous?.free?mazeDraft(previous):undefined);
+    const sameInputs=candidate&&[...new Set([...Object.keys(parameters),...Object.keys(candidate.parameters)])].every(key=>key==='freePassagePattern'||JSON.stringify(parameters[key as keyof Parameters])===JSON.stringify(candidate.parameters[key as keyof Parameters]));
+    const base=sameInputs?freeMaze(candidate!):generateFree({...parameters,freePassagePattern:'organic-sectors-v1'},previous,onProgress),source=mazeDraft(base);
+    delete source.layout.postRouteSource;
+    const completed=completeRouteCourtyards(base,onProgress),result=completed.maze;result.parameters={...parameters};result.free!.postRouteSource=source;
+    const issues=checkFreeQuality(result,{quick:true,routeAnalysis:completed.routeAnalysis});if(issues.length)throw Error('Финальные внутренние проходы нарушают требования: '+issues.join(' '));return result;
+  }
   if(parameters.freePassagePattern==='organic-sectors-v1'&&(parameters.loopTrapCount??0)>0)throw Error('Органические межсекторные связи пока поддерживают маршрутные Л без обязательного возвратного К.');
   const baseParameters=parameters.freeCavityMaze&&parameters.freeAngleSpread===0&&parameters.freeConnectionSpan===undefined&&parameters.freeSpanPolicy!=='maximum'?{...parameters,design:{...DEFAULT_DESIGN_LIMITS,...parameters.design,maxForcedStraight:Math.min(parameters.design?.maxForcedStraight??8,4),maxForcedRun:Math.min(parameters.design?.maxForcedRun??16,8)}}:parameters;
   const denseTraps=parameters.freeCavityMaze&&parameters.freeCourtyardPolicy==='dense-v3'&&(parameters.routeTrapCount??0)>0;

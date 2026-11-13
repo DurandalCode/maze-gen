@@ -8,17 +8,17 @@ import {bridgeGeometry} from './bridges';
 import {pathLength} from '../core/pathfinding';
 /** Actual doorway-to-doorway paths, including bends around physical screens.
  * The explicit bridge experiment measures continuous ground stretches separately. */
-export function freeGroundLengths(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'){
+export function freeGroundLengths(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'||maze.parameters.freePassagePattern==='organic-sectors-v2'){
  const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];
  return {...measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,undefined,normalizedConnectors(maze,normalized)),bridges:(maze.free!.bridges??[]).map(b=>({id:b.id,length:pathLength(bridgeGeometry(maze.free!,b).path)}))};
 }
 /** Longest actual directed corridor witness for constructive repair. */
-export function freeGroundRunWitness(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'){
+export function freeGroundRunWitness(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'||maze.parameters.freePassagePattern==='organic-sectors-v2'){
  const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];let best={length:0,rooms:[] as string[],points:[] as Point[]};
  measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(length,chain,points)=>{if(length>best.length)best={length,rooms:chain.map(i=>r.rooms[i]!.id),points};},normalizedConnectors(maze,normalized));return best;
 }
 /** Directed chain containing the longest physical straight ground segment. */
-export function freeGroundStraightWitness(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'){
+export function freeGroundStraightWitness(maze:Maze,normalized=maze.parameters.freePassagePattern==='organic-sectors-v1'||maze.parameters.freePassagePattern==='organic-sectors-v2'){
  const r=freeRuntime(maze),portals=maze.portals??[maze.entrance,maze.exit];let best={length:0,rooms:[] as string[],points:[] as Point[]};
  measure(r,portals.map(p=>({cell:p.cell,point:portalPoint(maze,p)})),undefined,(_length,chain,points,straight)=>{if(straight>best.length)best={length:straight,rooms:chain.map(i=>r.rooms[i]!.id),points};},normalizedConnectors(maze,normalized));return best;
 }
