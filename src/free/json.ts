@@ -6,13 +6,14 @@ import type { FreeDraft } from './model';
 export function mazeDraft(maze: Maze): FreeDraft {
   return { kind: 'maze-lab-free-draft', version: maze.free!.bridges?.length?2:1, parameters: structuredClone(maze.parameters), ...(maze.environment ? { environment: structuredClone(maze.environment) } : {}), construction: { wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof }, layout: structuredClone(maze.free!) };
 }
-function inspect(d: FreeDraft): void {
+function inspect(d: FreeDraft,sourceDepth=0): void {
   if (!d || d.kind !== 'maze-lab-free-draft' || ![1,2].includes(d.version) || d.parameters?.placementMode !== 'free') throw Error('Некорректный свободный черновик.');
   validateParameters(d.parameters);
   if (d.environment) validateEnvironment(d.environment);
   validateConstruction(d.construction);
   const l = d.layout;
   if (!l || ![l.modules, l.spaces, l.connections, l.openings, l.walls].every(Array.isArray) || l.modules.length > 2500 || l.spaces.length > 10000 || l.connections.length > 20000 || l.walls.length > 100000 || l.openings.length > 10000 || typeof l.entrance !== 'string' || typeof l.exit !== 'string') throw Error('Некорректная структура размещения.');
+  if(l.postRouteSource!==undefined){if(sourceDepth)throw Error('Вложенный источник финального заполнения не поддерживается.');inspect(l.postRouteSource,sourceDepth+1);}
   if(l.zones!==undefined&&(!Array.isArray(l.zones)||l.zones.length>100||l.zones.some(z=>!z||typeof z.id!=='string'||typeof z.title!=='string'||z.title.length>200||!['branching','braided','winding'].includes(z.style))||new Set(l.zones.map(z=>z.id)).size!==l.zones.length))throw Error('Некорректные зоны.');
   if([...l.modules,...l.spaces].some(m=>m.zone!==undefined&&(!l.zones?.some(z=>z.id===m.zone))))throw Error('Неизвестная зона пространства.');
   if(l.bridges!==undefined&&(!Array.isArray(l.bridges)||l.bridges.length>100||l.bridges.length>0&&d.version!==2))throw Error('Некорректный список мостов.');
@@ -59,6 +60,7 @@ export function decodeFree(value: Record<string, unknown>): Maze {
 }
 export function freeIdentity(maze: Maze): unknown {
   const l = structuredClone(maze.free!);
+  delete l.postRouteSource;
   delete l.zones;
   delete l.cavityReport;
   delete l.moduleConstruction;

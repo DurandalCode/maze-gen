@@ -92,9 +92,10 @@ export function analyzeFree(maze: Maze, samples = 256, profile: 'explorer' | 'co
   const unseen=areas.reduce((sum,w,i)=>sum+w*(1-probability[i]!),0)+bridgeAreas.reduce((sum,w,i)=>sum+w*(1-bridgeUsage[i]!.overProbability),0);
   return {bridgeUsage,unseenAreaRatio:totalArea?unseen/totalArea:0,probability, visits, expectedLength: expectedLength / samples, finishedRatio: finished / samples, coldAreaRatio: totalArea ? cold / totalArea : 0, largestColdArea: Math.max(0, ...regions.map(r=>r.area)), optimalLength: pathLength(routePoints(maze)), samples, profile };
 }
-export function checkFreeQuality(maze: Maze,options?:{quick?:boolean}): string[] {
+/** routeAnalysis is a fresh result for this exact geometry, never a saved report. */
+export function checkFreeQuality(maze: Maze,options?:{quick?:boolean;routeAnalysis?:ReturnType<typeof routeTraps>}): string[] {
   const errors: string[] = [...bridgeRouteErrors(maze)], p = maze.parameters;
-  if ((p.routeTrapCount ?? 0) > 0 && (p.routeTrapCount ?? 0) > routeTraps(maze).qualifiedCount) errors.push('Не выполнено требование маршрутных ловушек.');
+  if ((p.routeTrapCount ?? 0) > 0 && (p.routeTrapCount ?? 0) > (options?.routeAnalysis??routeTraps(maze)).qualifiedCount) errors.push('Не выполнено требование маршрутных ловушек.');
   if ((p.loopTrapCount ?? 0) > 0 && (p.loopTrapCount ?? 0) > loopTraps(maze).qualifiedCount) errors.push('Не выполнено требование кольцевых ловушек.');
   const requestedIslands=p.freeIslandCount??p.freeZoneCount??0;
   if(requestedIslands>0&&requestedIslands>freeIslands(maze.free!).length)errors.push('Не выполнено требование замкнутых островов.');
