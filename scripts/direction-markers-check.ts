@@ -5,6 +5,7 @@ import {validateWalk} from '../src/persistence/walk-json';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 const base=process.env.MAZE_TEST_URL??'http://127.0.0.1:1428',out=process.env.MAZE_OUTPUT_DIR??'test-results';
 const maze=process.env.MAZE_MARKER_MAP?deserialize(await readFile(process.env.MAZE_MARKER_MAP,'utf8')):generate({columns:4,rows:4,corridorWidth:2,extraConnections:1,algorithm:'prim',seed:'direction-marker-browser'});
+maze.roof=true;
 const saved=await (await fetch(base+'/api/mazes',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({maze,title:'F · проверка направления'})})).json() as {id:string};
 const browser=await chromium.launch({executablePath:process.env.MAZE_BROWSER??'/Applications/Yandex.app/Contents/MacOS/Yandex',headless:true,args:['--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
@@ -15,10 +16,11 @@ try{
  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+35,box.y+box.height/2);await page.waitForTimeout(500);await page.mouse.up();
  await page.keyboard.press('KeyF');await page.getByRole('status').filter({hasText:'Направление предполагаемого выхода записано'}).waitFor();
  await page.keyboard.down('KeyF');await page.keyboard.down('KeyF');await page.keyboard.up('KeyF');
- // One ordinary second press plus one repeat: exactly two events so far.
+ // One pre-turn press, one post-turn press and one ordinary press; the extra keydown is repeat.
  await page.getByRole('button',{name:'Ⅱ Пауза',exact:true}).click();await page.keyboard.press('KeyF');await page.waitForTimeout(250);
  await page.getByRole('button',{name:/Продолжить/}).first().click();await page.waitForTimeout(150);await page.keyboard.press('KeyF');
- await page.getByRole('button',{name:'← Вернуться к карте',exact:true}).click();
+ const stopped=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/api/walks')&&JSON.parse(r.request().postData()??'{}').status==='stopped');
+ await page.getByRole('button',{name:'← Вернуться к карте',exact:true}).click();if(!(await stopped).ok())throw Error('Stopped recording save failed');
  const panel=page.getByLabel('Метки предполагаемого выхода',{exact:true});await panel.waitFor();
  if(await panel.locator('li').count()!==4)throw Error('Repeat/pause produced wrong marker count');
  await panel.getByLabel('Показывать стрелки меток').uncheck();await panel.getByLabel('Показывать стрелки меток').check();await panel.locator('li button').last().click();
