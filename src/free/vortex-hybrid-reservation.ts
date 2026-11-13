@@ -11,7 +11,7 @@ function intersects(a:ReturnType<typeof modulePolygon>,b:ReturnType<typeof modul
 }
 /** Finite native-door fit. The largest feasible side span is preferred; the
  * physical upright clearance is reserved before accepting a real connector. */
-export function fitHybridNativeDoor(draft:FreeDraft,aId:string,bId:string,id:string):FreeConnection{
+export function fitHybridNativeDoor(draft:FreeDraft,aId:string,bId:string,id:string,deferPhysics=false):FreeConnection{
  const l=draft.layout,a=l.modules.find(m=>m.id===aId),b=l.modules.find(m=>m.id===bId);
  if(!a||!b)throw Error('Для глубокого перехода отсутствует настоящая рама.');
  const used=[...l.connections.flatMap(c=>[{...c.a,width:c.width},{...c.b,width:c.width}]),...l.openings];
@@ -24,6 +24,7 @@ export function fitHybridNativeDoor(draft:FreeDraft,aId:string,bId:string,id:str
    const g=connectionGeometry(l,c),span=Math.max(...g.sides.map(w=>distance(...ends(w)))),v={x:g.b.mid.x-g.a.mid.x,z:g.b.mid.z-g.a.mid.z};
    if(span>3+1e-7||span<.01||v.x*g.a.normal.x+v.z*g.a.normal.z<=0||-v.x*g.b.normal.x-v.z*g.b.normal.z<=0)continue;
    if(polygons.some(p=>intersects(g.polygon,p))||old.some(p=>intersects(g.polygon,p)))continue;
+   if(Math.min(segmentDistance(g.a.from,g.sides[0]!),segmentDistance(g.a.to,g.sides[1]!),segmentDistance(g.b.from,g.sides[1]!),segmentDistance(g.b.to,g.sides[0]!))<1)continue;
    const inward=(p:typeof g.a)=>({x:p.mid.x-p.normal.x*.35,z:p.mid.z-p.normal.z*.35}),segments=[segment(inward(g.a),g.a.mid),segment(g.a.mid,g.b.mid),segment(g.b.mid,inward(g.b))];
    if([...posts,g.a.from,g.a.to,g.b.from,g.b.to].some(p=>segments.some(w=>segmentDistance(p,w)<.25+Math.SQRT2*.06+1e-5)))continue;
    candidates.push({c,span});
@@ -32,7 +33,7 @@ export function fitHybridNativeDoor(draft:FreeDraft,aId:string,bId:string,id:str
  candidates.sort((a,b)=>b.span-a.span||b.c.width-a.c.width);
  for(const row of candidates.slice(0,8)){
   const trial=structuredClone(draft);trial.layout.connections.push(row.c);trial.layout.moduleConstruction={version:1,spans:structuredClone(trial.layout.connections)};
-  if(physicallyOpen(trial))continue;
+  if(!deferPhysics&&physicallyOpen(trial))continue;
   return {...row.c,spanAudit:{desired:3,actual:row.span,reason:'Выборочный переход между существующими спиральными рамами; пролёт ограничен их настоящими гранями.'}};
  }
  throw Error(`Не найден физически свободный пролёт до3м: ${aId} / ${bId}.`);
@@ -41,26 +42,28 @@ export function fitHybridNativeDoor(draft:FreeDraft,aId:string,bId:string,id:str
 /** Reserve deeper return circuits before allocating the negative-space bays.
  * The old hybrid keeps its original recipe. These native frames are obtained
  * from the same seed's uncarved spiral pool, never from a saved external map. */
-export function reserveHybridVortex(base:Maze,pool:Pick<FreeLayout,'modules'|'connections'>):Maze{
+export function reserveHybridVortex(base:Maze,pool:Pick<FreeLayout,'modules'|'connections'>,atomicTurns=false):Maze{
  const draft=mazeDraft(base),l=draft.layout,e=Number(l.openings.find(o=>o.id===l.entrance)!.room.match(/^spiral(\d)-23$/)![1]);
  const s=(arm:number,n:number)=>`spiral${(arm+e+3)%4}-${n}`,key=(a:string,b:string)=>[a,b].sort().join('|');
  const restore=[[2,8],[2,9],[1,6],[1,7],[1,12],[2,2],[2,3]]as const;
  for(const [arm,n] of [...restore].sort((a,b)=>pool.modules.findIndex(m=>m.id===s(a[0],a[1]))-pool.modules.findIndex(m=>m.id===s(b[0],b[1])))){const id=s(arm,n),module=pool.modules.find(m=>m.id===id);if(!module)throw Error('В исходной спирали отсутствует резервируемый модуль.');if(!l.modules.some(m=>m.id===id))l.modules.push(structuredClone(module));}
  const remove=new Set([[s(1,13),s(1,14)],[s(0,11),s(0,12)],[s(3,4),s(3,5)],[s(3,3),s(3,2)]].map(([a,b])=>key(a!,b!)));
  l.connections=l.connections.filter(c=>!remove.has(key(c.a.room,c.b.room)));
+ const superseded=new Set(atomicTurns?[s(1,12),s(2,2),s(2,3)]:[]);
  const links=[
   [s(1,14),s(2,9)],[s(2,9),s(2,8)],[s(2,8),s(3,4)],
   [s(3,3),s(2,7)],[s(2,7),s(1,12)],[s(1,12),s(1,13)],
   [s(0,11),s(1,6)],[s(1,6),s(2,2)],[s(2,2),s(2,3)],
   [s(2,3),s(1,7)],[s(1,7),s(0,12)],[s(3,1),s(3,2)],
  ];
- for(const [a,b] of links)if(!l.connections.some(c=>key(c.a.room,c.b.room)===key(a!,b!))){
+ for(const [a,b] of links)if(!superseded.has(a!)&&!superseded.has(b!)&&!l.connections.some(c=>key(c.a.room,c.b.room)===key(a!,b!))){
   const original=pool.connections.find(c=>key(c.a.room,c.b.room)===key(a!,b!));
   if(original)l.connections.push(structuredClone(original));
  }
- for(const [a,b] of links)if(!l.connections.some(c=>key(c.a.room,c.b.room)===key(a!,b!))){
-  l.connections.push(fitHybridNativeDoor(draft,a!,b!,`hybrid-reserve-${a}-${b}`));
+ for(const [a,b] of links)if(!superseded.has(a!)&&!superseded.has(b!)&&!l.connections.some(c=>key(c.a.room,c.b.room)===key(a!,b!))){
+  l.connections.push(fitHybridNativeDoor(draft,a!,b!,`hybrid-reserve-${a}-${b}`,atomicTurns));
  }
+ if(atomicTurns)return fitHybridTurningFrames(freeMaze(draft,false),pool);
  l.moduleConstruction={version:1,spans:structuredClone(l.connections)};
  const issue=physicallyOpen(draft);if(issue)throw Error('Зарезервированные межвитковые переходы: '+issue);
  return freeMaze(draft,false);
@@ -109,6 +112,6 @@ export function fitHybridTurningFrames(base:Maze,pool:Pick<FreeLayout,'modules'|
   });
  }
  l.moduleConstruction={version:1,spans:structuredClone(l.connections)};
- const issue=physicallyOpen(draft);if(issue)throw Error('Поворотные шестиметровые рамы: '+issue);
+ const issue=physicallyOpen(draft);if(issue)throw Object.assign(Error('Поворотные шестиметровые рамы: '+issue),{diagnosticDraft:draft});
  return freeMaze(draft,false);
 }

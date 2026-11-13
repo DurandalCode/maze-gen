@@ -1,0 +1,34 @@
+import{expect,test}from'bun:test';
+import fixture from'./fixtures/vortex-deep-reservation.json';
+import{deserialize,serialize}from'../src/persistence/maze-json';
+import{reserveHybridVortex,separateHybridBlindBranch,fitHybridTurningFrames}from'../src/free/vortex-hybrid-reservation';
+import{physicallyOpen}from'../src/free/cavity-maze';
+import{mazeDraft}from'../src/free/json';
+import{deepHybridVortexParameters,vortexParameters}from'../src/free/vortex-parameters';
+import{validateParameters}from'../src/core/maze';
+import{inspectHybridVortexDepth}from'../src/free/vortex-hybrid-depth';
+import{routeTraps}from'../src/analysis/route-traps';
+test('atomic native turns avoid requiring superseded temporary square links, retain old geometry and deep pure loops',()=>{
+ const base=deserialize(JSON.stringify(fixture.base)),before=serialize(base),pool=fixture.pool as Parameters<typeof reserveHybridVortex>[1];
+ const atomic=separateHybridBlindBranch(reserveHybridVortex(base,pool,true));
+ const legacy=fitHybridTurningFrames(separateHybridBlindBranch(reserveHybridVortex(base,pool)),pool);
+ expect(serialize(base)).toBe(before);
+ expect([...atomic.free!.modules].sort((a,b)=>a.id.localeCompare(b.id))).toEqual([...legacy.free!.modules].sort((a,b)=>a.id.localeCompare(b.id)));
+ expect(physicallyOpen(mazeDraft(atomic))).toBe('');
+ expect(inspectHybridVortexDepth(atomic,{x:35,z:35}).filter(k=>k.qualifies&&k.pure&&k.inwardExcursion>=10&&k.inwardBandConnections.length>=3)).toHaveLength(2);
+ expect(routeTraps(atomic).qualifiedCount).toBe(2);
+},30000);
+test('versioned atomic policy persists explicitly, mode changes clear it, invalid combinations reject',()=>{
+ const p={...deepHybridVortexParameters(fixture.base.parameters as any),freeVortexHybridRevision:'atomic-turns-v2' as const,freeVortexBaseSeed:'vortex-chaotic-05'};
+ expect(()=>validateParameters(p)).not.toThrow();
+ expect(()=>validateParameters({...p,freeVortexHybridDeep:false})).toThrow();
+ expect(()=>validateParameters({...p,freeVortexHybridRevision:'unknown'} as any)).toThrow();
+ expect(vortexParameters(p).freeVortexHybridRevision).toBeUndefined();
+ expect(vortexParameters(p).freeVortexBaseSeed).toBeUndefined();
+ const map=deserialize(JSON.stringify(fixture.base));map.parameters=p;const decoded=deserialize(serialize(map));
+ expect(decoded.parameters.freeVortexBaseSeed).toBe(p.freeVortexBaseSeed);
+ expect(decoded.parameters.freeVortexHybridRevision).toBe('atomic-turns-v2');
+ expect(()=>validateParameters({...p,freeVortexBaseSeed:''})).toThrow();
+ expect(()=>validateParameters({...p,freeVortexBaseSeed:'x'.repeat(129)})).toThrow();
+ expect(()=>validateParameters({...p,freeVortexHybrid:false})).toThrow();
+});

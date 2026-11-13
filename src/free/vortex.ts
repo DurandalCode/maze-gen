@@ -32,7 +32,7 @@ export function generateVortex(parameters:Parameters,previous?:Maze,progress?:(m
  if((parameters.routeTrapCount??0)>(central?2:1)||(parameters.loopTrapCount??0)>(central?2:1))throw Error('Вортекс: первая версия поддерживает один комплект из тупиковой и возвратной кольцевой ловушки.');
  if(parameters.freeCavityMaze||(parameters.freeBridgeCount??0)||(parameters.freeZoneCount??0)||(parameters.freeInfillPassages??0))throw Error('Вортекс строит собственную сеть спиралей; отключите заполнение пустот, мосты, зоны и дополнительные полосы.');
  if(parameters.freeConnectionSpan!==undefined&&Math.abs(parameters.freeConnectionSpan-3)>1e-8)throw Error('Вортекс: текущая конструкция рассчитана на целевой пролёт 3 м.');
- const rng=random(parameters.seed+'|vortex-v2'),width=Math.min(parameters.corridorWidth,1.6),layout=emptyLayout(),pitch=16/(2*Math.PI),cx=traps?30:parameters.columns/2,cz=traps?30:parameters.rows/2;
+ const rng=random((parameters.freeVortexBaseSeed??parameters.seed)+'|vortex-v2'),width=Math.min(parameters.corridorWidth,1.6),layout=emptyLayout(),pitch=16/(2*Math.PI),cx=traps?30:parameters.columns/2,cz=traps?30:parameters.rows/2;
  const module=(arm:number,j:number,t:number)=>{const r=5+pitch*t,a=arm*Math.PI/2+t;return{id:`spiral${arm}-${j}`,type:'2x2' as const,x:cx+r*Math.cos(a),z:cz+r*Math.sin(a),angle:(a+Math.atan2(r,pitch))*180/Math.PI};};
  progress?.('Вортекс: четыре спирали из настоящих повёрнутых рам.');
  for(let arm=0;arm<4;arm++){
@@ -63,7 +63,7 @@ export function generateVortex(parameters:Parameters,previous?:Maze,progress?:(m
  layout.openings=[{id:'entrance',...portals.a,width},{id:'exit',...portals.b,width}];layout.entrance='entrance';layout.exit='exit';layout.moduleConstruction={version:1,spans:[]};
  const original=knotted||chaotic?structuredClone(layout):undefined;
  let mutable=central?carveCentralVortex(layout,width,parameters.corridorWidth):traps?carveVortexTraps(layout,width):undefined;
- if(chaotic){carveChaoticVortex(layout,original!,parameters.corridorWidth,random(parameters.seed+'|chaos-v1'),progress);mutable=new Set();}
+ if(chaotic){carveChaoticVortex(layout,original!,parameters.corridorWidth,random((parameters.freeVortexBaseSeed??parameters.seed)+'|chaos-v1'),progress);mutable=new Set();}
  const deepPool=parameters.freeVortexHybridDeep?structuredClone(layout):undefined;
  if(deepPool)stabilizeVortexConnections(deepPool,parameters.corridorWidth,true);
  if(parameters.freeVortexContinuous)carveContinuousVortex(layout,parameters);
@@ -89,13 +89,13 @@ export function generateVortex(parameters:Parameters,previous?:Maze,progress?:(m
  const draft:FreeDraft={kind:'maze-lab-free-draft',version:1,parameters:{...parameters},construction:{...(previous?{wallHeight:previous.wallHeight,wallColor:previous.wallColor,translucentFabric:previous.translucentFabric}:DEFAULT_CONSTRUCTION),roof:true},layout};
  const issues=validateFree(draft);if(issues.length){const ids=issues[0]!.code==='clearance'?buildNavigation(layout).paths.flatMap((path,i)=>path?[]:[layout.connections[i]?.id??'portal']):issues[0]!.ids;throw Error('Вортекс: '+issues[0]!.message+' '+ids.join(', '));}
  let maze=freeMaze(draft,false);const lengths=freeGroundLengths(maze);if(lengths.straight>limits.straight+1e-7||lengths.run>limits.run+1e-7)throw Error(`Вортекс: физические длины ${lengths.straight.toFixed(2)}/${lengths.run.toFixed(2)} м превышают пределы; добавьте настоящие поперечные связи.`);
- if(traps&&(!knotted||(parameters.routeTrapCount??0)>0||(parameters.loopTrapCount??0)>0)){progress?.('Вортекс: проверяем квалифицированные Л/К, без рейтинга сложности.');const dead=routeTraps(maze),loops=loopTraps(maze);if(dead.qualifiedCount<(parameters.routeTrapCount??0)||loops.qualifiedCount<(parameters.loopTrapCount??0))throw Error(`Вортекс не подтвердил требуемые ловушки: Л${dead.qualifiedCount}, К${loops.qualifiedCount}.`);progress?.(knotted?`Вортекс: по критериям модели Л${dead.qualifiedCount} и К${loops.qualifiedCount}; ориентационные узлы построены.`:`Вортекс: подтверждены Л${dead.qualifiedCount} и К${loops.qualifiedCount}.`);}
+ if(traps&&!parameters.freeVortexHybridDeep&&(!knotted||(parameters.routeTrapCount??0)>0||(parameters.loopTrapCount??0)>0)){progress?.('Вортекс: проверяем квалифицированные Л/К, без рейтинга сложности.');const dead=routeTraps(maze),loops=loopTraps(maze);if(dead.qualifiedCount<(parameters.routeTrapCount??0)||loops.qualifiedCount<(parameters.loopTrapCount??0))throw Error(`Вортекс не подтвердил требуемые ловушки: Л${dead.qualifiedCount}, К${loops.qualifiedCount}.`);progress?.(knotted?`Вортекс: по критериям модели Л${dead.qualifiedCount} и К${loops.qualifiedCount}; ориентационные узлы построены.`:`Вортекс: подтверждены Л${dead.qualifiedCount} и К${loops.qualifiedCount}.`);}
  if(knotted)progress?.('Вортекс: разнесённые перекрёстки готовы.');
  if(parameters.freeVortexDeepRegions&&vortexDistrictStructure(maze).some(d=>d.doorsAtFork!==2||d.containsEntrance||d.containsExit||d.independentInnerCycles<3||d.internalJunctions<6||d.deepestJunction<15))throw Error('Не подтверждена внутренняя глубина возвратных районов.');
  if(parameters.freeVortexContinuous){const report=continuousVortexStructure(maze);if(report.loops.some(l=>!l.allInteriorDegreesTwo||l.doorsAtFork!==2||l.deadEnds.length||l.internalJunctions||l.forkVisibleAfterTwoRoomsFromEitherDoor.some(Boolean))||report.realRouteFragments.filter(f=>f.length>=28&&f.turnsOver20>=10).length<3)throw Error('Не подтверждены чистые петли и сходный непрерывный правильный путь.');}
  if(parameters.freeVortexHybridDeep){
   progress?.('Резервируем три настоящих витка для чистого возврата.');
-  maze=fitHybridTurningFrames(separateHybridBlindBranch(reserveHybridVortex(maze,deepPool!)),deepPool!);
+  maze=parameters.freeVortexHybridRevision==='atomic-turns-v2'?separateHybridBlindBranch(reserveHybridVortex(maze,deepPool!,true)):fitHybridTurningFrames(separateHybridBlindBranch(reserveHybridVortex(maze,deepPool!)),deepPool!);
  }
  if(parameters.freeVortexHybrid)maze=generateVortexHybrid(maze,progress);
  if(parameters.freeVortexHybridDeep){
