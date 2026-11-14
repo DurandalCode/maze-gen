@@ -1,0 +1,1790 @@
+{
+  "version": 1,
+  "source": "tests/fixtures/dense-one-trap-base.json",
+  "sourceSha256": "a7b4efb6ff99ef6268c85d2a317fc6b59d5f443662b199d2ef2149f84b54b887",
+  "outputSha256": "50fa0921649478e2d0f70f92acd6c7ad154d9f357790842889b92d428d10daa3",
+  "method": "Saved native organic geometry derivative, not seed-only regeneration. Preserve all52 original frame poses and10 courtyards; close four existing crosslinks to isolate the return district, add five native infill frames, extend the real exit around the east boundary, and shield the entrance using two square frames. Square assemblies and alternating supported1m doors bound forced straights.",
+  "parameters": {
+    "placementMode": "free",
+    "columns": 100,
+    "rows": 100,
+    "moduleSize": 2,
+    "corridorWidth": 2,
+    "extraConnections": 1,
+    "algorithm": "prim",
+    "seed": "DISTRIBUTION-ORGANIC-COURTS-68-v1",
+    "freeModuleTarget": 70,
+    "freeJunctionDegree": 3,
+    "freeAngleSpread": 80,
+    "freeSpanPolicy": "maximum",
+    "freeConnectionSpan": 3,
+    "freeCavityMaze": true,
+    "design": {
+      "maxForcedStraight": 8,
+      "maxForcedRun": 64,
+      "maxVisibleStraight": 12,
+      "maxColdRatio": 0.12,
+      "maxColdRegion": 16,
+      "allowReshape": false,
+      "maxModuleGrowth": 0.25,
+      "disabledLimits": [
+        "maxVisibleStraight"
+      ]
+    },
+    "freeCourtyardPolicy": "dense-v3",
+    "routeTrapCount": 1,
+    "loopTrapCount": 1
+  },
+  "construction": {
+    "wallHeight": 2.5,
+    "wallColor": "#000000",
+    "translucentFabric": true,
+    "roof": true
+  },
+  "removedConnections": [
+    "c-573-a",
+    "c-985-a",
+    "c-1001-a",
+    "dense-court-0-door-1"
+  ],
+  "addedModules": [
+    {
+      "id": "cavity-module-bcef25c3-128",
+      "type": "2x6",
+      "x": 85.80882874606515,
+      "z": 76.76294174377074,
+      "angle": 311.62417030194837
+    },
+    {
+      "id": "cavity-module-bcef25c3-206",
+      "type": "2x6",
+      "x": 90.55598780227784,
+      "z": 80.07157212986586,
+      "angle": 71.62417030194831
+    },
+    {
+      "id": "cavity-module-bcef25c3-609",
+      "type": "2x2",
+      "x": 86.34907983811777,
+      "z": 82.92320170204512,
+      "angle": 161.62417030194837
+    },
+    {
+      "id": "cavity-module-bcef25c3-989",
+      "type": "2x6",
+      "x": 81.4549296551013,
+      "z": 83.70599147070615,
+      "angle": 71.62417030194854
+    },
+    {
+      "id": "cavity-module-bcef25c3-1343",
+      "type": "2x6",
+      "x": 76.0720262941869,
+      "z": 87.05364479691669,
+      "angle": 191.62417030194837
+    },
+    {
+      "id": "organic-exit-0",
+      "type": "2x2",
+      "x": 90.3,
+      "z": 60.4,
+      "angle": 0
+    },
+    {
+      "id": "organic-exit-1",
+      "type": "2x6",
+      "x": 95.3,
+      "z": 60.4,
+      "angle": 0
+    },
+    {
+      "id": "organic-exit-3",
+      "type": "2x6",
+      "x": 97.1,
+      "z": 72.65,
+      "angle": 90
+    },
+    {
+      "id": "organic-exit-4",
+      "type": "2x6",
+      "x": 97.1,
+      "z": 79.9,
+      "angle": 90
+    },
+    {
+      "id": "organic-exit-6",
+      "type": "2x2",
+      "x": 98,
+      "z": 91.75,
+      "angle": 33.5
+    },
+    {
+      "id": "organic-exit-2-square-0",
+      "type": "2x2",
+      "x": 97.1,
+      "z": 63.400000000000006,
+      "angle": 90
+    },
+    {
+      "id": "organic-exit-2-square-1",
+      "type": "2x2",
+      "x": 97.1,
+      "z": 65.4,
+      "angle": 90
+    },
+    {
+      "id": "organic-exit-2-square-2",
+      "type": "2x2",
+      "x": 97.1,
+      "z": 67.4,
+      "angle": 90
+    },
+    {
+      "id": "organic-exit-5-square-0",
+      "type": "2x2",
+      "x": 97.1,
+      "z": 85.15,
+      "angle": 90
+    },
+    {
+      "id": "organic-exit-5-square-1",
+      "type": "2x2",
+      "x": 97.1,
+      "z": 87.15,
+      "angle": 90
+    },
+    {
+      "id": "organic-exit-5-square-2",
+      "type": "2x2",
+      "x": 97.1,
+      "z": 89.15,
+      "angle": 90
+    },
+    {
+      "id": "organic-start-0",
+      "type": "2x2",
+      "x": 44.84381276851827,
+      "z": 47.05118924706149,
+      "angle": 123.53689076611818
+    },
+    {
+      "id": "organic-start-1",
+      "type": "2x2",
+      "x": 47.05370789268117,
+      "z": 43.7170681424522,
+      "angle": 123.53689076611818
+    }
+  ],
+  "addedConnections": [
+    {
+      "id": "cavity-module-bcef25c3-132",
+      "a": {
+        "room": "m-1032",
+        "edge": 0,
+        "offset": 0
+      },
+      "b": {
+        "room": "cavity-module-bcef25c3-128",
+        "edge": 2,
+        "offset": 0
+      },
+      "width": 1.4,
+      "spanAudit": {
+        "desired": 3,
+        "actual": 1.5,
+        "reason": "Ограничение геометрией полости и модульного замыкания."
+      }
+    },
+    {
+      "id": "cavity-module-bcef25c3-208",
+      "a": {
+        "room": "cavity-module-bcef25c3-128",
+        "edge": 2,
+        "offset": -2.1800000000000086
+      },
+      "b": {
+        "room": "cavity-module-bcef25c3-206",
+        "edge": 3,
+        "offset": 0
+      },
+      "width": 1.4,
+      "spanAudit": {
+        "desired": 3,
+        "actual": 2.5,
+        "reason": "Ограничение геометрией полости и модульного замыкания."
+      }
+    },
+    {
+      "id": "cavity-module-bcef25c3-620",
+      "a": {
+        "room": "cavity-module-bcef25c3-206",
+        "edge": 2,
+        "offset": -2.179999999999996
+      },
+      "b": {
+        "room": "cavity-module-bcef25c3-609",
+        "edge": 3,
+        "offset": 0
+      },
+      "width": 1.4,
+      "spanAudit": {
+        "desired": 3,
+        "actual": 3
+      }
+    },
+    {
+      "id": "cavity-module-bcef25c3-1000",
+      "a": {
+        "room": "cavity-module-bcef25c3-609",
+        "edge": 1,
+        "offset": 0
+      },
+      "b": {
+        "room": "cavity-module-bcef25c3-989",
+        "edge": 0,
+        "offset": 0
+      },
+      "width": 1.4,
+      "spanAudit": {
+        "desired": 3,
+        "actual": 3
+      }
+    },
+    {
+      "id": "cavity-module-bcef25c3-1349",
+      "a": {
+        "room": "cavity-module-bcef25c3-989",
+        "edge": 2,
+        "offset": -2.179999999999996
+      },
+      "b": {
+        "room": "cavity-module-bcef25c3-1343",
+        "edge": 3,
+        "offset": 0
+      },
+      "width": 1.4,
+      "spanAudit": {
+        "desired": 3,
+        "actual": 3
+      }
+    },
+    {
+      "id": "cavity-module-bcef25c3-1350",
+      "a": {
+        "room": "cavity-module-bcef25c3-1343",
+        "edge": 2,
+        "offset": -2.1800000000000033
+      },
+      "b": {
+        "room": "m-1000",
+        "edge": 1,
+        "offset": 0
+      },
+      "width": 1.4,
+      "spanAudit": {
+        "desired": 3,
+        "actual": 0.6297758390946167,
+        "reason": "Замыкание между фиксированными модульными проёмами полости."
+      }
+    },
+    {
+      "id": "organic-exit-link-0",
+      "a": {
+        "room": "m-712",
+        "edge": 1,
+        "offset": 0
+      },
+      "b": {
+        "room": "organic-exit-0",
+        "edge": 3,
+        "offset": 0
+      },
+      "width": 1.4
+    },
+    {
+      "id": "organic-exit-link-1",
+      "a": {
+        "room": "organic-exit-0",
+        "edge": 1,
+        "offset": 0
+      },
+      "b": {
+        "room": "organic-exit-1",
+        "edge": 3,
+        "offset": 0
+      },
+      "width": 1.4
+    },
+    {
+      "id": "organic-exit-link-2",
+      "a": {
+        "room": "organic-exit-1",
+        "edge": 2,
+        "offset": -2.25
+      },
+      "b": {
+        "room": "organic-exit-2-square-0",
+        "edge": 3,
+        "offset": 0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-exit-link-3",
+      "a": {
+        "room": "organic-exit-2-square-2",
+        "edge": 1,
+        "offset": -0.45
+      },
+      "b": {
+        "room": "organic-exit-3",
+        "edge": 3,
+        "offset": 0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-exit-link-4",
+      "a": {
+        "room": "organic-exit-3",
+        "edge": 1,
+        "offset": 0.45
+      },
+      "b": {
+        "room": "organic-exit-4",
+        "edge": 3,
+        "offset": -0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-exit-link-5",
+      "a": {
+        "room": "organic-exit-4",
+        "edge": 1,
+        "offset": -0.45
+      },
+      "b": {
+        "room": "organic-exit-5-square-0",
+        "edge": 3,
+        "offset": 0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-exit-link-6",
+      "a": {
+        "room": "organic-exit-5-square-2",
+        "edge": 1,
+        "offset": 0
+      },
+      "b": {
+        "room": "organic-exit-6",
+        "edge": 3,
+        "offset": 0
+      },
+      "width": 1.4
+    },
+    {
+      "id": "organic-exit-2-square-baffle-0",
+      "a": {
+        "room": "organic-exit-2-square-0",
+        "edge": 1,
+        "offset": -0.45
+      },
+      "b": {
+        "room": "organic-exit-2-square-1",
+        "edge": 3,
+        "offset": 0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-exit-2-square-baffle-1",
+      "a": {
+        "room": "organic-exit-2-square-1",
+        "edge": 1,
+        "offset": 0.45
+      },
+      "b": {
+        "room": "organic-exit-2-square-2",
+        "edge": 3,
+        "offset": -0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-exit-5-square-baffle-0",
+      "a": {
+        "room": "organic-exit-5-square-0",
+        "edge": 1,
+        "offset": -0.45
+      },
+      "b": {
+        "room": "organic-exit-5-square-1",
+        "edge": 3,
+        "offset": 0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-exit-5-square-baffle-1",
+      "a": {
+        "room": "organic-exit-5-square-1",
+        "edge": 1,
+        "offset": 0.45
+      },
+      "b": {
+        "room": "organic-exit-5-square-2",
+        "edge": 3,
+        "offset": -0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-start-link-0",
+      "a": {
+        "id": "entrance",
+        "room": "m-856",
+        "edge": 2,
+        "offset": -0.45,
+        "width": 1.6
+      },
+      "b": {
+        "room": "organic-start-0",
+        "edge": 0,
+        "offset": 0.45
+      },
+      "width": 1
+    },
+    {
+      "id": "organic-start-link-1",
+      "a": {
+        "room": "organic-start-0",
+        "edge": 3,
+        "offset": -0.45
+      },
+      "b": {
+        "room": "organic-start-1",
+        "edge": 1,
+        "offset": 0.45
+      },
+      "width": 1
+    }
+  ],
+  "openings": [
+    {
+      "id": "entrance",
+      "room": "organic-start-1",
+      "edge": 2,
+      "offset": 0,
+      "width": 1
+    },
+    {
+      "id": "exit",
+      "room": "organic-exit-6",
+      "edge": 1,
+      "offset": 0,
+      "width": 1.4
+    }
+  ],
+  "moduleConstruction": {
+    "version": 1,
+    "spans": [
+      {
+        "id": "c-1",
+        "a": {
+          "room": "junction-3",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-0",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999964
+        }
+      },
+      {
+        "id": "c-73",
+        "a": {
+          "room": "junction-3",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-72",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999765
+        }
+      },
+      {
+        "id": "c-145",
+        "a": {
+          "room": "junction-3",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-144",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999925
+        }
+      },
+      {
+        "id": "c-217",
+        "a": {
+          "room": "m-72",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-216",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000075
+        }
+      },
+      {
+        "id": "c-233",
+        "a": {
+          "room": "m-216",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-232",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.999999999999997
+        }
+      },
+      {
+        "id": "c-249",
+        "a": {
+          "room": "m-72",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-248",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.000000000000006
+        }
+      },
+      {
+        "id": "c-265",
+        "a": {
+          "room": "m-248",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-264",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000036
+        }
+      },
+      {
+        "id": "c-285",
+        "a": {
+          "room": "m-0",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-284",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.375000000000001,
+          "reason": "Модуль пересекает пространство m-72."
+        }
+      },
+      {
+        "id": "c-297",
+        "a": {
+          "room": "m-284",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-296",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.000000000000024
+        }
+      },
+      {
+        "id": "c-317",
+        "a": {
+          "room": "m-0",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-316",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000004
+        }
+      },
+      {
+        "id": "c-345",
+        "a": {
+          "room": "m-316",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-344",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.999999999999995
+        }
+      },
+      {
+        "id": "c-361",
+        "a": {
+          "room": "m-144",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-360",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.999999999999989
+        }
+      },
+      {
+        "id": "c-377",
+        "a": {
+          "room": "m-360",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-376",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.999999999999996
+        }
+      },
+      {
+        "id": "c-393",
+        "a": {
+          "room": "m-144",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-392",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.999999999999998
+        }
+      },
+      {
+        "id": "c-409",
+        "a": {
+          "room": "m-392",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-408",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.000000000000003
+        }
+      },
+      {
+        "id": "c-425",
+        "a": {
+          "room": "m-344",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-424",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000027
+        }
+      },
+      {
+        "id": "c-441",
+        "a": {
+          "room": "m-424",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-440",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000044
+        }
+      },
+      {
+        "id": "c-457",
+        "a": {
+          "room": "m-344",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-456",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999947
+        }
+      },
+      {
+        "id": "c-487",
+        "a": {
+          "room": "m-456",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-486",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.578124999999989,
+          "reason": "Модуль пересекает пространство m-0."
+        }
+      },
+      {
+        "id": "c-497",
+        "a": {
+          "room": "m-296",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-496",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.999999999999995
+        }
+      },
+      {
+        "id": "c-537",
+        "a": {
+          "room": "m-496",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-536",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000013
+        }
+      },
+      {
+        "id": "c-553",
+        "a": {
+          "room": "m-296",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-552",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.000000000000004
+        }
+      },
+      {
+        "id": "c-573",
+        "a": {
+          "room": "m-552",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-572",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999907
+        }
+      },
+      {
+        "id": "c-585",
+        "a": {
+          "room": "m-572",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-584",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000036
+        }
+      },
+      {
+        "id": "c-601",
+        "a": {
+          "room": "m-584",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-600",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999942
+        }
+      },
+      {
+        "id": "c-681",
+        "a": {
+          "room": "m-572",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-680",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999845
+        }
+      },
+      {
+        "id": "c-713",
+        "a": {
+          "room": "m-680",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-712",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000107
+        }
+      },
+      {
+        "id": "c-841",
+        "a": {
+          "room": "m-376",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-840",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000004
+        }
+      },
+      {
+        "id": "c-857",
+        "a": {
+          "room": "m-840",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-856",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.999999999999996
+        }
+      },
+      {
+        "id": "c-873",
+        "a": {
+          "room": "m-376",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-872",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.000000000000005
+        }
+      },
+      {
+        "id": "c-889",
+        "a": {
+          "room": "m-872",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-888",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000004
+        }
+      },
+      {
+        "id": "c-905",
+        "a": {
+          "room": "m-486",
+          "edge": 0,
+          "offset": -2.000000000000004
+        },
+        "b": {
+          "room": "m-904",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.000000000000002
+        }
+      },
+      {
+        "id": "c-921",
+        "a": {
+          "room": "m-904",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-920",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.000000000000009
+        }
+      },
+      {
+        "id": "c-937",
+        "a": {
+          "room": "m-486",
+          "edge": 0,
+          "offset": 2.000000000000004
+        },
+        "b": {
+          "room": "m-936",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000058
+        }
+      },
+      {
+        "id": "c-969",
+        "a": {
+          "room": "m-936",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-968",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999996
+        }
+      },
+      {
+        "id": "c-985",
+        "a": {
+          "room": "m-600",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-984",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3.0000000000000164
+        }
+      },
+      {
+        "id": "c-1001",
+        "a": {
+          "room": "m-984",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-1000",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.99999999999999
+        }
+      },
+      {
+        "id": "c-1017",
+        "a": {
+          "room": "m-600",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-1016",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999973
+        }
+      },
+      {
+        "id": "c-1033",
+        "a": {
+          "room": "m-1016",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-1032",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.6,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.9999999999999942
+        }
+      },
+      {
+        "id": "cavity-module-e701aa51-1",
+        "a": {
+          "room": "m-840",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "cavity-module-e701aa51-0",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 1.5,
+          "reason": "Ограничение геометрией полости и модульного замыкания."
+        }
+      },
+      {
+        "id": "cavity-module-e701aa51-2",
+        "a": {
+          "room": "cavity-module-e701aa51-0",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-888",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 0.3613022901120998,
+          "reason": "Замыкание между фиксированными модульными проёмами полости."
+        }
+      },
+      {
+        "id": "cavity-module-5944ce8a-92",
+        "a": {
+          "room": "m-144",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "cavity-module-5944ce8a-91",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3
+        }
+      },
+      {
+        "id": "cavity-module-5944ce8a-93",
+        "a": {
+          "room": "cavity-module-5944ce8a-91",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-904",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 0.8069321089915645,
+          "reason": "Замыкание между фиксированными модульными проёмами полости."
+        }
+      },
+      {
+        "id": "selective-span-0",
+        "a": {
+          "room": "m-72",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-284",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.2
+      },
+      {
+        "id": "selective-span-2",
+        "a": {
+          "room": "m-296",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-316",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.2
+      },
+      {
+        "id": "selective-span-4",
+        "a": {
+          "room": "m-536",
+          "edge": 0,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-552",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.2
+      },
+      {
+        "id": "selective-span-16",
+        "a": {
+          "room": "m-456",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-968",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.2
+      },
+      {
+        "id": "selective-span-30",
+        "a": {
+          "room": "m-536",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-584",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.2
+      },
+      {
+        "id": "cavity-module-7136b60b-81",
+        "a": {
+          "room": "m-584",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "cavity-module-7136b60b-76",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 1,
+          "reason": "Ограничение геометрией полости и модульного замыкания."
+        }
+      },
+      {
+        "id": "cavity-module-7136b60b-84",
+        "a": {
+          "room": "cavity-module-7136b60b-76",
+          "edge": 0,
+          "offset": 2.1799999999999953
+        },
+        "b": {
+          "room": "m-984",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 1.569407948406083,
+          "reason": "Замыкание между фиксированными модульными проёмами полости."
+        }
+      },
+      {
+        "id": "cavity-module-7436bac4-86",
+        "a": {
+          "room": "m-424",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "cavity-module-7436bac4-85",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 1,
+          "reason": "Ограничение геометрией полости и модульного замыкания."
+        }
+      },
+      {
+        "id": "cavity-module-7436bac4-88",
+        "a": {
+          "room": "cavity-module-7436bac4-85",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-968",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 0.8022219668328886,
+          "reason": "Замыкание между фиксированными модульными проёмами полости."
+        }
+      },
+      {
+        "id": "cavity-module-d8861684-75",
+        "a": {
+          "room": "cavity-module-7136b60b-76",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "cavity-module-d8861684-74",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3
+        }
+      },
+      {
+        "id": "cavity-module-d8861684-76",
+        "a": {
+          "room": "cavity-module-d8861684-74",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-1000",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 1.211046397881746,
+          "reason": "Замыкание между фиксированными модульными проёмами полости."
+        }
+      },
+      {
+        "id": "cavity-module-ecff7d16-256",
+        "a": {
+          "room": "cavity-module-5944ce8a-91",
+          "edge": 2,
+          "offset": 2.179999999999996
+        },
+        "b": {
+          "room": "cavity-module-ecff7d16-255",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3
+        }
+      },
+      {
+        "id": "cavity-module-ecff7d16-335",
+        "a": {
+          "room": "cavity-module-ecff7d16-255",
+          "edge": 0,
+          "offset": -2.179999999999999
+        },
+        "b": {
+          "room": "cavity-module-ecff7d16-331",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 1.5,
+          "reason": "Ограничение геометрией полости и модульного замыкания."
+        }
+      },
+      {
+        "id": "cavity-module-ecff7d16-398",
+        "a": {
+          "room": "cavity-module-ecff7d16-331",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "cavity-module-ecff7d16-397",
+          "edge": 1,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3
+        }
+      },
+      {
+        "id": "cavity-module-ecff7d16-399",
+        "a": {
+          "room": "cavity-module-ecff7d16-397",
+          "edge": 3,
+          "offset": 0
+        },
+        "b": {
+          "room": "m-920",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2.7129226459536184,
+          "reason": "Замыкание между фиксированными модульными проёмами полости."
+        }
+      },
+      {
+        "id": "route-arm-span-21",
+        "a": {
+          "room": "cavity-module-ecff7d16-397",
+          "edge": 2,
+          "offset": 0
+        },
+        "b": {
+          "room": "route-arm-20",
+          "edge": 2,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3
+        }
+      },
+      {
+        "id": "route-arm-span-24",
+        "a": {
+          "room": "route-arm-20",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "route-arm-23",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3
+        }
+      },
+      {
+        "id": "route-arm-span-1006",
+        "a": {
+          "room": "cavity-module-ecff7d16-255",
+          "edge": 2,
+          "offset": 2.149999999999999
+        },
+        "b": {
+          "room": "route-arm-1005",
+          "edge": 0,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 3
+        }
+      },
+      {
+        "id": "route-arm-span-1032",
+        "a": {
+          "room": "route-arm-1005",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "route-arm-1031",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4,
+        "spanAudit": {
+          "desired": 3,
+          "actual": 2,
+          "reason": "Геометрия существующих рам ограничивает новую ложную ветвь."
+        }
+      },
+      {
+        "id": "organic-exit-link-0",
+        "a": {
+          "room": "m-712",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "organic-exit-0",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4
+      },
+      {
+        "id": "organic-exit-link-1",
+        "a": {
+          "room": "organic-exit-0",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "organic-exit-1",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4
+      },
+      {
+        "id": "organic-exit-link-2",
+        "a": {
+          "room": "organic-exit-1",
+          "edge": 2,
+          "offset": -2.25
+        },
+        "b": {
+          "room": "organic-exit-2-square-0",
+          "edge": 3,
+          "offset": 0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-exit-link-3",
+        "a": {
+          "room": "organic-exit-2-square-2",
+          "edge": 1,
+          "offset": -0.45
+        },
+        "b": {
+          "room": "organic-exit-3",
+          "edge": 3,
+          "offset": 0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-exit-link-4",
+        "a": {
+          "room": "organic-exit-3",
+          "edge": 1,
+          "offset": 0.45
+        },
+        "b": {
+          "room": "organic-exit-4",
+          "edge": 3,
+          "offset": -0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-exit-link-5",
+        "a": {
+          "room": "organic-exit-4",
+          "edge": 1,
+          "offset": -0.45
+        },
+        "b": {
+          "room": "organic-exit-5-square-0",
+          "edge": 3,
+          "offset": 0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-exit-link-6",
+        "a": {
+          "room": "organic-exit-5-square-2",
+          "edge": 1,
+          "offset": 0
+        },
+        "b": {
+          "room": "organic-exit-6",
+          "edge": 3,
+          "offset": 0
+        },
+        "width": 1.4
+      },
+      {
+        "id": "organic-exit-2-square-baffle-0",
+        "a": {
+          "room": "organic-exit-2-square-0",
+          "edge": 1,
+          "offset": -0.45
+        },
+        "b": {
+          "room": "organic-exit-2-square-1",
+          "edge": 3,
+          "offset": 0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-exit-2-square-baffle-1",
+        "a": {
+          "room": "organic-exit-2-square-1",
+          "edge": 1,
+          "offset": 0.45
+        },
+        "b": {
+          "room": "organic-exit-2-square-2",
+          "edge": 3,
+          "offset": -0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-exit-5-square-baffle-0",
+        "a": {
+          "room": "organic-exit-5-square-0",
+          "edge": 1,
+          "offset": -0.45
+        },
+        "b": {
+          "room": "organic-exit-5-square-1",
+          "edge": 3,
+          "offset": 0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-exit-5-square-baffle-1",
+        "a": {
+          "room": "organic-exit-5-square-1",
+          "edge": 1,
+          "offset": 0.45
+        },
+        "b": {
+          "room": "organic-exit-5-square-2",
+          "edge": 3,
+          "offset": -0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-start-link-0",
+        "a": {
+          "id": "entrance",
+          "room": "m-856",
+          "edge": 2,
+          "offset": -0.45,
+          "width": 1.6
+        },
+        "b": {
+          "room": "organic-start-0",
+          "edge": 0,
+          "offset": 0.45
+        },
+        "width": 1
+      },
+      {
+        "id": "organic-start-link-1",
+        "a": {
+          "room": "organic-start-0",
+          "edge": 3,
+          "offset": -0.45
+        },
+        "b": {
+          "room": "organic-start-1",
+          "edge": 1,
+          "offset": 0.45
+        },
+        "width": 1
+      }
+    ]
+  },
+  "command": ".tools/bun-windows-x64/bun.exe scripts/prepare-distribution-organic.ts --install"
+}

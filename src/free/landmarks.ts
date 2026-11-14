@@ -16,14 +16,14 @@ export function freeLandmarks(maze: Maze): LandmarkVisibility {
       const t = (maze.wallHeight - 1.7) / dy;
       if (t >= 0 && t <= 1 && r.contains({ x: from.x + (to.x - from.x) * t, z: from.z + (to.z - from.z) * t })) {
         if (!maze.translucentFabric || source === 'forest') return 0;
-        strength = .55;
+        strength = .55*(maze.fabricTransmissionStrength??1);
       }
     }
     for (const wall of r.panels) {
       const hit = rayWall(from, angle, wall, length);
       if (hit < length - 1e-7 && 1.7 + dy * hit / length <= maze.wallHeight + 1e-9) {
         if (!maze.translucentFabric || source === 'forest') return 0;
-        strength *= .35;
+        strength *= .35*(maze.fabricTransmissionStrength??1);
         if (strength < .2) return 0;
       }
     }

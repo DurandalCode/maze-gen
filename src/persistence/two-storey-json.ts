@@ -21,7 +21,7 @@ export function decodeStorey(data:Record<string,unknown>):Maze {
     for(const i of [c.lower,c.upper,...c.shaft]){if(reserved.has(i))return fail();reserved.add(i);}return c;
   });
   const maze=assembleStoreys(p,raw.floorHeight,stairs);
-  const construction={wallHeight:data.wallHeight,wallColor:data.wallColor,translucentFabric:data.translucentFabric,roof:data.roof} as Maze;validateConstruction(construction);Object.assign(maze,construction);
+  const construction={wallHeight:data.wallHeight,wallColor:data.wallColor,translucentFabric:data.translucentFabric, ...(data.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:data.fabricTransmissionStrength}),roof:data.roof} as Maze;validateConstruction(construction);Object.assign(maze,construction);
   if(data.width!==maze.width||data.depth!==maze.depth)return fail();
   if(data.environment!==undefined){validateEnvironment(data.environment as Maze['environment'] & {});maze.environment=data.environment as Maze['environment'];}
   if(!Array.isArray(data.passages)||data.passages.length!==maze.passages.length)return fail();

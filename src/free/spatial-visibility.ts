@@ -50,6 +50,6 @@ export function freeSpatialRay(maze:Maze,from:Point,direction:Point,limit:number
   if(t>1e-7&&([...r.rooms.map(r=>({polygon:r.polygon,holes:r.holes})),...r.connections.map(c=>({polygon:c.polygon,holes:[]}))]).some(s=>pointIn(p,s.polygon)&&!s.holes.some(h=>pointIn(p,h))))hit(t,true,true);
  }
  hits.sort((a,b)=>a.distance-b.distance);let strength=1;
- for(const h of hits){if(cue==='sun'&&maze.translucentFabric&&h.fabric){strength*=h.roof?.55:.35;if(strength>=.2)continue;}return {length:h.distance,strength:0};}
+ for(const h of hits){if(cue==='sun'&&maze.translucentFabric&&h.fabric){strength*=(h.roof?.55:.35)*(maze.fabricTransmissionStrength??1);if(strength>=.2)continue;}return {length:h.distance,strength:0};}
  return {length:limit,strength};
 }

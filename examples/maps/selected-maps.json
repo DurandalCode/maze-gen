@@ -1,0 +1,66 @@
+{
+  "kind": "maze-lab-selected-maps",
+  "version": 1,
+  "reviewDate": "2026-11-14",
+  "packaging": "approved-for-pc-distribution",
+  "maximumModules": 75,
+  "minimumRouteTraps": 1,
+  "minimumLoopTraps": 1,
+  "selected": [
+    {
+      "type": "classical",
+      "modules": 63,
+      "file": "../bundles/distribution-v2/01-classical.json",
+      "sha256": "cf14cc6a83a913bbe7d3ffdf3ae4388c92bff932ca3f41b9b7315a3fb8aa5c97",
+      "libraryId": "8a8fa3592809a1a1a50e27e9",
+      "url": "http://127.0.0.1:1420/?maze=8a8fa3592809a1a1a50e27e9",
+      "status": "user-approved",
+      "rawColdRatioExclusiveMaximum": 0.2
+    },
+    {
+      "type": "living-square",
+      "modules": 64,
+      "file": "../bundles/distribution-v2/02-living.json",
+      "sha256": "1f66b987b3f671313f269dfdcf71654ad6dc709fd26c636c1e16cd72bb88f78b",
+      "libraryId": "bc47e13eb7c70f49249604a9",
+      "url": "http://127.0.0.1:1420/?maze=bc47e13eb7c70f49249604a9",
+      "status": "user-approved"
+    },
+    {
+      "type": "vortex-hybrid",
+      "modules": 75,
+      "file": "../bundles/distribution-v2/04-vortex-hybrid.json",
+      "sha256": "c2af739f8521361268615c5b2658520ca400b75561615b36fc154eafa2e7c198",
+      "libraryId": "3a1795d08aa7de7f415c173e",
+      "url": "http://127.0.0.1:1420/?maze=3a1795d08aa7de7f415c173e",
+      "status": "user-approved"
+    },
+    {
+      "type": "free-bridges",
+      "revision": 2,
+      "modules": 60,
+      "file": "../bundles/distribution-v2/05-free-bridges-revision02.json",
+      "sha256": "5679967b5b3ab31f95653fe254a7d10881566b0eb00c76415e69e2533c6b866f",
+      "libraryId": "2e6a462cf1bdfc3a3fac9a99",
+      "url": "http://127.0.0.1:1420/?maze=2e6a462cf1bdfc3a3fac9a99",
+      "status": "user-approved",
+      "fabricTransmissionStrength": 0.25
+    },
+    {
+      "type": "organic-hybrid-with-courtyards",
+      "modules": 70,
+      "file": "../bundles/distribution-v2/03-free-hybrid.json",
+      "sha256": "50fa0921649478e2d0f70f92acd6c7ad154d9f357790842889b92d428d10daa3",
+      "libraryId": "4f9c091940af174b67fb14a5",
+      "url": "http://127.0.0.1:1420/?maze=4f9c091940af174b67fb14a5",
+      "status": "user-approved",
+      "ordinaryTraps": 1,
+      "loopTraps": 1,
+      "courtyards": 10,
+      "throughCourtyards": 8,
+      "maxForcedStraight": 8,
+      "maxForcedRun": 64
+    }
+  ],
+  "inProgress": []
+}

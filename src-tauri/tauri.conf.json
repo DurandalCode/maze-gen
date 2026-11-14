@@ -15,5 +15,14 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost; font-src 'self'"
     }
   },
-  "bundle": { "active": true, "targets": "all", "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"] }
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
+    "resources": {
+      "../examples/bundles/distribution-v2/bundle.json": "maps/bundle.json",
+      "../examples/bundles/distribution-v2/manifest.json": "maps/manifest.json",
+      "../examples/bundles/distribution-v2/README.md": "maps/README.md"
+    }
+  }
 }

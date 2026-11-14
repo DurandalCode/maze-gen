@@ -60,7 +60,7 @@ export function measureLandmarks(maze: Maze, context: NavigationContext): Landma
         if (!maze.translucentFabric || source === 'forest')
           return 0;
         // The current fabric roof scatters a directional source spot, but conceals scenery.
-        strength = 0.55;
+        strength = 0.55*(maze.fabricTransmissionStrength??1);
       }
     }
     let x = cell % columns, z = Math.floor(cell / columns);
@@ -78,7 +78,7 @@ export function measureLandmarks(maze: Maze, context: NavigationContext): Landma
         if (!maze.translucentFabric || source === 'forest')
           return 0;
         // A bright source can remain directional through one backlit fabric panel.
-        strength *= 0.35;
+        strength *= 0.35*(maze.fabricTransmissionStrength??1);
         if (strength < 0.2)
           return 0;
       }

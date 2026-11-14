@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "sha256": "cf14cc6a83a913bbe7d3ffdf3ae4388c92bff932ca3f41b9b7315a3fb8aa5c97",
+  "thresholdExclusive": 0.2,
+  "samples": 2048,
+  "profile": "outline",
+  "modules": 63,
+  "area": 884,
+  "cycles": 15,
+  "qualifiedRouteTraps": 1,
+  "qualifiedLoopTraps": 1,
+  "worstRawColdRatio": 0.19909502262443438,
+  "worstEffectiveColdRatio": 0.02262443438914027,
+  "scenarios": [
+    {
+      "strategy": "adaptive",
+      "rawColdRatio": 0.18552036199095023,
+      "effectiveColdRatio": 0,
+      "rawColdArea": 164,
+      "effectiveColdArea": 0,
+      "largestRawColdArea": 8,
+      "recognizedTerminalArea": 164,
+      "modelVersion": 9,
+      "options": {
+        "profile": "outline",
+        "beta": 3,
+        "threshold": 0.2,
+        "samples": 2048,
+        "corridorPreference": 1,
+        "boundaryPreference": 1.5,
+        "diagonalVision": true,
+        "decisionMode": "local",
+        "internalOrientation": 1,
+        "boundaryStrategy": "adaptive",
+        "routeMemory": 0.9
+      }
+    },
+    {
+      "strategy": "follow",
+      "rawColdRatio": 0.19909502262443438,
+      "effectiveColdRatio": 0.02262443438914027,
+      "rawColdArea": 176,
+      "effectiveColdArea": 20,
+      "largestRawColdArea": 8,
+      "recognizedTerminalArea": 156,
+      "modelVersion": 9,
+      "options": {
+        "profile": "outline",
+        "beta": 3,
+        "threshold": 0.2,
+        "samples": 2048,
+        "corridorPreference": 1,
+        "boundaryPreference": 1.5,
+        "diagonalVision": true,
+        "decisionMode": "local",
+        "internalOrientation": 1,
+        "boundaryStrategy": "follow",
+        "routeMemory": 0.9
+      }
+    },
+    {
+      "strategy": "avoid",
+      "rawColdRatio": 0.19004524886877827,
+      "effectiveColdRatio": 0.00904977375565611,
+      "rawColdArea": 168,
+      "effectiveColdArea": 8,
+      "largestRawColdArea": 8,
+      "recognizedTerminalArea": 160,
+      "modelVersion": 9,
+      "options": {
+        "profile": "outline",
+        "beta": 3,
+        "threshold": 0.2,
+        "samples": 2048,
+        "corridorPreference": 1,
+        "boundaryPreference": 1.5,
+        "diagonalVision": true,
+        "decisionMode": "local",
+        "internalOrientation": 1,
+        "boundaryStrategy": "avoid",
+        "routeMemory": 0.9
+      }
+    }
+  ],
+  "passed": true
+}

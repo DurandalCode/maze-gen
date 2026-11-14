@@ -1,0 +1,92 @@
+{
+  "source": "examples/maps/bridge-bundle-base60.json",
+  "sourceSha256": "98a1a278bfd47cf6bf40d9e8f526cc1e6d5976c1e4083de5e4e544a98c3776df",
+  "sourceStatus": "Native organic bridge generation staged before route-trap acceptance; frozen geometry is the reproducible input.",
+  "baseParameters": {
+    "placementMode": "free",
+    "generationType": "classical",
+    "columns": 100,
+    "rows": 100,
+    "moduleSize": 2,
+    "corridorWidth": 2,
+    "algorithm": "prim",
+    "seed": "BUNDLE-75-BRIDGES-1",
+    "extraConnections": 2,
+    "routeTrapCount": 1,
+    "loopTrapCount": 1,
+    "freeModuleTarget": 60,
+    "freeBridgeCount": 2,
+    "freeRequiredBridgeCount": 1,
+    "freeRequireUnderpass": true,
+    "freeAngleSpread": 80,
+    "freeJunctionDegree": 3
+  },
+  "removedModules": [
+    "m-348",
+    "m-420",
+    "m-458",
+    "m-510",
+    "m-528",
+    "m-602",
+    "m-642"
+  ],
+  "attachments": [
+    {
+      "room": "m-268",
+      "edge": 2,
+      "type": "2x6",
+      "gap": 2.5,
+      "id": "bridge-trap-51"
+    },
+    {
+      "room": "bridge-trap-51",
+      "edge": 0,
+      "type": "2x6",
+      "gap": 2.5,
+      "id": "bridge-trap-52"
+    },
+    {
+      "room": "bridge-trap-52",
+      "edge": 1,
+      "type": "2x2",
+      "gap": 2,
+      "id": "bridge-trap-53"
+    },
+    {
+      "room": "bridge-trap-53",
+      "edge": 1,
+      "type": "2x6",
+      "gap": 2,
+      "id": "bridge-trap-54"
+    },
+    {
+      "room": "bridge-trap-54",
+      "edge": 1,
+      "type": "2x6",
+      "gap": 1.5,
+      "id": "bridge-trap-55"
+    },
+    {
+      "room": "bridge-trap-55",
+      "edge": 0,
+      "type": "2x2",
+      "gap": 2,
+      "id": "bridge-trap-56"
+    },
+    {
+      "room": "exit-pocket",
+      "edge": 3,
+      "type": "2x6",
+      "gap": 1.5,
+      "id": "bridge-exit-extension"
+    }
+  ],
+  "restoredModules": [
+    "m-266",
+    "m-290"
+  ],
+  "output": "examples/bundles/distribution-v2/05-free-bridges.json",
+  "sha256": "32dc6b2d5bec5803c770d986756d6f0f9f38f042a8f233c5e8eb787c265d1f63",
+  "command": "bun scripts/prepare-free-bridge-map.ts",
+  "validation": "bun scripts/validate-free-bridge-map.ts examples/bundles/distribution-v2/05-free-bridges.json --install"
+}

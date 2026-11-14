@@ -31,6 +31,11 @@ export function generateBase(parameters: Parameters): Maze {
 }
 
 export function generate(parameters:Parameters,previous?:Maze,onProgress?:(message:string)=>void):Maze {
+  const maze=generateMaze(parameters,previous,onProgress);
+  if(previous?.fabricTransmissionStrength!==undefined)maze.fabricTransmissionStrength=previous.fabricTransmissionStrength;
+  return maze;
+}
+function generateMaze(parameters:Parameters,previous?:Maze,onProgress?:(message:string)=>void):Maze {
   if(parameters.placementMode==='free')return generateFree(parameters,previous,onProgress);
   if(parameters.generationType==='two-storey')return generateTwoStorey(parameters,previous,onProgress);
   if(parameters.generationType==='corridor')return generateCorridor(parameters,previous,onProgress);

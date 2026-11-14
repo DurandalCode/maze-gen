@@ -44,7 +44,7 @@ export function generateOrganic(parameters: Parameters, previous?: Maze, onProgr
       center.x = parameters.columns * (.2 + rng() * .6);
       center.z = parameters.rows * (.2 + rng() * .6);
     }
-    const draft: FreeDraft = { kind: 'maze-lab-free-draft', version: 1, parameters: { ...parameters, placementMode: 'free', moduleSize: 2 }, construction: previous ? { wallHeight: previous.wallHeight, wallColor: previous.wallColor, translucentFabric: previous.translucentFabric, roof: previous.roof } : { ...DEFAULT_CONSTRUCTION,...(parameters.freeRequiredBridgeCount||parameters.freeRoutePattern==='switchbacks'?{roof:true}:{}) }, layout };
+    const draft: FreeDraft = { kind: 'maze-lab-free-draft', version: 1, parameters: { ...parameters, placementMode: 'free', moduleSize: 2 }, construction: previous ? { wallHeight: previous.wallHeight, wallColor: previous.wallColor, translucentFabric: previous.translucentFabric, ...(previous.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:previous.fabricTransmissionStrength}), roof: previous.roof } : { ...DEFAULT_CONSTRUCTION,...(parameters.freeRequiredBridgeCount||parameters.freeRoutePattern==='switchbacks'?{roof:true}:{}) }, layout };
     let counter = 0;
     const nextId = (prefix: string) => `${prefix}-${counter++}`;
     let zones:ZoneSeed|undefined;

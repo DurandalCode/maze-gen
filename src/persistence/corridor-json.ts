@@ -12,13 +12,13 @@ const fail=(s='Некорректная геометрия коридорног�
 export function corridorWire(maze:Maze):Record<string,unknown>{
  const openings=(maze.portals??[maze.entrance,maze.exit]).map(p=>{const point=portalPoint(maze,p),size=cellSize(maze,p.cell);return {...point,side:p.side,width:p.width??(p.side==='west'||p.side==='east'?size.depth:size.width)};});
  const portals=maze.portals??[maze.entrance,maze.exit],index=(p:Portal)=>portals.findIndex(q=>q.cell===p.cell&&q.side===p.side);
- return {version:4,parameters:maze.parameters,width:maze.width,depth:maze.depth,layout:maze.layout,supports:corridorSupports(maze),panels:mergeWalls(walls(maze)),openings,entrance:index(maze.entrance),exit:index(maze.exit),wallHeight:maze.wallHeight,wallColor:maze.wallColor,translucentFabric:maze.translucentFabric,roof:maze.roof,...(maze.environment?{environment:maze.environment}:{})};
+ return {version:4,parameters:maze.parameters,width:maze.width,depth:maze.depth,layout:maze.layout,supports:corridorSupports(maze),panels:mergeWalls(walls(maze)),openings,entrance:index(maze.entrance),exit:index(maze.exit),wallHeight:maze.wallHeight,wallColor:maze.wallColor,translucentFabric:maze.translucentFabric, ...(maze.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:maze.fabricTransmissionStrength}),roof:maze.roof,...(maze.environment?{environment:maze.environment}:{})};
 }
 export function decodeCorridor(data:Record<string,unknown>):Maze{
  const p=data.parameters as Parameters;if(!p||p.generationType!=='corridor')fail();validateParameters(p);
  const layout=data.layout as CorridorLayout;if(!layout||!Array.isArray(layout.modules))fail();const maze=corridorShell(p,layout.modules,layout.spaces,layout.networkVersion);validatePlacement(maze);
  if(data.width!==maze.width||data.depth!==maze.depth)fail();
- const construction={wallHeight:data.wallHeight,wallColor:data.wallColor,translucentFabric:data.translucentFabric,roof:data.roof} as typeof DEFAULT_CONSTRUCTION;validateConstruction(construction);Object.assign(maze,construction);
+ const construction={wallHeight:data.wallHeight,wallColor:data.wallColor,translucentFabric:data.translucentFabric, ...(data.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:data.fabricTransmissionStrength}),roof:data.roof} as typeof DEFAULT_CONSTRUCTION;validateConstruction(construction);Object.assign(maze,construction);
  if(data.environment!==undefined){validateEnvironment(data.environment as NonNullable<Maze['environment']>);maze.environment=data.environment as Maze['environment'];}
  const d=domainOf(maze);
  if(Array.isArray(data.passages)){

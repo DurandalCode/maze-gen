@@ -1,0 +1,98 @@
+{
+  "version": 2,
+  "status": "accepted",
+  "mapCount": 5,
+  "plannedMapCount": 10,
+  "targetModules": {
+    "target": 75,
+    "min": 1,
+    "max": 75
+  },
+  "minimumRouteTraps": 1,
+  "minimumLoopTraps": 1,
+  "maps": [
+    {
+      "file": "01-classical.json",
+      "title": "01 · Классический",
+      "type": "classical",
+      "generationType": "classical",
+      "modules": 63,
+      "cycles": 15,
+      "qualifiedRouteTraps": 1,
+      "qualifiedLoopTraps": 1,
+      "sha256": "cf14cc6a83a913bbe7d3ffdf3ae4388c92bff932ca3f41b9b7315a3fb8aa5c97",
+      "status": "accepted",
+      "portalPrivacy": true,
+      "coldspots": {
+        "file": "01-classical.coldspots.json",
+        "thresholdExclusive": 0.2,
+        "samples": 2048,
+        "profile": "outline",
+        "worstRawColdRatio": 0.19909502262443438
+      },
+      "libraryId": "8a8fa3592809a1a1a50e27e9",
+      "url": "http://127.0.0.1:1420/?maze=8a8fa3592809a1a1a50e27e9"
+    },
+    {
+      "file": "02-living.json",
+      "title": "02 · Живой квадратный",
+      "type": "living",
+      "generationType": "living",
+      "modules": 64,
+      "cycles": 2,
+      "qualifiedRouteTraps": 1,
+      "qualifiedLoopTraps": 1,
+      "sha256": "1f66b987b3f671313f269dfdcf71654ad6dc709fd26c636c1e16cd72bb88f78b",
+      "status": "accepted",
+      "portalPrivacy": true,
+      "squareFootprint": true,
+      "libraryId": "bc47e13eb7c70f49249604a9",
+      "url": "http://127.0.0.1:1420/?maze=bc47e13eb7c70f49249604a9"
+    },
+    {
+      "file": "03-free-hybrid.json",
+      "title": "03 · Органический гибрид с дворами",
+      "type": "free-hybrid",
+      "generationType": "classical",
+      "modules": 70,
+      "cycles": 14,
+      "qualifiedRouteTraps": 1,
+      "qualifiedLoopTraps": 1,
+      "sha256": "50fa0921649478e2d0f70f92acd6c7ad154d9f357790842889b92d428d10daa3",
+      "status": "accepted",
+      "portalPrivacy": true,
+      "libraryId": "4f9c091940af174b67fb14a5",
+      "url": "http://127.0.0.1:1420/?maze=4f9c091940af174b67fb14a5"
+    },
+    {
+      "file": "04-vortex-hybrid.json",
+      "title": "04 · Гибридный вортекс",
+      "type": "vortex-hybrid",
+      "generationType": "classical",
+      "modules": 75,
+      "cycles": 11,
+      "qualifiedRouteTraps": 1,
+      "qualifiedLoopTraps": 1,
+      "sha256": "c2af739f8521361268615c5b2658520ca400b75561615b36fc154eafa2e7c198",
+      "status": "accepted",
+      "portalPrivacy": false,
+      "libraryId": "3a1795d08aa7de7f415c173e",
+      "url": "http://127.0.0.1:1420/?maze=3a1795d08aa7de7f415c173e"
+    },
+    {
+      "file": "05-free-bridges-revision02.json",
+      "title": "05 · Мостовой",
+      "type": "free-bridges",
+      "generationType": "classical",
+      "modules": 60,
+      "cycles": 1,
+      "qualifiedRouteTraps": 1,
+      "qualifiedLoopTraps": 1,
+      "sha256": "5679967b5b3ab31f95653fe254a7d10881566b0eb00c76415e69e2533c6b866f",
+      "status": "accepted",
+      "portalPrivacy": true,
+      "libraryId": "2e6a462cf1bdfc3a3fac9a99",
+      "url": "http://127.0.0.1:1420/?maze=2e6a462cf1bdfc3a3fac9a99"
+    }
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "source": "tests/fixtures/dense-one-trap-base.json",
+  "sourceSha256": "a7b4efb6ff99ef6268c85d2a317fc6b59d5f443662b199d2ef2149f84b54b887",
+  "recipe": "examples/bundles/distribution-v2/03-free-hybrid.recipe.json",
+  "method": "Saved native organic geometry derivative, not seed-only regeneration. Preserve all52 original frame poses and10 courtyards; close four existing crosslinks to isolate the return district, add five native infill frames, extend the real exit around the east boundary, and shield the entrance using two square frames. Square assemblies and alternating supported1m doors bound forced straights.",
+  "sha256": "50fa0921649478e2d0f70f92acd6c7ad154d9f357790842889b92d428d10daa3",
+  "modules": 70,
+  "originalFramePosesPreserved": 52,
+  "ordinaryTraps": 1,
+  "loopTraps": 1,
+  "courtyards": [
+    {
+      "id": "modular-court-0",
+      "doors": 2
+    },
+    {
+      "id": "modular-court-1",
+      "doors": 2
+    },
+    {
+      "id": "selective-court-1",
+      "doors": 1
+    },
+    {
+      "id": "selective-court-3",
+      "doors": 2
+    },
+    {
+      "id": "selective-court-5",
+      "doors": 2
+    },
+    {
+      "id": "selective-court-17",
+      "doors": 2
+    },
+    {
+      "id": "selective-court-31",
+      "doors": 2
+    },
+    {
+      "id": "dense-court-0",
+      "doors": 1
+    },
+    {
+      "id": "dense-court-1",
+      "doors": 2
+    },
+    {
+      "id": "dense-court-2",
+      "doors": 2
+    }
+  ],
+  "roof": true,
+  "oppositeExteriorPortals": true,
+  "portalPrivacy": {
+    "certified": true,
+    "entrance": {
+      "portal": {
+        "cell": 69,
+        "side": "north",
+        "width": 1,
+        "freeId": "entrance"
+      },
+      "certified": true,
+      "pocket": [
+        69,
+        68
+      ],
+      "gates": [
+        {
+          "x1": 45.70496673372263,
+          "z1": 47.561986514294595,
+          "x2": 45.152492952681904,
+          "z2": 48.39551679044692
+        }
+      ],
+      "blockers": [
+        {
+          "x1": 45.43796306336661,
+          "z1": 46.2452826599612,
+          "x2": 46.22981682571132,
+          "z2": 46.77013275194989
+        }
+      ],
+      "reason": "Полная ширина проёма экранирована от всех выходов из локального кармана."
+    },
+    "exit": {
+      "portal": {
+        "cell": 61,
+        "side": "north",
+        "width": 1.4,
+        "freeId": "exit"
+      },
+      "certified": true,
+      "pocket": [
+        61,
+        67,
+        66
+      ],
+      "gates": [
+        {
+          "x1": 97.05,
+          "z1": 86.15,
+          "x2": 98.05,
+          "z2": 86.15
+        }
+      ],
+      "blockers": [
+        {
+          "x1": 97.71805116324488,
+          "z1": 90.36417719262077,
+          "x2": 99.38582280737923,
+          "z2": 91.46805116324488
+        }
+      ],
+      "reason": "Полная ширина проёма экранирована от всех выходов из локального кармана."
+    }
+  },
+  "limits": {
+    "straight": 8,
+    "run": 64
+  },
+  "actualLengths": {
+    "straight": 7,
+    "run": 53.78442615215033,
+    "bridges": []
+  },
+  "wallAuditIssues": [],
+  "validation": [],
+  "components": 1,
+  "cycles": 14,
+  "capsuleLegsBothDirections": 2760,
+  "playerFinished": true,
+  "playerDistance": 153.45422652868027,
+  "jsonRoundTrip": true,
+  "libraryId": "4f9c091940af174b67fb14a5",
+  "url": "http://127.0.0.1:1420/?maze=4f9c091940af174b67fb14a5",
+  "browser": {
+    "opened": true,
+    "modules": 70,
+    "trapOverlay": [
+      "Все ловушки",
+      "Л1",
+      "К1"
+    ],
+    "firstPersonRendered": true,
+    "exitLandmark": "Выход — к полю",
+    "errors": []
+  },
+  "typeScriptCheck": true
+}

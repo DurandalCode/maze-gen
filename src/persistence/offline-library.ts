@@ -8,6 +8,8 @@ import type {Maze} from '../core/maze';
 import {contentId,browserTopologyId} from './identity';
 import bundled from '../data/field-pack.json';
 import commute from '../data/commute-pack.json';
+import distribution from '../../examples/bundles/distribution-v2/bundle.json';
+import {isTauri} from '@tauri-apps/api/core';
 const dbName=()=>{
  const test=typeof location!=='undefined'?new URLSearchParams(location.search).get('test'):null;
  return test&&/^[0-9]{1,6}$/.test(test)?'maze-lab-offline-test-'+test:'maze-lab-offline-v1';
@@ -38,6 +40,13 @@ export async function saveOfflineMaze(raw:unknown,title?:string):Promise<SavedMa
 }
 async function ensureBundle():Promise<void>{
  if(!seeded)seeded=(async()=>{
+  if(isTauri()){
+   for(const row of distribution.mazes){
+    const maze=deserialize(JSON.stringify(row.maze)),id=await contentId(maze),now=new Date().toISOString();
+    await update<SavedMaze>('mazes',id,old=>old??{id,title:row.title,maze,createdAt:now,updatedAt:now,status:'candidate'},false);
+   }
+   return;
+  }
   for(const id of (commute as {retiredIds?:string[]}).retiredIds??[]){
    await update<SavedMaze|null>('mazes',id,old=>old&&old.status!=='rejected'?{...old,status:'rejected',rejectionReason:'Отбракован: однотипная схема с очевидным кольцом и проходом без выбора.'}:old,false);
   }

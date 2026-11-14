@@ -8,7 +8,7 @@ import { fabricMaterial } from '../renderer/fabric-material';
 import { groundMaterial } from '../renderer/ground';
 import { timberMesh } from '../renderer/timber-mesh';
 export function freeMesh(maze: Maze): THREE.Group {
-  const group = new THREE.Group(), r = freeRuntime(maze), material = fabricMaterial(maze.wallColor, maze.translucentFabric);
+  const group = new THREE.Group(), r = freeRuntime(maze), material = fabricMaterial(maze.wallColor,maze.translucentFabric,'wall',maze.fabricTransmissionStrength);
   const walls=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,r.panels.length),dummy=new THREE.Object3D();
   walls.name='fabric-walls';walls.castShadow=true;walls.receiveShadow=true;
   if(maze.translucentFabric)walls.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,opacity:.99,alphaHash:true});
@@ -21,7 +21,7 @@ export function freeMesh(maze: Maze): THREE.Group {
   group.add(timberMesh(maze));
   if(maze.free!.bridges?.length)group.add(bridgeMesh(maze));
   if (maze.roof) {
-    const roofMaterial = fabricMaterial(maze.wallColor, maze.translucentFabric, 'roof');
+    const roofMaterial = fabricMaterial(maze.wallColor,maze.translucentFabric,'roof',maze.fabricTransmissionStrength);
     roofMaterial.side = THREE.DoubleSide;
     const surfaces = [...r.rooms.map(s => ({ polygon: s.polygon, holes: s.holes })), ...r.connections.map(c => ({ polygon: c.polygon, holes: [] }))];
     const pieces:THREE.BufferGeometry[]=[];

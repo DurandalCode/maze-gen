@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "source": "examples/maps/approved-vortex-hybrid09.json",
+  "sourceSha256": "32f8c1fcab136a91cc525558c25f52ba869724f02b6c940cb2f544babebe87a8",
+  "recipe": "saved-geometry derivative; remove listed optional districts, preserve all remaining frame coordinates and courtyard geometry",
+  "command": ".tools/bun-windows-x64/bun.exe scripts/prepare-distribution-vortex.ts --install",
+  "removedDistricts": [
+    [
+      "spiral0-23",
+      "spiral0-22",
+      "spiral0-21",
+      "spiral0-20",
+      "spiral0-19",
+      "spiral1-13",
+      "spiral1-12",
+      "spiral2-7",
+      "spiral3-3",
+      "spiral3-4",
+      "spiral2-8",
+      "spiral2-9",
+      "spiral1-14",
+      "spiral1-15"
+    ],
+    [
+      "spiral0-2",
+      "spiral0-1",
+      "spiral0-0",
+      "vortex-false-side"
+    ],
+    [
+      "spiral3-2",
+      "hybrid-vortexchaotic05spreadbay19-635",
+      "hybrid-vortexchaotic05spreadbay19-1207"
+    ]
+  ],
+  "sha256": "c2af739f8521361268615c5b2658520ca400b75561615b36fc154eafa2e7c198",
+  "modules": 75,
+  "ordinaryTraps": 1,
+  "loopTraps": 1,
+  "throughCourtyards": 5,
+  "roof": true,
+  "oppositeExteriorPortals": true,
+  "limits": {
+    "straight": 8,
+    "run": 64
+  },
+  "actualLengths": {
+    "straight": 5.278561244963228,
+    "run": 60.491303320890374,
+    "bridges": []
+  },
+  "wallAuditIssues": [],
+  "components": 1,
+  "cycles": 11,
+  "capsuleLegsBothDirections": 1828,
+  "playerFinished": true,
+  "jsonRoundTrip": true,
+  "libraryId": "3a1795d08aa7de7f415c173e",
+  "url": "http://127.0.0.1:1420/?maze=3a1795d08aa7de7f415c173e",
+  "browser": {
+    "load": true,
+    "modules": 75,
+    "trapOverlay": [
+      "Л1",
+      "К1"
+    ],
+    "pageErrors": [],
+    "screenshot": "test-results/vortex75-browser.png"
+  },
+  "typecheck": true
+}

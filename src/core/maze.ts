@@ -79,12 +79,15 @@ export interface Construction {
   wallHeight: number;
   wallColor: string;
   translucentFabric: boolean;
+  /** Relative fabric transmission; absent preserves the original material. */
+  fabricTransmissionStrength?: number;
   roof: boolean;
 }
 export const DEFAULT_CONSTRUCTION: Readonly<Construction> = {
   wallHeight: 2.5, wallColor: '#000000', translucentFabric: true, roof: false,
 };
 export function validateConstruction(value: Construction): void {
+  if(value.fabricTransmissionStrength!==undefined&&(!Number.isFinite(value.fabricTransmissionStrength)||value.fabricTransmissionStrength<0||value.fabricTransmissionStrength>1))throw new Error('Сила просвечивания ткани должна быть от 0 до 1.');
   if (!Number.isFinite(value.wallHeight) || value.wallHeight < 1.8 || value.wallHeight > 10)
     throw new Error('Высота стен должна быть от 1,8 до 10 м.');
   if (typeof value.wallColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(value.wallColor))

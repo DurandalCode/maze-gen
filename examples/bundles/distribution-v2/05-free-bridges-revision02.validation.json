@@ -1,0 +1,164 @@
+{
+  "file": "examples/bundles/distribution-v2/05-free-bridges-revision02.json",
+  "sha256": "5679967b5b3ab31f95653fe254a7d10881566b0eb00c76415e69e2533c6b866f",
+  "modules": 60,
+  "qualifiedRouteTraps": 1,
+  "qualifiedLoopTraps": 1,
+  "cycles": 1,
+  "roof": true,
+  "fabricTransmissionStrength": 0.25,
+  "oppositePortals": true,
+  "portalPrivacy": {
+    "certified": true,
+    "entrance": {
+      "portal": {
+        "cell": 62,
+        "side": "north",
+        "width": 1,
+        "freeId": "entrance-pocket-opening"
+      },
+      "certified": true,
+      "pocket": [
+        62,
+        44,
+        32
+      ],
+      "gates": [
+        {
+          "x1": 24.920306654465026,
+          "z1": 42.148545443328786,
+          "x2": 26.51946884846838,
+          "z2": 42.09677404900356
+        }
+      ],
+      "blockers": [
+        {
+          "x1": 21.580253748619953,
+          "z1": 44.51352575728352,
+          "x2": 23.910215597625566,
+          "z2": 47.764875904865036
+        }
+      ],
+      "reason": "Полная ширина проёма экранирована от всех выходов из локального кармана."
+    },
+    "exit": {
+      "portal": {
+        "cell": 52,
+        "side": "north",
+        "width": 1.6,
+        "freeId": "bridge-exit-final"
+      },
+      "certified": true,
+      "pocket": [
+        52,
+        63
+      ],
+      "gates": [
+        {
+          "x1": 75.5960513980628,
+          "z1": 35.65028864946552,
+          "x2": 75.52313916047785,
+          "z2": 34.051950823594424
+        }
+      ],
+      "blockers": [
+        {
+          "x1": 87.71010687018261,
+          "z1": 31.29372348658731,
+          "x2": 81.716340023166,
+          "z2": 31.567144377530894
+        }
+      ],
+      "reason": "Полная ширина проёма экранирована от всех выходов из локального кармана."
+    }
+  },
+  "bridges": {
+    "total": 2,
+    "minimumCrossings": 1,
+    "required": [
+      "bridge-1"
+    ],
+    "routeOver": [
+      "bridge-1"
+    ],
+    "routeUnder": [
+      "bridge-1"
+    ],
+    "underpassRequired": true
+  },
+  "groundPathsCheckedBothDirections": 126,
+  "player": {
+    "finished": true,
+    "crossed": [
+      "bridge-1"
+    ],
+    "distance": 137.33178815524823
+  },
+  "exploration": {
+    "finished": true,
+    "bridgesBothDirections": [
+      "bridge-1",
+      "bridge-2-return"
+    ],
+    "distance": 204.11387367353268
+  },
+  "jsonRoundTrip": true,
+  "validation": [],
+  "libraryId": "2e6a462cf1bdfc3a3fac9a99",
+  "url": "http://127.0.0.1:1420/?maze=2e6a462cf1bdfc3a3fac9a99",
+  "bridgeRoles": {
+    "axesAngleDegrees": 90,
+    "roles": [
+      {
+        "id": "bridge-1",
+        "role": "district-transition",
+        "onShortestEntranceExitRoute": true,
+        "componentsWithoutBridge": 2,
+        "exitReachableWithoutBridge": false,
+        "axis": {
+          "x": 0.715445216763831,
+          "z": 0.6986688355793144
+        }
+      },
+      {
+        "id": "bridge-2-return",
+        "role": "return-circuit",
+        "onShortestEntranceExitRoute": false,
+        "componentsWithoutBridge": 1,
+        "exitReachableWithoutBridge": true,
+        "axis": {
+          "x": 0.6986688355793145,
+          "z": -0.7154452167638309
+        },
+        "returnCircuit": {
+          "forkRoom": "return-fork",
+          "groundRooms": [
+            "return-fork",
+            "return-s",
+            "return-se",
+            "return-e",
+            "return-ne",
+            "return-n",
+            "return-nw",
+            "return-fork"
+          ],
+          "length": 55.17584647076919,
+          "componentRooms": 15,
+          "onlyNetworkAttachment": [
+            "return-fork"
+          ],
+          "containsEntranceOrExit": false
+        }
+      }
+    ]
+  },
+  "browser": {
+    "url": "http://127.0.0.1:1420/?maze=2e6a462cf1bdfc3a3fac9a99",
+    "opened": true,
+    "settingsStrengthPercent": 25,
+    "changedStrengthSurvivesDownload": true,
+    "firstPersonRendered": true,
+    "exitLandmarkReminder": true,
+    "errors": []
+  }
+}

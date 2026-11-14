@@ -1,3 +1,7 @@
 # Keep the byte-exact approved export identical on every checkout platform.
 examples/maps/approved-vortex-hybrid09.json text eol=lf
 examples/maps/approved-vortex-ending-ring.json text eol=lf
+# Distribution checksums and recipes use exact UTF-8/LF JSON bytes.
+examples/bundles/**/*.json text eol=lf
+examples/maps/bridge-bundle-base60.json text eol=lf
+examples/maps/selected-maps.json text eol=lf

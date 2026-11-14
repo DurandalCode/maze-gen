@@ -4,7 +4,7 @@ import { freeMaze } from './layout';
 import { validateEnvironment } from '../core/environment';
 import type { FreeDraft } from './model';
 export function mazeDraft(maze: Maze): FreeDraft {
-  return { kind: 'maze-lab-free-draft', version: maze.free!.bridges?.length?2:1, parameters: structuredClone(maze.parameters), ...(maze.environment ? { environment: structuredClone(maze.environment) } : {}), construction: { wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof }, layout: structuredClone(maze.free!) };
+  return { kind: 'maze-lab-free-draft', version: maze.free!.bridges?.length?2:1, parameters: structuredClone(maze.parameters), ...(maze.environment ? { environment: structuredClone(maze.environment) } : {}), construction: { wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, ...(maze.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:maze.fabricTransmissionStrength}), roof: maze.roof }, layout: structuredClone(maze.free!) };
 }
 function inspect(d: FreeDraft,sourceDepth=0): void {
   if (!d || d.kind !== 'maze-lab-free-draft' || ![1,2].includes(d.version) || d.parameters?.placementMode !== 'free') throw Error('Некорректный свободный черновик.');
@@ -48,7 +48,7 @@ export function freeWire(maze: Maze): Record<string, unknown> {
   return { version: maze.free!.bridges?.length?7:5, parameters: d.parameters, layout: d.layout, ...d.construction, ...(maze.environment ? { environment: maze.environment } : {}) };
 }
 export function decodeFree(value: Record<string, unknown>): Maze {
-  const d = { kind: 'maze-lab-free-draft', version: value.version===7?2:1, parameters: value.parameters, layout: value.layout ?? value.free, construction: { ...DEFAULT_CONSTRUCTION, wallHeight: value.wallHeight, wallColor: value.wallColor, translucentFabric: value.translucentFabric, roof: value.roof } } as FreeDraft;
+  const d = { kind: 'maze-lab-free-draft', version: value.version===7?2:1, parameters: value.parameters, layout: value.layout ?? value.free, construction: { ...DEFAULT_CONSTRUCTION, wallHeight: value.wallHeight, wallColor: value.wallColor, translucentFabric: value.translucentFabric, ...(value.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:value.fabricTransmissionStrength}), roof: value.roof } } as FreeDraft;
   inspect(d);
   const maze = freeMaze(d);
   if(maze.version!==value.version)throw Error('Версия карты не соответствует мостам.');

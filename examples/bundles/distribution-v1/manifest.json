@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "status": "candidate",
+  "targetModules": {
+    "min": 90,
+    "max": 105
+  },
+  "minimumRouteTraps": 1,
+  "minimumLoopTraps": 1,
+  "maps": [
+    {
+      "file": "01-classical.json",
+      "title": "Бандл 01 · Классический",
+      "type": "classical",
+      "modules": 100,
+      "squareModules": 100,
+      "longModules": 0,
+      "sha256": "f6e3cf24298c8f05de62b96326cf4d71ad69de431cb00a4ff681e867b8a1862b",
+      "portalPrivacy": true,
+      "libraryId": "619da20f10c48641c15728e5",
+      "url": "http://127.0.0.1:1420/?maze=619da20f10c48641c15728e5"
+    },
+    {
+      "file": "02-living.json",
+      "title": "Бандл 02 · Живой",
+      "type": "living",
+      "modules": 100,
+      "squareModules": 100,
+      "longModules": 0,
+      "sha256": "eabe8cbd83b3821ffc7326d913e5dec9527db8d4c1b6d0393a6252a9876ca071",
+      "portalPrivacy": true,
+      "libraryId": "dd58d3e816ee2058c0e9c08e",
+      "url": "http://127.0.0.1:1420/?maze=dd58d3e816ee2058c0e9c08e"
+    },
+    {
+      "file": "03-corridor.json",
+      "title": "Бандл 03 · Коридорный",
+      "type": "corridor",
+      "modules": 94,
+      "squareModules": 62,
+      "longModules": 32,
+      "sha256": "33a4b55c28dbfa6028fb3d3a3879642a6957f3f2846364074b56db3d97833760",
+      "portalPrivacy": false,
+      "libraryId": "a4ac12a3c6ed117cd4985c77",
+      "url": "http://127.0.0.1:1420/?maze=a4ac12a3c6ed117cd4985c77"
+    }
+  ]
+}

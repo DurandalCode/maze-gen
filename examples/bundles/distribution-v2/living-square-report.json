@@ -1,0 +1,58 @@
+{
+  "kind": "living",
+  "parameters": {
+    "generationType": "living",
+    "loopTrapCount": 1,
+    "routeTrapCount": 1,
+    "columns": 8,
+    "rows": 8,
+    "corridorWidth": 2,
+    "extraConnections": 2,
+    "seed": "BUNDLE-75-LIVING-SQUARE64-77",
+    "algorithm": "backtracker",
+    "moduleSize": 2
+  },
+  "modules": 64,
+  "squareModules": 64,
+  "longModules": 0,
+  "width": 30,
+  "depth": 30,
+  "roof": true,
+  "area": 900,
+  "components": 1,
+  "cycles": 2,
+  "routeTraps": 1,
+  "loopTraps": 1,
+  "entranceSide": "west",
+  "exitSide": "east",
+  "portalPrivacy": true,
+  "contours": {
+    "layers": 8,
+    "retained": 208,
+    "maximum": 219,
+    "ratio": 0.9497716894977168,
+    "separation": 0.9417989417989417,
+    "certified": true
+  },
+  "sha256": "1f66b987b3f671313f269dfdcf71654ad6dc709fd26c636c1e16cd72bb88f78b",
+  "libraryId": "bc47e13eb7c70f49249604a9",
+  "url": "http://127.0.0.1:1420/?maze=bc47e13eb7c70f49249604a9",
+  "date": "2026-11-13",
+  "previous": {
+    "libraryId": "b83958c4aec1b1c9a929da43",
+    "sha256": "7ee619adb09e41261f11fcad667bf8ddc8a4afec164873713323176bfbaca06f",
+    "modules": 75,
+    "width": 58,
+    "depth": 18
+  },
+  "recipe": "bun scripts/prepare-distribution-map.ts living BUNDLE-75-LIVING-SQUARE64-77 8 8 test-results/square-living-64.json --route-traps=1 --loop-traps=1 --cycles=2 --min-modules=64",
+  "checks": {
+    "jsonRoundTrip": true,
+    "oppositeExternalPortals": true,
+    "portalPrivacy": true,
+    "contourStyle": true,
+    "openingsCheckedBothDirections": 226,
+    "playerFinished": true
+  },
+  "note": "Чистый квадрат8×8 в общем пределе75модулей. Подбор75с центральным отверстием и симметричными выемками не прошёл; определения Л/К не ослаблялись."
+}

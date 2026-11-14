@@ -1,0 +1,109 @@
+{
+  "file": "examples/bundles/distribution-v2/05-free-bridges.json",
+  "sha256": "32dc6b2d5bec5803c770d986756d6f0f9f38f042a8f233c5e8eb787c265d1f63",
+  "modules": 60,
+  "qualifiedRouteTraps": 1,
+  "qualifiedLoopTraps": 1,
+  "cycles": 2,
+  "roof": true,
+  "oppositePortals": true,
+  "portalPrivacy": {
+    "certified": true,
+    "entrance": {
+      "portal": {
+        "cell": 62,
+        "side": "north",
+        "width": 1,
+        "freeId": "entrance-pocket-opening"
+      },
+      "certified": true,
+      "pocket": [
+        62,
+        48,
+        35
+      ],
+      "gates": [
+        {
+          "x1": 24.920306654465026,
+          "z1": 42.148545443328786,
+          "x2": 26.51946884846838,
+          "z2": 42.09677404900356
+        }
+      ],
+      "blockers": [
+        {
+          "x1": 21.580253748619953,
+          "z1": 44.51352575728352,
+          "x2": 23.910215597625566,
+          "z2": 47.764875904865036
+        }
+      ],
+      "reason": "Полная ширина проёма экранирована от всех выходов из локального кармана."
+    },
+    "exit": {
+      "portal": {
+        "cell": 57,
+        "side": "north",
+        "width": 1.6,
+        "freeId": "bridge-exit-final"
+      },
+      "certified": true,
+      "pocket": [
+        57,
+        63
+      ],
+      "gates": [
+        {
+          "x1": 75.5960513980628,
+          "z1": 35.65028864946552,
+          "x2": 75.52313916047785,
+          "z2": 34.051950823594424
+        }
+      ],
+      "blockers": [
+        {
+          "x1": 87.71010687018261,
+          "z1": 31.29372348658731,
+          "x2": 81.716340023166,
+          "z2": 31.567144377530894
+        }
+      ],
+      "reason": "Полная ширина проёма экранирована от всех выходов из локального кармана."
+    }
+  },
+  "bridges": {
+    "total": 2,
+    "minimumCrossings": 1,
+    "required": [
+      "bridge-1"
+    ],
+    "routeOver": [
+      "bridge-1"
+    ],
+    "routeUnder": [
+      "bridge-1",
+      "bridge-2"
+    ],
+    "underpassRequired": true
+  },
+  "groundPathsCheckedBothDirections": 128,
+  "player": {
+    "finished": true,
+    "crossed": [
+      "bridge-1"
+    ],
+    "distance": 137.33178815524823
+  },
+  "exploration": {
+    "finished": true,
+    "bridgesBothDirections": [
+      "bridge-1",
+      "bridge-2"
+    ],
+    "distance": 221.82195690257532
+  },
+  "jsonRoundTrip": true,
+  "validation": [],
+  "libraryId": "db3ab555afc11b1c126c3d60",
+  "url": "http://127.0.0.1:1420/?maze=db3ab555afc11b1c126c3d60"
+}

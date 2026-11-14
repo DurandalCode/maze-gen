@@ -1,0 +1,90 @@
+{
+  "source": "examples/bundles/distribution-v2/05-free-bridges.json",
+  "sourceSha256": "32dc6b2d5bec5803c770d986756d6f0f9f38f042a8f233c5e8eb787c265d1f63",
+  "removedModules": [
+    "return-w",
+    "m-176",
+    "m-174",
+    "m-492",
+    "m-856"
+  ],
+  "shifted": [
+    {
+      "ids": [
+        "return-nw",
+        "return-n",
+        "return-ne",
+        "m-534"
+      ],
+      "distance": 2
+    },
+    {
+      "ids": [
+        "return-e",
+        "m-178",
+        "m-638"
+      ],
+      "distance": 1
+    }
+  ],
+  "additions": [
+    [
+      "return-n",
+      2,
+      1.5,
+      2,
+      0
+    ],
+    [
+      "bridge-r02-0",
+      1,
+      0,
+      2,
+      0
+    ],
+    [
+      "bridge-r02-1",
+      2,
+      0,
+      1.5,
+      25
+    ],
+    [
+      "bridge-r02-2",
+      2,
+      0,
+      2,
+      -25
+    ],
+    [
+      "bridge-r02-2",
+      1,
+      0,
+      2,
+      0
+    ]
+  ],
+  "replacedBridge": "bridge-2",
+  "newBridge": {
+    "id": "bridge-2-return",
+    "a": {
+      "room": "return-fork",
+      "edge": 0,
+      "offset": 0
+    },
+    "b": {
+      "room": "return-nw",
+      "edge": 2,
+      "offset": 0
+    },
+    "width": 1.4,
+    "rise": 2.8,
+    "stairRun": 4.48
+  },
+  "fabricTransmissionStrength": 0.25,
+  "modules": 60,
+  "cycles": 1,
+  "command": "bun scripts/prepare-free-bridge-revision02.ts",
+  "validation": "bun scripts/validate-free-bridge-map.ts examples/bundles/distribution-v2/05-free-bridges-revision02.json --install --revision02; bun scripts/check-bridge-roles.ts examples/bundles/distribution-v2/05-free-bridges-revision02.json",
+  "sha256": "5679967b5b3ab31f95653fe254a7d10881566b0eb00c76415e69e2533c6b866f"
+}

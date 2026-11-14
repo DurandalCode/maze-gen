@@ -32,7 +32,7 @@ export function spatialRay(maze:Maze,from:Point,direction:Point,limit:number,cue
     if(t>1e-6&&t<limit){const x=from.x+direction.x*t,z=from.z+direction.z*t,u=((x-a.x)*dx+(z-a.z)*dz)/l2,cross=Math.abs((x-a.x)*dz-(z-a.z)*dx)/Math.sqrt(l2);if(u>=0&&u<=1&&cross<=st.width/2)hits.push({t});}
   }
   hits.sort((a,b)=>a.t-b.t);let strength=1;
-  for(const hit of hits){if(cue==='sun'&&maze.translucentFabric&&hit.fabric){strength*=hit.roof?.55:.35;if(strength>=.2)continue;}return {length:hit.t,strength:0};}
+  for(const hit of hits){if(cue==='sun'&&maze.translucentFabric&&hit.fabric){strength*=(hit.roof?.55:.35)*(maze.fabricTransmissionStrength??1);if(strength>=.2)continue;}return {length:hit.t,strength:0};}
   return {length:limit,strength};
 }
 export function spatialLineVisible(maze:Maze,a:Point,b:Point):boolean {

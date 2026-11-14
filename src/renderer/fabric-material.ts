@@ -1,16 +1,18 @@
 import * as THREE from 'three';
 
 /** Close pores remain visible; distant transmission requires light behind the fabric. */
-export function fabricMaterial(color: string, translucent: boolean, surface: 'wall' | 'roof' = 'wall'): THREE.MeshStandardMaterial {
+export function fabricMaterial(color: string, translucent: boolean, surface: 'wall' | 'roof' = 'wall', transmissionStrength=1): THREE.MeshStandardMaterial {
+  const strength=Math.max(0,Math.min(1,transmissionStrength));
   const material = new THREE.MeshStandardMaterial({
-    color, roughness: 0.98, metalness: 0, transparent: translucent, depthWrite: !translucent,
+    color, roughness: 0.98, metalness: 0, transparent: translucent&&strength>0, depthWrite: !translucent||strength===0,
   });
-  if (!translucent) return material;
-  material.customProgramCacheKey = () => `backlit-fabric-v5-${surface}`;
+  if (!translucent||strength===0) return material;
+  material.customProgramCacheKey = () => `backlit-fabric-v6-${surface}`;
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, {
       uFabricNear: { value: 0.3 }, uFabricFar: { value: surface === 'roof' ? 0.5 : 0.9 },
       uFabricPeriod: { value: 0.003 }, uFabricOpenArea: { value: 0.01 },
+      uFabricTransmissionStrength:{value:strength},
     });
     shader.vertexShader = shader.vertexShader.replace('#include <common>', `
       #include <common>
@@ -30,6 +32,7 @@ export function fabricMaterial(color: string, translucent: boolean, surface: 'wa
       uniform float uFabricFar;
       uniform float uFabricPeriod;
       uniform float uFabricOpenArea;
+      uniform float uFabricTransmissionStrength;
     `).replace('#include <lights_pars_begin>', `
       #include <lights_pars_begin>
       vec2 fabricLightSides(vec3 normal, IncidentLight light) {
@@ -108,11 +111,11 @@ export function fabricMaterial(color: string, translucent: boolean, surface: 'wa
         length(fract(fabricGlowCoordinates) - 0.5));
       float fabricGlowResolved = 1.0 - smoothstep(0.4, 1.0, max(fabricGlowFootprint.x, fabricGlowFootprint.y));
       float fabricGlowDots = mix(0.1018, fabricGlowPore, fabricGlowResolved);
-      diffuseColor.a *= 1.0 - fabricClose * fabricTransmission;
-      ` : 'diffuseColor.a *= 1.0 - mix(uFabricOpenArea * fabricBacklight, fabricTransmission, fabricClose);'}
+      diffuseColor.a *= 1.0 - uFabricTransmissionStrength * fabricClose * fabricTransmission;
+      ` : 'diffuseColor.a *= 1.0 - uFabricTransmissionStrength * mix(uFabricOpenArea * fabricBacklight, fabricTransmission, fabricClose);'}
     `).replace('#include <emissivemap_fragment>', `
       #include <emissivemap_fragment>
-      ${surface === 'roof' ? 'totalEmissiveRadiance += fabricGlow * fabricGlowDots * fabricBacklight * (1.0 - fabricClose);' : ''}
+      ${surface === 'roof' ? 'totalEmissiveRadiance += uFabricTransmissionStrength * fabricGlow * fabricGlowDots * fabricBacklight * (1.0 - fabricClose);' : ''}
     `);
   };
   return material;

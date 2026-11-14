@@ -6,8 +6,8 @@ import {woodMaterial} from '../renderer/wood';
 /** Render the same landings, stair runs and deck used by the free walker. */
 export function bridgeMesh(maze:Maze):THREE.Group{
  const group=new THREE.Group();group.name='covered-free-bridges';
- const wood=woodMaterial(),fabric=fabricMaterial(maze.wallColor,maze.translucentFabric);fabric.side=THREE.DoubleSide;
- const roof=fabricMaterial(maze.wallColor,maze.translucentFabric,'roof');roof.side=THREE.DoubleSide;
+ const wood=woodMaterial(),fabric=fabricMaterial(maze.wallColor,maze.translucentFabric,'wall',maze.fabricTransmissionStrength);fabric.side=THREE.DoubleSide;
+ const roof=fabricMaterial(maze.wallColor,maze.translucentFabric,'roof',maze.fabricTransmissionStrength);roof.side=THREE.DoubleSide;
  for(const bridge of maze.free!.bridges??[]){
   const g=bridgeGeometry(maze.free!,bridge),part=new THREE.Group();part.name=bridge.id;
   const box=(p:Point,w:number,h:number,d:number)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wood);m.rotation.y=-Math.atan2(g.uz,g.ux);m.position.set(p.x,p.y??0,p.z);m.castShadow=true;m.receiveShadow=true;part.add(m);};

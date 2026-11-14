@@ -83,5 +83,5 @@ export function convertToFree(maze: Maze): FreeDraft {
     });
     shape = { kind: 'grid-rectangles', rectangles };
   }
-  return { kind: 'maze-lab-free-draft', version: 1, ...(maze.environment ? { environment: structuredClone(maze.environment) } : {}), parameters: { ...p, placementMode: 'free', corridorWidth: Math.min(3, Math.max(1, p.corridorWidth)), columns: maze.width, rows: maze.depth, ...(shape ? { shape } : {}) }, construction: { wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof }, layout: l };
+  return { kind: 'maze-lab-free-draft', version: 1, ...(maze.environment ? { environment: structuredClone(maze.environment) } : {}), parameters: { ...p, placementMode: 'free', corridorWidth: Math.min(3, Math.max(1, p.corridorWidth)), columns: maze.width, rows: maze.depth, ...(shape ? { shape } : {}) }, construction: { wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, ...(maze.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:maze.fabricTransmissionStrength}), roof: maze.roof }, layout: l };
 }

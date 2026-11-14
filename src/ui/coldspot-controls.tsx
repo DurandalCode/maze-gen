@@ -69,7 +69,7 @@ export function ColdspotControls({ maze, request = 0, onDisplay, onOptimized }: 
     worker.postMessage({ kind: 'analyze', maze, options, detailed });
     },100);
     return () => {active=false;window.clearTimeout(timer);worker?.terminate();};
-  }, [enabled, request, maze.free,maze.parameters, maze.passages, maze.entrance, maze.exit, maze.wallHeight, maze.roof, maze.translucentFabric, maze.environment, options, onDisplay,detailRequest,analysisAttempt]);
+  }, [enabled, request, maze.free,maze.parameters, maze.passages, maze.entrance, maze.exit, maze.wallHeight, maze.roof, maze.translucentFabric, maze.fabricTransmissionStrength, maze.environment, options, onDisplay,detailRequest,analysisAttempt]);
   useEffect(() => () => { optimizer.current?.terminate(); onDisplay(null); }, [onDisplay]);
   useEffect(() => { onDisplay(show && analysis ? { analysis, layer, coldOnly,showDistricts } : null); }, [analysis, show, layer, coldOnly,showDistricts, onDisplay]);
   const cancel = () => { optimizer.current?.terminate(); optimizer.current = null; setOptimizing(false); setProgress(''); setNotice('Оптимизация отменена.'); };

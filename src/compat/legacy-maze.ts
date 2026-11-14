@@ -43,6 +43,7 @@ export function readLegacyMaze(json: string): Maze {
     translucentFabric: data.translucentFabric === undefined
       ? legacyOpacity !== undefined && (legacyOpacity as number) < 1 : data.translucentFabric,
     roof: data.roof === undefined ? DEFAULT_CONSTRUCTION.roof : data.roof,
+    ...(data.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:data.fabricTransmissionStrength}),
   } as Construction;
   validateConstruction(construction);
   Object.assign(maze, construction);

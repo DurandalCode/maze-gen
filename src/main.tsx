@@ -134,7 +134,7 @@ function App() {
         worker.onerror=e=>{worker.terminate();generationCancel.current=null;reject(new Error(e.message||'Не удалось сгенерировать лабиринт.'));};
         worker.postMessage({parameters:parameters,previous:maze});
       }):generate(parameters,maze);
-      const next = { ...generated, wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, roof: maze.roof,
+      const next = { ...generated, wallHeight: maze.wallHeight, wallColor: maze.wallColor, translucentFabric: maze.translucentFabric, ...(maze.fabricTransmissionStrength===undefined?{}:{fabricTransmissionStrength:maze.fabricTransmissionStrength}), roof: maze.roof,
         ...(maze.environment ? { environment: maze.environment } : {}) }; setGenerationMs(performance.now()-start);
       const oldPortals=mazePortals(maze),newPortals=mazePortals(next);
       const moved=oldPortals.some((p,i)=>!newPortals[i] || !samePortal(p,newPortals[i]!));
