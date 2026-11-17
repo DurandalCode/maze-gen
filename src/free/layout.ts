@@ -1,3 +1,4 @@
+import {SpatialIndex} from './spatial-index';
 import {auditModuleWalls} from './module-origin';
 import {nativePanels} from './panels';
 import {detectFreeIslands,type FreeIsland} from './islands';
@@ -55,7 +56,7 @@ function cutWall(w: Wall, cuts: Wall[]): Wall[] {
   return out;
 }
 export function physical(l: FreeLayout) {
-  const rs = rooms(l), polygons = rs.map(r => r.polygon), holes = rs.flatMap(r => r.holes), cuts: Wall[] = [], connections: { id: string; polygon: Point[]; sides: Wall[] }[] = [],bridges:ReturnType<typeof bridgeGeometry>[]=[];
+  const rs = rooms(l).map(r=>({...r,polygon:r.polygon.map(p=>({...p})),holes:r.holes.map(h=>h.map(p=>({...p})))})), polygons = rs.map(r => r.polygon), holes = rs.flatMap(r => r.holes), cuts: Wall[] = [], connections: { id: string; polygon: Point[]; sides: Wall[] }[] = [],bridges:ReturnType<typeof bridgeGeometry>[]=[];
   for (const c of l.connections) {
     try {
       const g = connectionGeometry(l, c);
@@ -86,8 +87,15 @@ export function physical(l: FreeLayout) {
     const a = panels[i]!, b = panels[j]!, t = intersection(...ends(a), ...ends(b));
     if (t !== null) add(lerp(...ends(a), t));
   }
-  const posts = [...postMap.values()], contains = (p: Point) => polygons.some(poly => pointIn(p, poly)) && !holes.some(h => pointIn(p, h, false)), boundaries = [...polygons.flatMap(edges), ...holes.flatMap(edges)], obstacles = [...panels, ...posts.map(p => ({ ...segment(p, p), thickness: .12 }))];
-  return { rooms: rs, polygons, holes, panels, posts, obstacles, boundaries, contains, connections,bridges };
+  // Index this newly built physical snapshot, not the mutable source layout.
+  // EPS padding preserves pointIn's boundary band and intersection's tolerated
+  // endpoint extension. All final containment/intersection predicates are exact.
+  const padded=(b:ReturnType<typeof bounds>,pad=EPS)=>({x1:b.x1-pad,z1:b.z1-pad,x2:b.x2+pad,z2:b.z2+pad});
+  const polygonIndex=new SpatialIndex(polygons,p=>padded(bounds(p))),holeIndex=new SpatialIndex(holes,p=>padded(bounds(p)));
+  const posts = [...postMap.values()], contains = (p: Point) => polygonIndex.at(p).some(poly => pointIn(p, poly)) && !holeIndex.at(p).some(h => pointIn(p, h, false)), boundaries = [...polygons.flatMap(edges), ...holes.flatMap(edges)], obstacles = [...panels, ...posts.map(p => ({ ...segment(p, p), thickness: .12 }))];
+  const boundaryIndex=new SpatialIndex(boundaries,w=>padded(bounds(ends(w)),EPS*Math.max(1,distance(...ends(w)))));
+  const nearbyBoundaries=(a:Point,b:Point)=>boundaryIndex.query(padded(bounds([a,b]),EPS*Math.max(1,distance(a,b))));
+  return { rooms: rs, polygons, holes, panels, posts, obstacles, boundaries, contains, nearbyBoundaries, connections,bridges };
 }
 export function validateFree(d: FreeDraft, ready = true): FreeIssue[] {
   const l = d.layout, out: FreeIssue[] = [], issue = (code: string, message: string, ...ids: string[]) => out.push({ code, message, ids }), site = siteGeometry(d.parameters), rs = rooms(l);
@@ -364,15 +372,16 @@ export function freeDomain(maze: Maze): Domain {
   const r = freeRuntime(maze), cells = r.rooms.map((_, i) => i);
   const result:Domain={
     active: new Uint8Array(cells.length).fill(1), cells, modules: Uint8Array.from(r.rooms.map(room=>maze.free!.modules.some(m=>!m.frameOnly&&m.id===room.id)?1:0)), rectangles: r.rooms.map(s => bounds(s.polygon)), boundary: maze.free!.openings.map(o=>({wall:anchorGeometry(maze.free!,o,o.width).wall,portal:{freeId:o.id,cell:r.rooms.findIndex(s=>s.id===o.room),side:'north' as const,width:o.width}})), area: (maze.free!.bridges??[]).reduce((sum,b)=>{const g=bridgeGeometry(maze.free!,b);return sum+b.width*(2*Math.hypot(b.stairRun,b.rise)+g.length-2*b.stairRun);},0)+r.rooms.reduce((n, s) => n + area(s.polygon) - s.holes.reduce((n, h) => n + area(h), 0), 0) + r.connections.reduce((n, c) => n + area(c.polygon), 0), contains: p => p.bridge!==undefined ? (()=>{const surface=bridgeSurface(maze.free!,p);return !!surface&&Math.abs((p.y??0)-surface.y!)<1e-5;})() : (p.y??0)===0&&r.contains(p), constrain(from, to) {
-      if (segmentInside(from, to, r.contains, r.boundaries)) return { ...to };
+      const boundaries=r.nearbyBoundaries(from,to);
+      if (segmentInside(from, to, r.contains, boundaries)) return { ...to };
       // Clip to the real boundary, not the EPS-wide outside band accepted by
       // polygon predicates. This also stops at the first hole on a long step.
-      const cuts=[...new Set(r.boundaries.map(w=>intersection(from,to,...ends(w))).filter((t):t is number=>t!==null))].sort((a,b)=>a-b),length=distance(from,to);
+      const cuts=[...new Set(boundaries.map(w=>intersection(from,to,...ends(w))).filter((t):t is number=>t!==null))].sort((a,b)=>a-b),length=distance(from,to);
       for(let i=0;i<cuts.length;i++){const t=cuts[i]!,next=cuts[i+1]??1,after=next>t?(t+next)/2:t+1e-5/Math.max(length,1e-5);if(!r.contains(lerp(from,to,after)))return lerp(from,to,t);}
       let lo = 0, hi = 1;
       for (let i = 0; i < 30; i++) {
         const mid = (lo + hi) / 2;
-        if (segmentInside(from, lerp(from, to, mid), r.contains, r.boundaries)) lo = mid; else hi = mid;
+        if (segmentInside(from, lerp(from, to, mid), r.contains, boundaries)) lo = mid; else hi = mid;
       }
       return lerp(from, to, lo);
     }
