@@ -1,8 +1,7 @@
 import {recordJson,restoreRecord} from './record-codec';
 import type {SavedMaze,SavedWalk} from '../../server/store';
 import {deserialize} from './maze-json';
-import {validateWalk} from './walk-json';
-import {assessWalk} from '../analysis/walk-assessment';
+import {prepareOfflineWalkForStorage} from './offline-walk-client';
 import {storedModuleCount,storedTopologyPayload} from './library-summary';
 import type {Maze} from '../core/maze';
 import {contentId,browserTopologyId} from './identity';
@@ -57,14 +56,21 @@ async function ensureBundle():Promise<void>{
  })().catch(e=>{seeded=undefined;throw e;});return seeded;
 }
 export async function saveOfflineWalk(raw:unknown):Promise<SavedWalk>{
- const walk=validateWalk(raw),maze=await saveOfflineMaze(walk.maze),now=new Date().toISOString(),assessment=assessWalk(walk.maze,walk.recording.samples,walk.recording.distance,walk.finished),physicalId=await browserTopologyId(walk.maze);
- return update<SavedWalk>('walks',walk.id,old=>{
-  if(old&&old.mazeId!==maze.id)throw new Error('Запись относится к другой карте.');
+ const prepared=await prepareOfflineWalkForStorage(raw),{walk,wire,mazeId,topologyId,assessment}=prepared,now=new Date().toISOString();
+ // IndexedDB transactions only compare raw persisted metadata and commit wire
+ // snapshots. Restoring an old map here rebuilt its navigation on every save.
+ await update<SavedMaze>('mazes',mazeId,old=>({id:mazeId,title:old?.title||walk.maze.parameters.columns+' × '+walk.maze.parameters.rows,createdAt:old?.createdAt??now,updatedAt:now,maze:wire.maze,status:old?.status??'candidate'}),false);
+ const saved=await update<SavedWalk>('walks',walk.id,old=>{
+  if(old&&old.mazeId!==mazeId)throw new Error('Запись относится к другой карте.');
   if(old&&old.walk.recording.elapsed===walk.recording.elapsed&&(old.walk.recording.markers?.length??0)>(walk.recording.markers?.length??0))return old;
   if(old&&(old.walk.finished||old.walk.recording.elapsed>walk.recording.elapsed||(old.walk.status==='stopped'&&walk.status==='in-progress'&&old.walk.recording.elapsed>=walk.recording.elapsed)))return old;
-  return {id:walk.id,mazeId:maze.id,createdAt:old?.createdAt??now,updatedAt:now,walk,assessment,topologyId:physicalId};
- });
+  return {id:walk.id,mazeId,createdAt:old?.createdAt??now,updatedAt:now,walk:wire,assessment,topologyId};
+ },false);
+ // Even when an older checkpoint loses the atomic comparison, its map has the
+ // same verified content ID. Return the winning recording with the runtime map.
+ return {...saved,walk:{...saved.walk,maze:walk.maze}};
 }
+
 export async function offlineRequest(path:string,body?:unknown):Promise<unknown>{
  await ensureBundle();
  if(path==='/api/mazes'&&body===undefined)return {mazes:(await all<SavedMaze>('mazes',false)).sort((a,b)=>a.title.localeCompare(b.title,'ru')).map(row=>({id:row.id,title:row.title,createdAt:row.createdAt,updatedAt:row.updatedAt,status:row.status??'candidate',rejectionReason:row.rejectionReason,columns:row.maze.parameters.columns,rows:row.maze.parameters.rows,generationType:row.maze.parameters.generationType??'classical',modules:row.maze.parameters.moduleSize===undefined?null:storedModuleCount(row.maze)}))};
