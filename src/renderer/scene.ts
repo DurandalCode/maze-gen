@@ -1,3 +1,4 @@
+import {FollowingShadowRegion} from './shadow-region';
 import * as THREE from 'three';
 import type { Maze } from '../core/maze';
 import type { Player } from '../simulation/player';
@@ -19,6 +20,9 @@ export class WalkScene {
   private landmarks: WorldLandmarks | null = null;
   private sun = new THREE.DirectionalLight('#fff4de', 2.1);
   private sunDirection = new THREE.Vector3();
+  private shadowRegion = new FollowingShadowRegion();
+  private contextLost = (event:Event) => { event.preventDefault(); document.exitPointerLock(); };
+  private contextRestored = () => { this.renderer.shadowMap.autoUpdate=false; this.shadowRegion.invalidate(); };
   private ambient = new THREE.HemisphereLight('#eff7ff', '#6d7658', 2.3);
   constructor(readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -28,6 +32,7 @@ export class WalkScene {
     this.renderer.toneMappingExposure = 1.25;
     this.composer = sceneComposer(this.renderer, this.scene, this.camera);
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene.background = new THREE.Color('#c9dce5');
     this.scene.fog = new THREE.Fog('#c9dce5', 50, 250);
@@ -41,9 +46,11 @@ export class WalkScene {
     this.scene.add(this.sun, this.sun.target);
     this.camera.rotation.order = 'YXZ';
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(canvas);
-    canvas.addEventListener('webglcontextlost', event => { event.preventDefault(); document.exitPointerLock(); });
+    canvas.addEventListener('webglcontextlost', this.contextLost);
+    canvas.addEventListener('webglcontextrestored', this.contextRestored);
   }
   setMaze(maze: Maze): void {
+    this.shadowRegion.invalidate();
     const direction = sunDirection(environmentOf(maze));
     this.sunDirection.set(direction.x, direction.y, direction.z).multiplyScalar(40);
     const daylight = THREE.MathUtils.smoothstep(direction.y, -0.1, 0.15);
@@ -76,8 +83,7 @@ export class WalkScene {
   }
   render(player: Player): void {
     // A bounded shadow region follows the visitor instead of spreading over 100×100 cells.
-    const x = Math.round(player.position.x*2)/2, z = Math.round(player.position.z*2)/2;
-    this.sun.position.set(x, player.position.y??0, z).add(this.sunDirection); this.sun.target.position.set(x, player.position.y??0, z);
+    if(this.shadowRegion.update(player.position,this.sunDirection,this.sun))this.renderer.shadowMap.needsUpdate=true;
     this.camera.position.set(player.position.x, (player.position.y??0)+1.7, player.position.z);
     this.camera.rotation.set(player.pitch, player.yaw, 0);
     this.wallSorter?.update(this.camera);
@@ -86,6 +92,8 @@ export class WalkScene {
   }
   dispose(): void {
     this.observer.disconnect();
+    this.canvas.removeEventListener('webglcontextlost',this.contextLost);
+    this.canvas.removeEventListener('webglcontextrestored',this.contextRestored);
     disposeMeshes(this.scene);
     this.sun.shadow.dispose();
     this.wallSorter = null;
