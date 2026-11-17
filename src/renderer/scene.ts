@@ -1,3 +1,5 @@
+import {qualitySettings,type RenderQuality} from './render-quality';
+import {spatialInstances} from './spatial-instances';
 import {FollowingShadowRegion} from './shadow-region';
 import * as THREE from 'three';
 import type { Maze } from '../core/maze';
@@ -21,10 +23,11 @@ export class WalkScene {
   private sun = new THREE.DirectionalLight('#fff4de', 2.1);
   private sunDirection = new THREE.Vector3();
   private shadowRegion = new FollowingShadowRegion();
+  private quality:RenderQuality='high';
   private contextLost = (event:Event) => { event.preventDefault(); document.exitPointerLock(); };
   private contextRestored = () => { this.renderer.shadowMap.autoUpdate=false; this.shadowRegion.invalidate(); };
   private ambient = new THREE.HemisphereLight('#eff7ff', '#6d7658', 2.3);
-  constructor(readonly canvas: HTMLCanvasElement) {
+  constructor(readonly canvas: HTMLCanvasElement, private batchOpaque = true) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -66,14 +69,24 @@ export class WalkScene {
       disposeMeshes(this.group);
     }
     this.group = mazeMesh(maze);
+    // Keep legacy opaque depth-tie ordering at bridge/frame intersections.
+    const spatial=this.batchOpaque&&!maze.free?.bridges?.length;
+    if(spatial)spatialInstances(this.group);
     const fabric = this.group.getObjectByName('fabric-walls');
     this.wallSorter = maze.translucentFabric && fabric instanceof THREE.InstancedMesh
       ? new TransparentWallSorter(fabric) : null;
     this.scene.add(this.group); this.resize();
-    this.landmarks = new WorldLandmarks(maze); this.scene.add(this.landmarks.group);
+    this.landmarks = new WorldLandmarks(maze); if(spatial)spatialInstances(this.landmarks.group); this.scene.add(this.landmarks.group);
     const extent = Math.hypot(maze.width, maze.depth);
     this.camera.far = Math.max(1500, extent+500); this.camera.updateProjectionMatrix();
     this.scene.fog = new THREE.Fog(sky, Math.max(50, extent*0.6), Math.max(250, extent*2.5+100));
+  }
+  setQuality(quality:RenderQuality):void {
+    if(this.quality===quality)return;this.quality=quality;
+    const settings=qualitySettings(quality,devicePixelRatio,this.renderer.capabilities.maxSamples);
+    this.renderer.setPixelRatio(settings.pixelRatio);this.composer.setPixelRatio(settings.pixelRatio);
+    for(const target of[this.composer.renderTarget1,this.composer.renderTarget2])if(target.samples!==settings.samples){target.samples=settings.samples;target.dispose();}
+    this.resize();
   }
   private resize(): void {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;

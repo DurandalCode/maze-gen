@@ -1,3 +1,4 @@
+import {loadRenderQuality,saveRenderQuality,type RenderQuality} from '../renderer/render-quality';
 import {analyseDirectionMarkers} from '../analysis/direction-markers';
 import {DirectionMarkerPanel} from './direction-marker-panel';
 import {directionMarkerShortcut} from '../simulation/direction-markers';
@@ -115,6 +116,10 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
   const finishNumber = portals.findIndex(p => samePortal(p, maze.exit))+1;
   const canvas = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<Player | null>(null);
+  const sceneRef = useRef<import('../renderer/scene').WalkScene|null>(null);
+  const [graphics,setGraphics]=useState<RenderQuality>(()=>loadRenderQuality());
+  const graphicsRef=useRef(graphics);graphicsRef.current=graphics;
+  useEffect(()=>{sceneRef.current?.setQuality(graphics);saveRenderQuality(graphics);},[graphics]);
   const runId = useRef(crypto.randomUUID());
   const [locked, setLocked] = useState(false);
   const [touch, setTouch] = useState(touchControlsAvailable);
@@ -150,7 +155,8 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
     try {
       const { WalkScene } = await import('../renderer/scene');
       if (cancelled) return;
-      scene = new WalkScene(element); scene.setMaze(maze);
+      scene = new WalkScene(element);
+      sceneRef.current=scene;scene.setQuality(graphicsRef.current); scene.setMaze(maze);
     }
     catch (error) { onError(`3D недоступен: ${error instanceof Error ? error.message : String(error)}`); return; }
     const player = new Player(maze, new CollisionWorld([...walls(maze), ...supportColliders(maze),...(inspection&&maze.free?bridgeInspectionSolids(maze.free):[])], maze.parameters.corridorWidth),inspection?'inspection':'walk');
@@ -218,7 +224,7 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
       if (document.pointerLockElement === element) document.exitPointerLock();
       document.removeEventListener('keydown', keyDown); document.removeEventListener('keyup', keyUp);
       document.removeEventListener('mousemove', mouse); document.removeEventListener('pointerlockchange', change);
-      window.removeEventListener('blur', suspend); window.removeEventListener('maze:native-pause', suspend); document.removeEventListener('visibilitychange', visibility); clear(); scene.dispose(); playerRef.current = null;
+      window.removeEventListener('blur', suspend); window.removeEventListener('maze:native-pause', suspend); document.removeEventListener('visibilitychange', visibility); clear(); if(sceneRef.current===scene)sceneRef.current=null;scene.dispose(); playerRef.current = null;
     };
     })();
     return () => { cancelled = true; cleanup(); };
@@ -248,6 +254,8 @@ export function WalkCanvas({ maze, onEnd, onCancel, onError, onCheckpoint, inspe
       <p>Ориентир выхода — А-образная башня высотой 6 м. Крыша и стены могут закрывать её изнутри.</p>
       {touch ? <div className="key-guide touch-guide"><span>ЛЕВЫЙ · ходьба / бег</span><span>ПРАВЫЙ · обзор</span></div> : <div className="key-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> движение</span><span><kbd>⇧</kbd> быстрее</span><span>МЫШЬ · обзор</span></div>}
       {!inspection&&<p className="direction-marker-help"><kbd>F</kbd> — отметить взглядом, где, как кажется, выход. Стрелки и сравнение появятся после возвращения к карте.</p>}
+      <label className="walk-touch-choice"><input type="checkbox" checked={graphics==='reduced'} onChange={e=>setGraphics(e.target.checked?'reduced':'high')}/> Сниженная нагрузка на графику</label>
+      <small>Менее чёткая 3D-картинка для слабого ПК. Настройку можно изменить на паузе; конструкция, свет и ткань сохраняются.</small>
       <label className="walk-touch-choice"><input type="checkbox" checked={touch} onChange={event => { clearTouch(); setTouch(event.target.checked); }} /> Управление двумя джойстиками</label>
       <button className="primary" onClick={() => void lock()}>{inspection?'Начать осмотр':stats.elapsed > 0 ? 'Продолжить' : 'Начать прохождение'} <span>↗</span></button>
       <small>{touch ? 'Чем сильнее отклонён левый джойстик, тем быстрее движение: у края — бег. Кнопка «Пауза» останавливает таймер.' : 'Esc — пауза и освобождение курсора. Таймер на паузе не идёт.'}</small>
